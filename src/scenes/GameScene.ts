@@ -326,23 +326,25 @@ export class GameScene extends Phaser.Scene {
     h: number,
     top: number
   ): void {
-    const gfx = this.add.graphics();
-
     // Narrower footprint — 80% of full width, centred on plot
     const bw = Math.round(w * 0.8);
     const bx = x + (w - bw) / 2;
 
-    // Main brick body
-    gfx.fillStyle(0xb5651d, 1);
-    gfx.fillRect(bx, top, bw, h);
+    // Main brick body — Light2D pipeline so it responds to the sun position
+    const body = this.add.rectangle(bx + bw / 2, top + h / 2, bw, h, 0xb5651d);
+    body.setPipeline('Light2D');
+    container.add(body);
+
+    // Decorative details drawn on top via Graphics (roof, chimney, windows, door)
+    const gfx = this.add.graphics();
 
     // Pitched roof (triangle sitting on top of the body)
     const roofHeight = Math.round(bw * 0.45);
     gfx.fillStyle(0x7a3b10, 1);
     gfx.fillTriangle(
-      bx - 4, top,               // bottom-left of roof
-      bx + bw + 4, top,           // bottom-right of roof
-      bx + bw / 2, top - roofHeight // apex
+      bx - 4, top,                   // bottom-left of roof
+      bx + bw + 4, top,               // bottom-right of roof
+      bx + bw / 2, top - roofHeight   // apex
     );
 
     // Chimney (small rectangle poking above the roof on the right side)
@@ -378,18 +380,20 @@ export class GameScene extends Phaser.Scene {
     h: number,
     top: number
   ): void {
-    const gfx = this.add.graphics();
+    // Main body — Light2D pipeline so it responds to the sun position
+    const body = this.add.rectangle(x + w / 2, top + h / 2, w, h, 0xd4a96a);
+    body.setPipeline('Light2D');
+    container.add(body);
 
-    // Main body
-    gfx.fillStyle(0xd4a96a, 1);
-    gfx.fillRect(x, top, w, h);
+    // Decorative details drawn on top via Graphics (parapet, windows)
+    const gfx = this.add.graphics();
 
     // Flat parapet strip at the very top
     const parapetH = 10;
     gfx.fillStyle(0xbf8c50, 1);
     gfx.fillRect(x, top, w, parapetH);
 
-    // Window grid — 2 columns, rows determined by available height
+    // Window grid — 3 columns, rows determined by available height
     const winW = Math.round(w * 0.18);
     const winH = Math.round(winW * 1.5);
     const cols = 3;
@@ -418,11 +422,13 @@ export class GameScene extends Phaser.Scene {
     h: number,
     top: number
   ): void {
-    const gfx = this.add.graphics();
+    // Main body — Light2D pipeline so it responds to the sun position
+    const body = this.add.rectangle(x + w / 2, top + h / 2, w, h, 0x5a7a8a);
+    body.setPipeline('Light2D');
+    container.add(body);
 
-    // Main body
-    gfx.fillStyle(0x5a7a8a, 1);
-    gfx.fillRect(x, top, w, h);
+    // Decorative details drawn on top via Graphics (floor lines, windows)
+    const gfx = this.add.graphics();
 
     // Thin horizontal floor lines
     const floorH = 22;
@@ -460,11 +466,13 @@ export class GameScene extends Phaser.Scene {
     h: number,
     top: number
   ): void {
-    const gfx = this.add.graphics();
+    // Main dark glass body — Light2D pipeline so it responds to the sun position
+    const body = this.add.rectangle(x + w / 2, top + h / 2, w, h, 0x1a2a3a);
+    body.setPipeline('Light2D');
+    container.add(body);
 
-    // Main dark glass body
-    gfx.fillStyle(0x1a2a3a, 1);
-    gfx.fillRect(x, top, w, h);
+    // Decorative details drawn on top via Graphics (antenna, windows, trim)
+    const gfx = this.add.graphics();
 
     // Narrow antenna / spire on top
     const antennaW = 4;
@@ -537,8 +545,8 @@ export class GameScene extends Phaser.Scene {
     // Elliptical pool of light on the ground below the sun
     this.sunGroundGlow = this.add.ellipse(cx, GROUND_Y + 6, 340, 28, 0xfffae0, 0).setDepth(5);
 
-    // Phaser point light — large enough to cover the full scene width
-    this.sunLight = this.lights.addLight(cx, 100, 960, 0xffeeaa, 3.2);
+    // Phaser point light — radius covers the full scene width even when sun is off-screen
+    this.sunLight = this.lights.addLight(cx, 100, 1600, 0xffeeaa, 3.2);
 
     this.updateSun();
   }
@@ -547,17 +555,18 @@ export class GameScene extends Phaser.Scene {
     const a = this.sunAngle;
     const { width } = this.scale;
     const cx = width / 2;
-    const orbitRadius = 350;
+    const orbitX = width * 0.95; // sun/moon travel well off both screen edges
+    const orbitY = 400;
 
     const elevation = Math.sin(a); // 1 = noon overhead, 0 = horizon, −1 = midnight
-    const sunX = cx - Math.cos(a) * cx * 0.7; // east → centre → west arc
-    const sunY = GROUND_Y - elevation * orbitRadius;
+    const sunX = cx - Math.cos(a) * orbitX;
+    const sunY = GROUND_Y - elevation * orbitY;
     const sunAbove = elevation > 0.02;
 
     // Moon on the opposite side of the orbit
     const moonElev = Math.sin(a + Math.PI);
-    const moonX = cx - Math.cos(a + Math.PI) * cx * 0.7;
-    const moonY = GROUND_Y - moonElev * orbitRadius;
+    const moonX = cx - Math.cos(a + Math.PI) * orbitX;
+    const moonY = GROUND_Y - moonElev * orbitY;
 
     this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
     this.sunGlowArc.setPosition(sunX, sunY).setVisible(sunAbove);
