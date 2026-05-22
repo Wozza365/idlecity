@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+
 const PLOT_COUNT = 5;
 const PLOT_WIDTH = 160;
 const PLOT_BASE_HEIGHT = 140;
@@ -7,12 +9,18 @@ const HEIGHT_PER_LEVEL = 2;
 const MAX_LEVEL = 100;
 const PLOT_GAP = 24;
 const GROUND_Y = 480;
+const PANEL_TOP = GROUND_Y + 20; // top of the bottom UI panel
+const SECTION_W = 1280 / PLOT_COUNT; // width of each panel column (256px)
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface PlotState {
   id: number;
   unlocked: boolean;
   level: number; // 1–100 when unlocked; 0 when locked
 }
+
+// ── Scene ──────────────────────────────────────────────────────────────────────
 
 export class GameScene extends Phaser.Scene {
   private plotStates: PlotState[] = Array.from({ length: PLOT_COUNT }, (_, i) => ({
@@ -22,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   }));
 
   private plotContainers: Phaser.GameObjects.Container[] = [];
+  private uiContainers: Phaser.GameObjects.Container[] = [];
 
   constructor() {
     super({ key: 'GameScene' });
@@ -29,18 +38,26 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.drawBackground();
+
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);
     }
+
+    this.drawPanelChrome();
+
+    for (let i = 0; i < PLOT_COUNT; i++) {
+      this.uiContainers[i] = this.renderUISection(i);
+    }
   }
 
-  // ── Layout ────────────────────────────────────────────────────────────────
+  // ── Height helper ──────────────────────────────────────────────────────────
 
-  /** Returns pixel height for a given level (1–MAX_LEVEL). */
   private buildingHeight(level: number): number {
     const clamped = Math.max(1, Math.min(level, MAX_LEVEL));
     return PLOT_BASE_HEIGHT + (clamped - 1) * HEIGHT_PER_LEVEL;
   }
+
+  // ── Layout helper ──────────────────────────────────────────────────────────
 
   private plotLeft(index: number): number {
     const totalWidth = PLOT_COUNT * PLOT_WIDTH + (PLOT_COUNT - 1) * PLOT_GAP;
@@ -48,7 +65,7 @@ export class GameScene extends Phaser.Scene {
     return startX + index * (PLOT_WIDTH + PLOT_GAP);
   }
 
-  // ── Background ────────────────────────────────────────────────────────────
+  // ── Background ─────────────────────────────────────────────────────────────
 
   private drawBackground(): void {
     const { width, height } = this.scale;
@@ -59,17 +76,37 @@ export class GameScene extends Phaser.Scene {
     // Ground strip
     this.add.rectangle(width / 2, GROUND_Y + 10, width, 20, 0x555e6b);
 
-    // Panel area below ground
+    // UI panel background
     this.add.rectangle(
       width / 2,
-      (GROUND_Y + 20 + height) / 2,
+      (PANEL_TOP + height) / 2,
       width,
-      height - GROUND_Y - 20,
+      height - PANEL_TOP,
       0x1e2433
     );
   }
 
-  // ── Plot rendering ────────────────────────────────────────────────────────
+  /** Static chrome: panel top border + column dividers. */
+  private drawPanelChrome(): void {
+    const { height } = this.scale;
+    const gfx = this.add.graphics();
+
+    // Top border
+    gfx.lineStyle(1, 0x3a4a5a, 1);
+    gfx.moveTo(0, PANEL_TOP);
+    gfx.lineTo(this.scale.width, PANEL_TOP);
+    gfx.strokePath();
+
+    // Column dividers
+    for (let i = 1; i < PLOT_COUNT; i++) {
+      const x = i * SECTION_W;
+      gfx.moveTo(x, PANEL_TOP);
+      gfx.lineTo(x, height);
+      gfx.strokePath();
+    }
+  }
+
+  // ── Plot rendering ─────────────────────────────────────────────────────────
 
   private renderPlot(index: number): Phaser.GameObjects.Container {
     this.plotContainers[index]?.destroy();
@@ -80,7 +117,7 @@ export class GameScene extends Phaser.Scene {
     if (this.plotStates[index].unlocked) {
       this.buildBuilding(container, x, this.plotStates[index].level);
     } else {
-      this.buildLockedPlot(container, x, index);
+      this.buildEmptyPlot(container, x);
     }
 
     return container;
@@ -97,47 +134,123 @@ export class GameScene extends Phaser.Scene {
     const cx = x + w / 2;
 
     // Main body — brick red
-    const body = this.add.rectangle(cx, top + h / 2, w, h, 0x7b3f2a);
-    container.add(body);
+    container.add(this.add.rectangle(cx, top + h / 2, w, h, 0x7b3f2a));
 
     // Roof ledge — cement grey
-    const roof = this.add.rectangle(cx, top - 5, w + 8, 12, 0x9aa2a8);
-    container.add(roof);
+    container.add(this.add.rectangle(cx, top - 5, w + 8, 12, 0x9aa2a8));
   }
 
-  private buildLockedPlot(
+  private buildEmptyPlot(container: Phaser.GameObjects.Container, x: number): void {
+    const gfx = this.add.graphics();
+    gfx.fillStyle(0x1a1b2e, 0.7);
+    gfx.fillRect(x, GROUND_Y - PLOT_BASE_HEIGHT, PLOT_WIDTH, PLOT_BASE_HEIGHT);
+    gfx.lineStyle(2, 0x3a3d5c, 1);
+    gfx.strokeRect(x, GROUND_Y - PLOT_BASE_HEIGHT, PLOT_WIDTH, PLOT_BASE_HEIGHT);
+    container.add(gfx);
+  }
+
+  // ── UI panel ───────────────────────────────────────────────────────────────
+
+  private renderUISection(index: number): Phaser.GameObjects.Container {
+    this.uiContainers[index]?.destroy();
+
+    const container = this.add.container(0, 0);
+    const cx = index * SECTION_W + SECTION_W / 2;
+    const plot = this.plotStates[index];
+
+    // Building label
+    container.add(
+      this.add
+        .text(cx, PANEL_TOP + 22, `Building ${index + 1}`, {
+          fontSize: '14px',
+          color: '#8899aa',
+        })
+        .setOrigin(0.5)
+    );
+
+    if (plot.unlocked) {
+      this.buildUpgradeSection(container, cx, plot, index);
+    } else {
+      this.buildUnlockSection(container, cx, index);
+    }
+
+    return container;
+  }
+
+  private buildUpgradeSection(
     container: Phaser.GameObjects.Container,
-    x: number,
+    cx: number,
+    plot: PlotState,
     index: number
   ): void {
-    const w = PLOT_WIDTH;
-    const h = PLOT_BASE_HEIGHT;
-    const top = GROUND_Y - h;
-    const cx = x + w / 2;
-    const cy = top + h / 2;
+    const atMax = plot.level >= MAX_LEVEL;
 
-    // Dim background + border
-    const gfx = this.add.graphics();
-    gfx.fillStyle(0x1e2433, 0.9);
-    gfx.fillRect(x, top, w, h);
-    gfx.lineStyle(2, 0x3a3d5c, 1);
-    gfx.strokeRect(x, top, w, h);
-    container.add(gfx);
+    // Level indicator
+    container.add(
+      this.add
+        .text(cx, PANEL_TOP + 58, `Level ${plot.level} / ${MAX_LEVEL}`, {
+          fontSize: '13px',
+          color: '#ddeeff',
+        })
+        .setOrigin(0.5)
+    );
 
-    // Lock icon
-    const lockIcon = this.add.text(cx, cy - 18, '🔒', { fontSize: '24px' }).setOrigin(0.5);
-    container.add(lockIcon);
+    // Upgrade button
+    const btnColor = atMax ? 0x2a2a3a : 0x1a5276;
+    const btn = this.add
+      .rectangle(cx, PANEL_TOP + 100, 120, 30, btnColor)
+      .setInteractive({ useHandCursor: !atMax });
+    container.add(btn);
+
+    container.add(
+      this.add
+        .text(cx, PANEL_TOP + 100, atMax ? 'Max Level' : '▲ Upgrade', {
+          fontSize: '13px',
+          color: atMax ? '#555566' : '#cce8ff',
+        })
+        .setOrigin(0.5)
+    );
+
+    if (!atMax) {
+      btn.on('pointerover', () => btn.setFillStyle(0x2471a3));
+      btn.on('pointerout', () => btn.setFillStyle(0x1a5276));
+      btn.on('pointerdown', () => {
+        this.plotStates[index].level = Math.min(plot.level + 1, MAX_LEVEL);
+        this.plotContainers[index] = this.renderPlot(index);
+        this.uiContainers[index] = this.renderUISection(index);
+      });
+    }
+  }
+
+  private buildUnlockSection(
+    container: Phaser.GameObjects.Container,
+    cx: number,
+    index: number
+  ): void {
+    // Locked status
+    container.add(
+      this.add
+        .text(cx, PANEL_TOP + 58, '🔒  Locked', {
+          fontSize: '13px',
+          color: '#555566',
+        })
+        .setOrigin(0.5)
+    );
 
     // Unlock button
     const btn = this.add
-      .rectangle(cx, cy + 22, 104, 28, 0x2d6b1a)
+      .rectangle(cx, PANEL_TOP + 100, 120, 30, 0x2d6b1a)
       .setInteractive({ useHandCursor: true });
     container.add(btn);
 
-    const btnLabel = this.add
-      .text(cx, cy + 22, 'Unlock', { fontSize: '13px', color: '#e8ffe8' })
-      .setOrigin(0.5);
-    container.add(btnLabel);
+    container.add(
+      this.add
+        .text(cx, PANEL_TOP + 100, 'Unlock', {
+          fontSize: '13px',
+          color: '#e8ffe8',
+        })
+        .setOrigin(0.5)
+    );
 
     btn.on('pointerover', () => btn.setFillStyle(0x3d8a22));
     btn.on('pointerout', () => btn.setFillStyle(0x2d6b1a));
@@ -145,6 +258,7 @@ export class GameScene extends Phaser.Scene {
       this.plotStates[index].unlocked = true;
       this.plotStates[index].level = 1;
       this.plotContainers[index] = this.renderPlot(index);
+      this.uiContainers[index] = this.renderUISection(index);
     });
   }
 }
