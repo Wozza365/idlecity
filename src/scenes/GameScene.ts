@@ -617,7 +617,7 @@ export class GameScene extends Phaser.Scene {
     gfx.clear();
     if (elevation <= 0.02) return;
 
-    const totalAlpha = Math.min(0.55, elevation * 0.7 + 0.1);
+    const totalAlpha = Math.min(0.66, elevation * 0.84 + 0.12);
     const shadowH = ROAD_H - 4;
 
     const NUM_SAMPLES = 5;
@@ -643,8 +643,8 @@ export class GameScene extends Phaser.Scene {
         const bx = plot.level <= 15 ? x + (w - bw) / 2 : x;
 
         // Parallel-ray lean: sun is infinitely distant so all rays are
-        // parallel. Formula: horizontal_component / elevation * height.
-        const rawLean = (-sHoriz / sElev) * h;
+        // parallel. Sign: sun right (cos<0) → shadow left (lean<0), and vice versa.
+        const rawLean = (sHoriz / sElev) * h;
         const lean = Math.max(-w * 4, Math.min(w * 4, rawLean));
 
         const p1x = bx,              p1y = this.groundY;
