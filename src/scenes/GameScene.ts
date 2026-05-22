@@ -8,7 +8,6 @@ const PLOT_WIDTH = 96;
 const PLOT_BASE_HEIGHT = 80;
 const HEIGHT_PER_LEVEL = 2;
 const MAX_LEVEL = 100;
-const PLOT_GAP = 0;
 const GROUND_Y = 340;
 const PANEL_TOP = GROUND_Y + 18;
 const STATS_BAR_H = 54;
