@@ -67,6 +67,9 @@ export class GameScene extends Phaser.Scene {
   private sunGroundGlow!: Phaser.GameObjects.Ellipse;
   private sunLight!: Phaser.GameObjects.Light;
 
+  /** Graphics layer that receives projected ground shadows from each building. */
+  private buildingShadowGfx!: Phaser.GameObjects.Graphics;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -80,6 +83,9 @@ export class GameScene extends Phaser.Scene {
     this.setupSun();
     this.roadGraphics = this.add.graphics();
     this.renderRoad();
+
+    // Shadow layer — sits above the road but below all building objects
+    this.buildingShadowGfx = this.add.graphics();
 
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);
@@ -96,6 +102,9 @@ export class GameScene extends Phaser.Scene {
 
     this.refreshButtons();
     this.updateStats();
+
+    // Set initial sun/moon positions and draw first-frame shadows
+    this.updateSun();
 
     // Tax tick — every 100ms (1/10 of taxRate per tick = same per-second rate)
     this.time.addEvent({
@@ -547,8 +556,6 @@ export class GameScene extends Phaser.Scene {
 
     // Phaser point light — radius covers the full scene width even when sun is off-screen
     this.sunLight = this.lights.addLight(cx, 100, 1600, 0xffeeaa, 3.2);
-
-    this.updateSun();
   }
 
   private updateSun(): void {
@@ -588,6 +595,60 @@ export class GameScene extends Phaser.Scene {
     const amb = Math.max(0.08, elevation * 0.55 + 0.14);
     const av = Math.round(amb * 255);
     this.lights.setAmbientColor((av << 16) | (av << 8) | av);
+
+    // Reproject ground shadows for all buildings
+    this.drawBuildingShadows(sunX, sunY, elevation);
+  }
+
+  /**
+   * Draws a parallelogram ground shadow beneath each building.
+   * The shadow leans away from the sun (left when sun is right, right when left)
+   * and shortens as the sun rises toward noon. Drawn as two triangles so there
+   * is no reliance on Phaser's fillPoints polygon winding behaviour.
+   */
+  private drawBuildingShadows(sunX: number, sunY: number, elevation: number): void {
+    const gfx = this.buildingShadowGfx;
+    gfx.clear();
+
+    if (elevation <= 0.02) return; // sun at or below horizon — no shadows
+
+    // Shadow is darker at noon (high contrast) and fades toward the horizon
+    const alpha = Math.min(0.55, elevation * 0.7 + 0.1);
+    // How far down the road the shadow extends (px). Fixed depth looks clean.
+    const shadowH = 20;
+
+    gfx.fillStyle(0x000022, alpha);
+
+    for (let i = 0; i < PLOT_COUNT; i++) {
+      const plot = this.state.plots[i];
+      if (!plot.unlocked) continue;
+
+      const x = this.plotLeft(i);
+      const w = PLOT_WIDTH;
+      const h = this.buildingHeight(plot.level);
+
+      // Tier 1 has a narrower footprint than the full plot width
+      const bw = plot.level <= 15 ? Math.round(w * 0.8) : w;
+      const bx = plot.level <= 15 ? x + (w - bw) / 2 : x;
+      const cx = bx + bw / 2;
+
+      // Horizontal lean of the shadow at ground level.
+      // Sun to the right → lean left (negative); sun to the left → lean right.
+      // Scale by building height so taller buildings cast longer shadows.
+      const rawLean = ((cx - sunX) / (GROUND_Y - sunY)) * h;
+      const lean = Math.max(-bw * 2, Math.min(bw * 2, rawLean));
+
+      // Parallelogram as two triangles (avoids fillPoints winding issues):
+      //   P1──────────P2        ← GROUND_Y  (building base)
+      //   P4──────────P3        ← GROUND_Y + shadowH (road surface)
+      const p1x = bx,          p1y = GROUND_Y;
+      const p2x = bx + bw,     p2y = GROUND_Y;
+      const p3x = bx + bw + lean, p3y = GROUND_Y + shadowH;
+      const p4x = bx + lean,   p4y = GROUND_Y + shadowH;
+
+      gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+      gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+    }
   }
 
   private drawSunRays(cx: number, cy: number, visible: boolean): void {
