@@ -4,16 +4,16 @@ import { type GameState, type PlotState, loadGame, saveGame } from '../game/Game
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const PLOT_COUNT = 5;
-const PLOT_WIDTH = 160;
-const PLOT_BASE_HEIGHT = 140;
+const PLOT_WIDTH = 96;
+const PLOT_BASE_HEIGHT = 80;
 const HEIGHT_PER_LEVEL = 2;
 const MAX_LEVEL = 100;
-const PLOT_GAP = 24;
-const GROUND_Y = 480;
-const PANEL_TOP = GROUND_Y + 20;
-const STATS_BAR_H = 44;
+const PLOT_GAP = 0;
+const GROUND_Y = 340;
+const PANEL_TOP = GROUND_Y + 18;
+const STATS_BAR_H = 54;
 const COL_TOP = PANEL_TOP + STATS_BAR_H;
-const SECTION_W = 1280 / PLOT_COUNT;
+const SECTION_W = 480 / PLOT_COUNT;
 
 /** Gold required to unlock each building slot (index = building id). */
 const UNLOCK_COSTS: readonly number[] = [0, 500, 2_500, 15_000, 100_000];
@@ -259,9 +259,7 @@ export class GameScene extends Phaser.Scene {
   // ── Layout helper ──────────────────────────────────────────────────────────
 
   private plotLeft(index: number): number {
-    const totalWidth = PLOT_COUNT * PLOT_WIDTH + (PLOT_COUNT - 1) * PLOT_GAP;
-    const startX = (this.scale.width - totalWidth) / 2;
-    return startX + index * (PLOT_WIDTH + PLOT_GAP);
+    return index * PLOT_WIDTH;
   }
 
   // ── Background ─────────────────────────────────────────────────────────────
@@ -290,10 +288,10 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const midY = PANEL_TOP + STATS_BAR_H / 2;
     this.taxRateText = this.add
-      .text(24, midY, '', { fontSize: '15px', color: '#88ccff' })
+      .text(8, midY, '', { fontSize: '15px', color: '#88ccff' })
       .setOrigin(0, 0.5);
     this.goldText = this.add
-      .text(width - 24, midY, '', { fontSize: '15px', color: '#ffd966' })
+      .text(width - 8, midY, '', { fontSize: '15px', color: '#ffd966' })
       .setOrigin(1, 0.5);
   }
 
@@ -552,10 +550,10 @@ export class GameScene extends Phaser.Scene {
     this.sunCircle = this.add.arc(cx, 100, 20, 0, 360, false, 0xfff8aa, 1).setDepth(4);
 
     // Elliptical pool of light on the ground below the sun
-    this.sunGroundGlow = this.add.ellipse(cx, GROUND_Y + 6, 340, 28, 0xfffae0, 0).setDepth(5);
+    this.sunGroundGlow = this.add.ellipse(cx, GROUND_Y + 6, 240, 22, 0xfffae0, 0).setDepth(5);
 
     // Phaser point light — radius covers the full scene width even when sun is off-screen
-    this.sunLight = this.lights.addLight(cx, 100, 1600, 0xffeeaa, 3.2);
+    this.sunLight = this.lights.addLight(cx, 100, 800, 0xffeeaa, 3.2);
   }
 
   private updateSun(): void {
@@ -563,7 +561,7 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const cx = width / 2;
     const orbitX = width * 0.95; // sun/moon travel well off both screen edges
-    const orbitY = 400;
+    const orbitY = 280;
 
     const elevation = Math.sin(a); // 1 = noon overhead, 0 = horizon, −1 = midnight
     const sunX = cx - Math.cos(a) * orbitX;
@@ -687,7 +685,7 @@ export class GameScene extends Phaser.Scene {
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 18, `Building ${index + 1}`, { fontSize: '14px', color: '#8899aa' })
+        .text(cx, COL_TOP + 16, `Bldg ${index + 1}`, { fontSize: '13px', color: '#8899aa' })
         .setOrigin(0.5)
     );
 
@@ -711,8 +709,8 @@ export class GameScene extends Phaser.Scene {
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 48, `Level ${plot.level} / ${MAX_LEVEL}`, {
-          fontSize: '13px',
+        .text(cx, COL_TOP + 40, `Lv ${plot.level}/${MAX_LEVEL}`, {
+          fontSize: '14px',
           color: '#ddeeff',
         })
         .setOrigin(0.5)
@@ -720,8 +718,8 @@ export class GameScene extends Phaser.Scene {
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 64, `Earns: ${fmt(perBuildingIncome(plot.level))}/s`, {
-          fontSize: '11px',
+        .text(cx, COL_TOP + 62, `${fmt(perBuildingIncome(plot.level))}/s`, {
+          fontSize: '12px',
           color: '#88ddaa',
         })
         .setOrigin(0.5)
@@ -729,7 +727,7 @@ export class GameScene extends Phaser.Scene {
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 82, atMax ? '' : `Cost: ${fmt(cost)}`, {
+        .text(cx, COL_TOP + 82, atMax ? '' : `${fmt(cost)}`, {
           fontSize: '12px',
           color: '#99aabb',
         })
@@ -737,14 +735,14 @@ export class GameScene extends Phaser.Scene {
     );
 
     const btn = this.add
-      .rectangle(cx, COL_TOP + 104, 130, 30, 0x2a2a3a)
+      .rectangle(cx, COL_TOP + 118, 82, 44, 0x2a2a3a)
       .setInteractive({ useHandCursor: false });
     container.add(btn);
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 104, atMax ? 'Max Level' : '▲ Upgrade', {
-          fontSize: '13px',
+        .text(cx, COL_TOP + 118, atMax ? 'Max' : '▲ Upgrade', {
+          fontSize: '12px',
           color: atMax ? '#555566' : '#cce8ff',
         })
         .setOrigin(0.5)
@@ -776,24 +774,24 @@ export class GameScene extends Phaser.Scene {
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 48, '🔒  Locked', { fontSize: '13px', color: '#555566' })
+        .text(cx, COL_TOP + 40, '🔒', { fontSize: '18px', color: '#555566' })
         .setOrigin(0.5)
     );
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 72, `Cost: ${fmt(cost)}`, { fontSize: '12px', color: '#99aabb' })
+        .text(cx, COL_TOP + 68, `${fmt(cost)}`, { fontSize: '12px', color: '#99aabb' })
         .setOrigin(0.5)
     );
 
     const btn = this.add
-      .rectangle(cx, COL_TOP + 104, 130, 30, 0x2a2a3a)
+      .rectangle(cx, COL_TOP + 110, 82, 44, 0x2a2a3a)
       .setInteractive({ useHandCursor: false });
     container.add(btn);
 
     container.add(
       this.add
-        .text(cx, COL_TOP + 104, 'Unlock', { fontSize: '13px', color: '#e8ffe8' })
+        .text(cx, COL_TOP + 110, 'Unlock', { fontSize: '13px', color: '#e8ffe8' })
         .setOrigin(0.5)
     );
 
@@ -935,16 +933,16 @@ export class GameScene extends Phaser.Scene {
     // Centred label showing tier name
     container.add(
       this.add
-        .text(width / 2, midY - 10, `Road: ${this.roadTierName()}`, {
+        .text(width / 2, midY - 13, `Road: ${this.roadTierName()}`, {
           fontSize: '12px',
           color: '#aabbcc',
         })
         .setOrigin(0.5, 0.5)
     );
 
-    const btnW = 180;
+    const btnW = 130;
     const btn = this.add
-      .rectangle(width / 2, midY + 10, btnW, 22, 0x2a2a3a)
+      .rectangle(width / 2, midY + 12, btnW, 26, 0x2a2a3a)
       .setInteractive({ useHandCursor: false });
     container.add(btn);
 
@@ -952,8 +950,8 @@ export class GameScene extends Phaser.Scene {
       this.add
         .text(
           width / 2,
-          midY + 10,
-          atMax ? 'Road: Max Level' : `▲ Road Lv ${this.state.road.level + 1}  ${fmt(cost)}`,
+          midY + 12,
+          atMax ? 'Road: Max' : `▲ Lv ${this.state.road.level + 1}  ${fmt(cost)}`,
           { fontSize: '11px', color: atMax ? '#555566' : '#cce8ff' }
         )
         .setOrigin(0.5, 0.5)
