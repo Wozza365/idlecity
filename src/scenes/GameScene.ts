@@ -9,8 +9,10 @@ const HEIGHT_PER_LEVEL = 2;
 const MAX_LEVEL = 100;
 const PLOT_GAP = 24;
 const GROUND_Y = 480;
-const PANEL_TOP = GROUND_Y + 20; // top of the bottom UI panel
-const SECTION_W = 1280 / PLOT_COUNT; // width of each panel column (256px)
+const PANEL_TOP = GROUND_Y + 20;   // top of the bottom UI panel (500)
+const STATS_BAR_H = 44;            // height reserved for the global stats row
+const COL_TOP = PANEL_TOP + STATS_BAR_H; // where column content begins (544)
+const SECTION_W = 1280 / PLOT_COUNT;     // column width (256px)
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -29,12 +31,20 @@ export class GameScene extends Phaser.Scene {
     level: i === 0 ? 1 : 0,
   }));
 
+  private gold: number = 0;
+
   private plotContainers: Phaser.GameObjects.Container[] = [];
   private uiContainers: Phaser.GameObjects.Container[] = [];
+
+  // Stats bar text refs — set in drawStatsBar()
+  private goldText!: Phaser.GameObjects.Text;
+  private taxRateText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'GameScene' });
   }
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   create(): void {
     this.drawBackground();
@@ -44,10 +54,41 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.drawPanelChrome();
+    this.drawStatsBar();
 
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.uiContainers[i] = this.renderUISection(i);
     }
+
+    // Tax tick — fires every second
+    this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: this.onTaxTick,
+      callbackScope: this,
+    });
+  }
+
+  // ── Tax system ─────────────────────────────────────────────────────────────
+
+  /**
+   * Tax rate = sum of levels across all unlocked buildings.
+   * More buildings and higher levels both increase income.
+   */
+  private get taxRate(): number {
+    return this.plotStates
+      .filter((p) => p.unlocked)
+      .reduce((sum, p) => sum + p.level, 0);
+  }
+
+  private onTaxTick(): void {
+    this.gold += this.taxRate;
+    this.updateStats();
+  }
+
+  private updateStats(): void {
+    this.goldText.setText(`Balance: ${fmt(this.gold)}`);
+    this.taxRateText.setText(`Tax Rate: ${fmt(this.taxRate)}/s`);
   }
 
   // ── Height helper ──────────────────────────────────────────────────────────
@@ -77,33 +118,47 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(width / 2, GROUND_Y + 10, width, 20, 0x555e6b);
 
     // UI panel background
-    this.add.rectangle(
-      width / 2,
-      (PANEL_TOP + height) / 2,
-      width,
-      height - PANEL_TOP,
-      0x1e2433
-    );
+    this.add.rectangle(width / 2, (PANEL_TOP + height) / 2, width, height - PANEL_TOP, 0x1e2433);
   }
 
-  /** Static chrome: panel top border + column dividers. */
+  /** Static chrome: panel top border, stats divider, column dividers. */
   private drawPanelChrome(): void {
-    const { height } = this.scale;
+    const { width, height } = this.scale;
     const gfx = this.add.graphics();
-
-    // Top border
     gfx.lineStyle(1, 0x3a4a5a, 1);
-    gfx.moveTo(0, PANEL_TOP);
-    gfx.lineTo(this.scale.width, PANEL_TOP);
-    gfx.strokePath();
 
-    // Column dividers
+    // Panel top border
+    gfx.moveTo(0, PANEL_TOP).lineTo(width, PANEL_TOP).strokePath();
+
+    // Stats bar bottom border
+    gfx.moveTo(0, COL_TOP).lineTo(width, COL_TOP).strokePath();
+
+    // Column dividers (below stats bar only)
     for (let i = 1; i < PLOT_COUNT; i++) {
       const x = i * SECTION_W;
-      gfx.moveTo(x, PANEL_TOP);
-      gfx.lineTo(x, height);
-      gfx.strokePath();
+      gfx.moveTo(x, COL_TOP).lineTo(x, height).strokePath();
     }
+  }
+
+  // ── Stats bar ──────────────────────────────────────────────────────────────
+
+  private drawStatsBar(): void {
+    const { width } = this.scale;
+    const midY = PANEL_TOP + STATS_BAR_H / 2;
+
+    this.taxRateText = this.add
+      .text(24, midY, `Tax Rate: ${fmt(this.taxRate)}/s`, {
+        fontSize: '15px',
+        color: '#88ccff',
+      })
+      .setOrigin(0, 0.5);
+
+    this.goldText = this.add
+      .text(width - 24, midY, `Balance: ${fmt(this.gold)}`, {
+        fontSize: '15px',
+        color: '#ffd966',
+      })
+      .setOrigin(1, 0.5);
   }
 
   // ── Plot rendering ─────────────────────────────────────────────────────────
@@ -149,7 +204,7 @@ export class GameScene extends Phaser.Scene {
     container.add(gfx);
   }
 
-  // ── UI panel ───────────────────────────────────────────────────────────────
+  // ── UI panel columns ───────────────────────────────────────────────────────
 
   private renderUISection(index: number): Phaser.GameObjects.Container {
     this.uiContainers[index]?.destroy();
@@ -161,10 +216,7 @@ export class GameScene extends Phaser.Scene {
     // Building label
     container.add(
       this.add
-        .text(cx, PANEL_TOP + 22, `Building ${index + 1}`, {
-          fontSize: '14px',
-          color: '#8899aa',
-        })
+        .text(cx, COL_TOP + 20, `Building ${index + 1}`, { fontSize: '14px', color: '#8899aa' })
         .setOrigin(0.5)
     );
 
@@ -185,26 +237,24 @@ export class GameScene extends Phaser.Scene {
   ): void {
     const atMax = plot.level >= MAX_LEVEL;
 
-    // Level indicator
     container.add(
       this.add
-        .text(cx, PANEL_TOP + 58, `Level ${plot.level} / ${MAX_LEVEL}`, {
+        .text(cx, COL_TOP + 54, `Level ${plot.level} / ${MAX_LEVEL}`, {
           fontSize: '13px',
           color: '#ddeeff',
         })
         .setOrigin(0.5)
     );
 
-    // Upgrade button
     const btnColor = atMax ? 0x2a2a3a : 0x1a5276;
     const btn = this.add
-      .rectangle(cx, PANEL_TOP + 100, 120, 30, btnColor)
+      .rectangle(cx, COL_TOP + 92, 120, 30, btnColor)
       .setInteractive({ useHandCursor: !atMax });
     container.add(btn);
 
     container.add(
       this.add
-        .text(cx, PANEL_TOP + 100, atMax ? 'Max Level' : '▲ Upgrade', {
+        .text(cx, COL_TOP + 92, atMax ? 'Max Level' : '▲ Upgrade', {
           fontSize: '13px',
           color: atMax ? '#555566' : '#cce8ff',
         })
@@ -218,6 +268,7 @@ export class GameScene extends Phaser.Scene {
         this.plotStates[index].level = Math.min(plot.level + 1, MAX_LEVEL);
         this.plotContainers[index] = this.renderPlot(index);
         this.uiContainers[index] = this.renderUISection(index);
+        this.updateStats();
       });
     }
   }
@@ -227,28 +278,20 @@ export class GameScene extends Phaser.Scene {
     cx: number,
     index: number
   ): void {
-    // Locked status
     container.add(
       this.add
-        .text(cx, PANEL_TOP + 58, '🔒  Locked', {
-          fontSize: '13px',
-          color: '#555566',
-        })
+        .text(cx, COL_TOP + 54, '🔒  Locked', { fontSize: '13px', color: '#555566' })
         .setOrigin(0.5)
     );
 
-    // Unlock button
     const btn = this.add
-      .rectangle(cx, PANEL_TOP + 100, 120, 30, 0x2d6b1a)
+      .rectangle(cx, COL_TOP + 92, 120, 30, 0x2d6b1a)
       .setInteractive({ useHandCursor: true });
     container.add(btn);
 
     container.add(
       this.add
-        .text(cx, PANEL_TOP + 100, 'Unlock', {
-          fontSize: '13px',
-          color: '#e8ffe8',
-        })
+        .text(cx, COL_TOP + 92, 'Unlock', { fontSize: '13px', color: '#e8ffe8' })
         .setOrigin(0.5)
     );
 
@@ -259,6 +302,16 @@ export class GameScene extends Phaser.Scene {
       this.plotStates[index].level = 1;
       this.plotContainers[index] = this.renderPlot(index);
       this.uiContainers[index] = this.renderUISection(index);
+      this.updateStats();
     });
   }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Format a number as a compact $ string. */
+function fmt(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${Math.floor(n)}`;
 }
