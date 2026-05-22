@@ -571,7 +571,7 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const cx = width / 2;
     const orbitX = width * 0.95;
-    const orbitY = Math.round(this.groundY * 0.82);
+    const orbitY = Math.round(this.groundY * 0.90);
 
     const elevation = Math.sin(a);
     const sunX = cx - Math.cos(a) * orbitX;
@@ -600,39 +600,61 @@ export class GameScene extends Phaser.Scene {
     const av = Math.round(amb * 255);
     this.lights.setAmbientColor((av << 16) | (av << 8) | av);
 
-    this.drawBuildingShadows(sunX, sunY, elevation);
+    this.drawBuildingShadows(a, elevation);
   }
 
-  private drawBuildingShadows(sunX: number, sunY: number, elevation: number): void {
+  /**
+   * Draws soft ground shadows using parallel sun rays (accurate for a
+   * distant light source) with multi-sample penumbra simulation.
+   *
+   * The sun is treated as an extended disc of angular width DISC_SPREAD.
+   * NUM_SAMPLES point lights are spread across that disc; each casts a
+   * shadow at 1/N alpha. Overlapping umbra regions reach full alpha while
+   * the non-overlapping penumbra edges appear softer.
+   */
+  private drawBuildingShadows(sunAngle: number, elevation: number): void {
     const gfx = this.buildingShadowGfx;
     gfx.clear();
     if (elevation <= 0.02) return;
 
-    const alpha = Math.min(0.55, elevation * 0.7 + 0.1);
+    const totalAlpha = Math.min(0.55, elevation * 0.7 + 0.1);
     const shadowH = ROAD_H - 4;
-    gfx.fillStyle(0x000022, alpha);
 
-    for (let i = 0; i < PLOT_COUNT; i++) {
-      const plot = this.state.plots[i];
-      if (!plot.unlocked) continue;
+    const NUM_SAMPLES = 5;
+    const DISC_SPREAD = 0.10; // radians (~5.7°) — wider = softer penumbra
 
-      const x = this.plotLeft(i);
-      const w = this.plotWidth;
-      const h = this.buildingHeight(plot.level);
-      const bw = plot.level <= 15 ? Math.round(w * 0.8) : w;
-      const bx = plot.level <= 15 ? x + (w - bw) / 2 : x;
-      const bcx = bx + bw / 2;
+    for (let s = 0; s < NUM_SAMPLES; s++) {
+      const t = (s / (NUM_SAMPLES - 1)) - 0.5; // −0.5 … +0.5
+      const sAngle = sunAngle + t * DISC_SPREAD;
+      const sElev = Math.sin(sAngle);
+      const sHoriz = Math.cos(sAngle);
+      if (sElev <= 0.01) continue;
 
-      const rawLean = ((bcx - sunX) / (this.groundY - sunY)) * h;
-      const lean = Math.max(-bw * 2, Math.min(bw * 2, rawLean));
+      gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
 
-      const p1x = bx,           p1y = this.groundY;
-      const p2x = bx + bw,      p2y = this.groundY;
-      const p3x = bx + bw + lean, p3y = this.groundY + shadowH;
-      const p4x = bx + lean,    p4y = this.groundY + shadowH;
+      for (let i = 0; i < PLOT_COUNT; i++) {
+        const plot = this.state.plots[i];
+        if (!plot.unlocked) continue;
 
-      gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-      gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+        const x = this.plotLeft(i);
+        const w = this.plotWidth;
+        const h = this.buildingHeight(plot.level);
+        const bw = plot.level <= 15 ? Math.round(w * 0.8) : w;
+        const bx = plot.level <= 15 ? x + (w - bw) / 2 : x;
+
+        // Parallel-ray lean: sun is infinitely distant so all rays are
+        // parallel. Formula: horizontal_component / elevation * height.
+        const rawLean = (-sHoriz / sElev) * h;
+        const lean = Math.max(-w * 4, Math.min(w * 4, rawLean));
+
+        const p1x = bx,              p1y = this.groundY;
+        const p2x = bx + bw,         p2y = this.groundY;
+        const p3x = bx + bw + lean,  p3y = this.groundY + shadowH;
+        const p4x = bx + lean,       p4y = this.groundY + shadowH;
+
+        gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+        gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+      }
     }
   }
 
