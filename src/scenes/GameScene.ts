@@ -9,7 +9,7 @@ const HEIGHT_PER_LEVEL = 6;
 const MAX_LEVEL = 100;
 const UI_HEIGHT = 200;    // fixed UI panel height at the bottom
 const STATS_BAR_H = 54;   // top strip of UI panel (road + income + balance)
-const ROAD_H = 24;        // road strip between sky and UI panel
+const ROAD_H = 48;        // road strip between sky and UI panel
 
 /** Gold required to unlock each building slot (index = building id). */
 const UNLOCK_COSTS: readonly number[] = [0, 500, 2_500, 15_000, 100_000];
@@ -52,6 +52,14 @@ export class GameScene extends Phaser.Scene {
 
   // Night overlay — repositioned on resize, never recreated (tween target)
   private nightOverlay!: Phaser.GameObjects.Rectangle;
+
+  // Dev panel
+  private devPanelContainer!: Phaser.GameObjects.Container;
+
+  // Tween references — needed so advanceTime() can seek them
+  private nightOverlayTween!: Phaser.Tweens.Tween;
+  private timeOfDayTween!: Phaser.Tweens.Tween;
+  private sunOrbitTween!: Phaser.Tweens.Tween;
 
   private timeOfDay = 0;
   private sunAngle: number = Math.PI / 2;
@@ -123,7 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
 
     // Day/night overlay fade
-    this.tweens.add({
+    this.nightOverlayTween = this.tweens.add({
       targets: this.nightOverlay,
       alpha: 0.55,
       duration: 120_000,
@@ -133,7 +141,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Sky colour interpolation
-    this.tweens.addCounter({
+    this.timeOfDayTween = this.tweens.addCounter({
       from: 0, to: 1,
       duration: 120_000,
       yoyo: true,
@@ -146,7 +154,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Sun orbit (full circle, no yoyo — east→west rise/set)
-    this.tweens.addCounter({
+    this.sunOrbitTween = this.tweens.addCounter({
       from: Math.PI / 2,
       to: Math.PI / 2 + Math.PI * 2,
       duration: 240_000,
@@ -192,6 +200,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.roadUiContainer = this.renderRoadUI();
+    this.buildDevPanel();
 
     this.refreshButtons();
     this.updateStats();
@@ -210,6 +219,70 @@ export class GameScene extends Phaser.Scene {
     if (this.sunLight) this.sunLight.radius = Math.max(800, width * 2);
 
     this.buildLayout();
+  }
+
+  // ── Dev panel ──────────────────────────────────────────────────────────────
+
+  private buildDevPanel(): void {
+    this.devPanelContainer?.destroy();
+    const { width } = this.scale;
+    const container = this.add.container(0, 0).setDepth(90);
+
+    container.add(this.add.rectangle(width / 2, 22, width, 44, 0x000000, 0.6));
+
+    const btnW = 130;
+    const gap = 8;
+    const leftX = (width - btnW * 2 - gap) / 2 + btnW / 2;
+    const rightX = leftX + btnW + gap;
+
+    const btn1 = this.add
+      .rectangle(leftX, 22, btnW, 30, 0x1a4400)
+      .setInteractive({ useHandCursor: true });
+    container.add(btn1);
+    container.add(
+      this.add.text(leftX, 22, '+$100K', { fontSize: '13px', color: '#88ff88' }).setOrigin(0.5)
+    );
+    btn1.on('pointerover', () => btn1.setFillStyle(0x285e00));
+    btn1.on('pointerout', () => btn1.setFillStyle(0x1a4400));
+    btn1.on('pointerdown', () => {
+      this.state.gold += 100_000;
+      this.updateStats();
+      this.refreshButtons();
+    });
+
+    const btn2 = this.add
+      .rectangle(rightX, 22, btnW, 30, 0x001444)
+      .setInteractive({ useHandCursor: true });
+    container.add(btn2);
+    container.add(
+      this.add.text(rightX, 22, '+1 hr', { fontSize: '13px', color: '#88aaff' }).setOrigin(0.5)
+    );
+    btn2.on('pointerover', () => btn2.setFillStyle(0x001e5e));
+    btn2.on('pointerout', () => btn2.setFillStyle(0x001444));
+    btn2.on('pointerdown', () => this.advanceTime());
+
+    this.devPanelContainer = container;
+  }
+
+  private advanceTime(): void {
+    // Advance sun by 1/24 of a full orbit (= 1 game hour)
+    this.sunAngle += (Math.PI * 2) / 24;
+
+    // Seek sun orbit counter to match new angle so it continues from here
+    const norm =
+      (((this.sunAngle - Math.PI / 2) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    this.sunOrbitTween.seek(Math.min(0.9999, norm / (Math.PI * 2)));
+
+    // Derive timeOfDay from new sun elevation (0 = noon/day, 1 = midnight/night)
+    this.timeOfDay = Math.max(0, Math.min(1, (1 - Math.sin(this.sunAngle)) / 2));
+    this.timeOfDayTween.seek(this.timeOfDay);
+
+    // Sync sky and overlay immediately
+    this.updateSkyColour();
+    this.nightOverlay?.setAlpha(this.timeOfDay * 0.55);
+    this.nightOverlayTween.seek(this.timeOfDay);
+
+    this.updateSun();
   }
 
   // ── Tax system ─────────────────────────────────────────────────────────────
