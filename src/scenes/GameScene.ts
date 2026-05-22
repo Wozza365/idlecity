@@ -58,6 +58,15 @@ export class GameScene extends Phaser.Scene {
   /** 0 = full day, 1 = full night. Driven by the repeating tween counter. */
   private timeOfDay = 0;
 
+  /** Current sun orbit angle in radians. PI/2 = noon at startup. */
+  private sunAngle: number = Math.PI / 2;
+  private sunCircle!: Phaser.GameObjects.Arc;
+  private sunGlowArc!: Phaser.GameObjects.Arc;
+  private moonCircle!: Phaser.GameObjects.Arc;
+  private sunRaysGfx!: Phaser.GameObjects.Graphics;
+  private sunGroundGlow!: Phaser.GameObjects.Ellipse;
+  private sunLight!: Phaser.GameObjects.Light;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -65,7 +74,10 @@ export class GameScene extends Phaser.Scene {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   create(): void {
+    this.lights.enable();
+    this.lights.setAmbientColor(0x888888);
     this.drawBackground();
+    this.setupSun();
     this.roadGraphics = this.add.graphics();
     this.renderRoad();
 
@@ -136,6 +148,19 @@ export class GameScene extends Phaser.Scene {
       onUpdate: (tween) => {
         this.timeOfDay = tween.getValue() ?? 0;
         this.updateSkyColour();
+      },
+    });
+
+    // Sun orbit — linear full circle (no yoyo) so east/west rise/set are distinct
+    this.tweens.addCounter({
+      from: Math.PI / 2,
+      to: Math.PI / 2 + Math.PI * 2,
+      duration: 240_000,
+      repeat: -1,
+      ease: 'Linear',
+      onUpdate: (tween): void => {
+        this.sunAngle = tween.getValue() ?? Math.PI / 2;
+        this.updateSun();
       },
     });
 
@@ -235,6 +260,7 @@ export class GameScene extends Phaser.Scene {
   private drawBackground(): void {
     const { width, height } = this.scale;
     this.skyRect = this.add.rectangle(width / 2, GROUND_Y / 2, width, GROUND_Y, 0x4a7fb5);
+    this.skyRect.setPipeline('Light2D'); // sky responds to the sun Phaser light
     // Gray ground strip removed — renderRoad() covers this band
     this.add.rectangle(width / 2, (PANEL_TOP + height) / 2, width, height - PANEL_TOP, 0x1e2433);
   }
@@ -488,6 +514,95 @@ export class GameScene extends Phaser.Scene {
     const dayColour = 0x4a7fb5;
     const nightColour = 0x0a0a1a;
     this.skyRect.setFillStyle(lerpColor(dayColour, nightColour, this.timeOfDay));
+  }
+
+  // ── Sun & lighting ─────────────────────────────────────────────────────────
+
+  private setupSun(): void {
+    const { width } = this.scale;
+    const cx = width / 2;
+
+    // Moon — shows on the opposite side of the sky from the sun
+    this.moonCircle = this.add.arc(cx, GROUND_Y, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(1);
+
+    // Sun rays — drawn behind the sun disc
+    this.sunRaysGfx = this.add.graphics().setDepth(2);
+
+    // Sun glow halo
+    this.sunGlowArc = this.add.arc(cx, 100, 44, 0, 360, false, 0xffe066, 0.3).setDepth(3);
+
+    // Sun disc — bright core
+    this.sunCircle = this.add.arc(cx, 100, 20, 0, 360, false, 0xfff8aa, 1).setDepth(4);
+
+    // Elliptical pool of light on the ground below the sun
+    this.sunGroundGlow = this.add.ellipse(cx, GROUND_Y + 6, 340, 28, 0xfffae0, 0).setDepth(5);
+
+    // Phaser point light — large enough to cover the full scene width
+    this.sunLight = this.lights.addLight(cx, 100, 960, 0xffeeaa, 3.2);
+
+    this.updateSun();
+  }
+
+  private updateSun(): void {
+    const a = this.sunAngle;
+    const { width } = this.scale;
+    const cx = width / 2;
+    const orbitRadius = 350;
+
+    const elevation = Math.sin(a); // 1 = noon overhead, 0 = horizon, −1 = midnight
+    const sunX = cx - Math.cos(a) * cx * 0.7; // east → centre → west arc
+    const sunY = GROUND_Y - elevation * orbitRadius;
+    const sunAbove = elevation > 0.02;
+
+    // Moon on the opposite side of the orbit
+    const moonElev = Math.sin(a + Math.PI);
+    const moonX = cx - Math.cos(a + Math.PI) * cx * 0.7;
+    const moonY = GROUND_Y - moonElev * orbitRadius;
+
+    this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
+    this.sunGlowArc.setPosition(sunX, sunY).setVisible(sunAbove);
+    this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
+    this.drawSunRays(sunX, sunY, sunAbove);
+
+    // Ground light pool — wider and brighter when the sun is high
+    this.sunGroundGlow
+      .setPosition(sunX, GROUND_Y + 6)
+      .setVisible(sunAbove)
+      .setAlpha(Math.max(0, elevation * 0.22));
+
+    // Move the Phaser point light and scale intensity with sun elevation
+    this.sunLight.x = sunX;
+    this.sunLight.y = sunY;
+    this.sunLight.intensity = Math.max(0, elevation * 3.2);
+
+    // Ambient light: bright grey at noon, near-black at midnight
+    const amb = Math.max(0.08, elevation * 0.55 + 0.14);
+    const av = Math.round(amb * 255);
+    this.lights.setAmbientColor((av << 16) | (av << 8) | av);
+  }
+
+  private drawSunRays(cx: number, cy: number, visible: boolean): void {
+    const gfx = this.sunRaysGfx;
+    gfx.clear();
+    if (!visible) return;
+
+    const numRays = 12;
+    const innerR = 24;
+    const outerR = 72;
+    const halfAngle = 0.11;
+
+    gfx.fillStyle(0xffe066, 0.22);
+    for (let i = 0; i < numRays; i++) {
+      const angle = (i / numRays) * Math.PI * 2;
+      gfx.fillTriangle(
+        cx + Math.cos(angle - halfAngle) * innerR,
+        cy + Math.sin(angle - halfAngle) * innerR,
+        cx + Math.cos(angle + halfAngle) * innerR,
+        cy + Math.sin(angle + halfAngle) * innerR,
+        cx + Math.cos(angle) * outerR,
+        cy + Math.sin(angle) * outerR
+      );
+    }
   }
 
   // ── UI panel columns ───────────────────────────────────────────────────────
@@ -787,7 +902,7 @@ export class GameScene extends Phaser.Scene {
         this.refreshButtons();
       });
 
-      this.actionRefs[PLOT_COUNT] = { btn, getCost: () => cost, activeColor: 0x5a3e00 };
+      this.actionRefs[PLOT_COUNT] = { btn, getCost: (): number => cost, activeColor: 0x5a3e00 };
     }
 
     return container;
