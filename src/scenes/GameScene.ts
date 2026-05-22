@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { type GameState, type PlotState, loadGame, saveGame } from '../game/GameState';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -24,12 +25,6 @@ function upgradeCost(level: number): number {
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface PlotState {
-  id: number;
-  unlocked: boolean;
-  level: number; // 1–100 when unlocked; 0 when locked
-}
-
 /** Minimal reference kept per action button so enable/disable can be refreshed each tick. */
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
@@ -40,13 +35,8 @@ interface ActionRef {
 // ── Scene ──────────────────────────────────────────────────────────────────────
 
 export class GameScene extends Phaser.Scene {
-  private plotStates: PlotState[] = Array.from({ length: PLOT_COUNT }, (_, i) => ({
-    id: i,
-    unlocked: i === 0,
-    level: i === 0 ? 1 : 0,
-  }));
-
-  private gold: number = 0;
+  /** Single source of truth for all persistent game data. */
+  private state: GameState = loadGame(PLOT_COUNT);
 
   private plotContainers: Phaser.GameObjects.Container[] = [];
   private uiContainers: Phaser.GameObjects.Container[] = [];
@@ -54,6 +44,7 @@ export class GameScene extends Phaser.Scene {
 
   private goldText!: Phaser.GameObjects.Text;
   private taxRateText!: Phaser.GameObjects.Text;
+  private saveNotification!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -76,44 +67,81 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.refreshButtons();
+    this.updateStats();
 
+    // Tax tick — every second
     this.time.addEvent({
-      delay: 1000,
+      delay: 1_000,
       loop: true,
       callback: this.onTaxTick,
       callbackScope: this,
     });
+
+    // Autosave — every 10 seconds
+    this.time.addEvent({
+      delay: 10_000,
+      loop: true,
+      callback: this.onAutosave,
+      callbackScope: this,
+    });
+
+    // Save notification (created last so it sits above everything)
+    this.saveNotification = this.add
+      .text(this.scale.width - 12, 12, '✓ Saved successfully', {
+        fontSize: '12px',
+        color: '#88ffaa',
+        backgroundColor: '#162416',
+        padding: { x: 10, y: 5 },
+      })
+      .setOrigin(1, 0)
+      .setAlpha(0)
+      .setDepth(100);
   }
 
   // ── Tax system ─────────────────────────────────────────────────────────────
 
   private get taxRate(): number {
-    return this.plotStates
+    return this.state.plots
       .filter((p) => p.unlocked)
       .reduce((sum, p) => sum + p.level, 0);
   }
 
   private onTaxTick(): void {
-    this.gold += this.taxRate;
+    this.state.gold += this.taxRate;
     this.updateStats();
     this.refreshButtons();
   }
 
   private updateStats(): void {
-    this.goldText.setText(`Balance: ${fmt(this.gold)}`);
+    this.goldText.setText(`Balance: ${fmt(this.state.gold)}`);
     this.taxRateText.setText(`Tax Rate: ${fmt(this.taxRate)}/s`);
+  }
+
+  // ── Save & notification ────────────────────────────────────────────────────
+
+  private onAutosave(): void {
+    saveGame(this.state);
+    this.showSaveNotification();
+  }
+
+  private showSaveNotification(): void {
+    this.tweens.killTweensOf(this.saveNotification);
+    this.saveNotification.setAlpha(1);
+    this.tweens.add({
+      targets: this.saveNotification,
+      alpha: 0,
+      delay: 1_500,
+      duration: 600,
+      ease: 'Power1',
+    });
   }
 
   // ── Button affordability ───────────────────────────────────────────────────
 
-  /**
-   * Called after every tick and every purchase.
-   * Enables buttons the player can afford; disables those they cannot.
-   */
   private refreshButtons(): void {
     for (const ref of this.actionRefs) {
       if (!ref) continue;
-      const canAfford = this.gold >= ref.getCost();
+      const canAfford = this.state.gold >= ref.getCost();
       if (canAfford) {
         ref.btn.setInteractive({ useHandCursor: true });
         ref.btn.setFillStyle(ref.activeColor);
@@ -164,10 +192,10 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const midY = PANEL_TOP + STATS_BAR_H / 2;
     this.taxRateText = this.add
-      .text(24, midY, `Tax Rate: ${fmt(this.taxRate)}/s`, { fontSize: '15px', color: '#88ccff' })
+      .text(24, midY, '', { fontSize: '15px', color: '#88ccff' })
       .setOrigin(0, 0.5);
     this.goldText = this.add
-      .text(width - 24, midY, `Balance: ${fmt(this.gold)}`, { fontSize: '15px', color: '#ffd966' })
+      .text(width - 24, midY, '', { fontSize: '15px', color: '#ffd966' })
       .setOrigin(1, 0.5);
   }
 
@@ -177,8 +205,8 @@ export class GameScene extends Phaser.Scene {
     this.plotContainers[index]?.destroy();
     const x = this.plotLeft(index);
     const container = this.add.container(0, 0);
-    if (this.plotStates[index].unlocked) {
-      this.buildBuilding(container, x, this.plotStates[index].level);
+    if (this.state.plots[index].unlocked) {
+      this.buildBuilding(container, x, this.state.plots[index].level);
     } else {
       this.buildEmptyPlot(container, x);
     }
@@ -211,7 +239,7 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(0, 0);
     const cx = index * SECTION_W + SECTION_W / 2;
-    const plot = this.plotStates[index];
+    const plot = this.state.plots[index];
 
     container.add(
       this.add
@@ -273,9 +301,9 @@ export class GameScene extends Phaser.Scene {
       btn.on('pointerover', () => btn.setFillStyle(0x2471a3));
       btn.on('pointerout', () => btn.setFillStyle(0x1a5276));
       btn.on('pointerdown', (): void => {
-        if (this.gold < cost) return;
-        this.gold -= cost;
-        this.plotStates[index].level = Math.min(plot.level + 1, MAX_LEVEL);
+        if (this.state.gold < cost) return;
+        this.state.gold -= cost;
+        this.state.plots[index].level = Math.min(plot.level + 1, MAX_LEVEL);
         this.plotContainers[index] = this.renderPlot(index);
         this.uiContainers[index] = this.renderUISection(index);
         this.updateStats();
@@ -319,10 +347,10 @@ export class GameScene extends Phaser.Scene {
     btn.on('pointerover', () => btn.setFillStyle(0x3d8a22));
     btn.on('pointerout', () => btn.setFillStyle(0x2d6b1a));
     btn.on('pointerdown', (): void => {
-      if (this.gold < cost) return;
-      this.gold -= cost;
-      this.plotStates[index].unlocked = true;
-      this.plotStates[index].level = 1;
+      if (this.state.gold < cost) return;
+      this.state.gold -= cost;
+      this.state.plots[index].unlocked = true;
+      this.state.plots[index].level = 1;
       this.plotContainers[index] = this.renderPlot(index);
       this.uiContainers[index] = this.renderUISection(index);
       this.updateStats();
