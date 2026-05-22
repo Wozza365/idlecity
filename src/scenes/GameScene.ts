@@ -56,10 +56,9 @@ export class GameScene extends Phaser.Scene {
   // Dev panel
   private devPanelContainer!: Phaser.GameObjects.Container;
 
-  // Tween references — needed so advanceTime() can seek them
-  private nightOverlayTween!: Phaser.Tweens.Tween;
-  private timeOfDayTween!: Phaser.Tweens.Tween;
-  private sunOrbitTween!: Phaser.Tweens.Tween;
+  // Single master clock — all day/night visuals derive from this + timeOffsetMs
+  private masterClock!: Phaser.Tweens.Tween;
+  private timeOffsetMs: number = 0;
 
   private timeOfDay = 0;
   private sunAngle: number = Math.PI / 2;
@@ -130,40 +129,16 @@ export class GameScene extends Phaser.Scene {
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
 
-    // Day/night overlay fade
-    this.nightOverlayTween = this.tweens.add({
-      targets: this.nightOverlay,
-      alpha: 0.55,
-      duration: 120_000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    // Sky colour interpolation
-    this.timeOfDayTween = this.tweens.addCounter({
-      from: 0, to: 1,
-      duration: 120_000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-      onUpdate: (tween) => {
-        this.timeOfDay = tween.getValue() ?? 0;
-        this.updateSkyColour();
-      },
-    });
-
-    // Sun orbit (full circle, no yoyo — east→west rise/set)
-    this.sunOrbitTween = this.tweens.addCounter({
-      from: Math.PI / 2,
-      to: Math.PI / 2 + Math.PI * 2,
+    // Master clock: 0→240_000 ms, linear, loops forever.
+    // All day/night state is derived from (clock + timeOffsetMs) % 240_000
+    // so advanceTime() can simply add to timeOffsetMs with no tween seeking.
+    this.masterClock = this.tweens.addCounter({
+      from: 0,
+      to: 240_000,
       duration: 240_000,
       repeat: -1,
       ease: 'Linear',
-      onUpdate: (tween): void => {
-        this.sunAngle = tween.getValue() ?? Math.PI / 2;
-        this.updateSun();
-      },
+      onUpdate: () => this.onClockTick(),
     });
   }
 
@@ -264,25 +239,26 @@ export class GameScene extends Phaser.Scene {
     this.devPanelContainer = container;
   }
 
-  private advanceTime(): void {
-    // Advance sun by 1/24 of a full orbit (= 1 game hour)
-    this.sunAngle += (Math.PI * 2) / 24;
+  private onClockTick(): void {
+    if (!this.masterClock) return;
+    const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
 
-    // Seek sun orbit counter to match new angle so it continues from here
-    const norm =
-      (((this.sunAngle - Math.PI / 2) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    this.sunOrbitTween.seek(Math.min(0.9999, norm / (Math.PI * 2)));
+    // Sun completes one full orbit per 240s cycle
+    this.sunAngle = Math.PI / 2 + (elapsed / 240_000) * Math.PI * 2;
 
-    // Derive timeOfDay from new sun elevation (0 = noon/day, 1 = midnight/night)
-    this.timeOfDay = Math.max(0, Math.min(1, (1 - Math.sin(this.sunAngle)) / 2));
-    this.timeOfDayTween.seek(this.timeOfDay);
+    // timeOfDay: 0 = noon (bright), 1 = midnight (dark). Cosine gives smooth
+    // natural transitions without needing a separate easing tween.
+    const phase = (elapsed / 240_000) * Math.PI * 2;
+    this.timeOfDay = (1 - Math.cos(phase)) / 2;
 
-    // Sync sky and overlay immediately
     this.updateSkyColour();
     this.nightOverlay?.setAlpha(this.timeOfDay * 0.55);
-    this.nightOverlayTween.seek(this.timeOfDay);
-
     this.updateSun();
+  }
+
+  private advanceTime(): void {
+    // Advance by 1/24 of the 240s cycle (= 1 game hour = 10s real time)
+    this.timeOffsetMs = (this.timeOffsetMs + 240_000 / 24) % 240_000;
   }
 
   // ── Tax system ─────────────────────────────────────────────────────────────
