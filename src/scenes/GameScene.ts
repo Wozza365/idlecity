@@ -620,7 +620,7 @@ export class GameScene extends Phaser.Scene {
     const totalAlpha = Math.min(0.99, elevation * 1.26 + 0.18);
     const shadowH = ROAD_H - 4;
 
-    const NUM_SAMPLES = 5;
+    const NUM_SAMPLES = 11;
     const DISC_SPREAD = 0.10; // radians (~5.7°) — wider = softer penumbra
 
     // Clamp the lean-to-height ratio so all buildings share the same shadow
