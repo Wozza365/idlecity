@@ -407,7 +407,7 @@ export class GameScene extends Phaser.Scene {
     const bodyH  = h - foundH;  // wall height above foundation
 
     // ── Body (Light2D pipeline so it responds to the sun) ──────
-    const body = this.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xf8f0e2);
+    const body = this.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xfdf7ed);
     body.setPipeline('Light2D');
     container.add(body);
 
@@ -433,7 +433,7 @@ export class GameScene extends Phaser.Scene {
     // ── Chimney — drawn BEFORE roof so roof occludes the base ──
     const cw  = Math.round(bw * 0.10);
     const chx = bx + Math.round(bw * 0.67);
-    const chimneyTopY = top - roofH - 5;
+    const chimneyTopY = top - roofH - 2;
     gfx.fillStyle(0x9a3e2e, 1);
     gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
 
@@ -441,9 +441,9 @@ export class GameScene extends Phaser.Scene {
     gfx.fillStyle(0xb04030, 1);
     gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
 
-    // Shingle rows
+    // Shingle rows (10% darker than roof colour 0xb04030)
     const shingleRows = 7;
-    gfx.lineStyle(1, 0x882c20, 0.9);
+    gfx.lineStyle(1, 0x9e3a2b, 0.9);
     for (let r = 1; r < shingleRows; r++) {
       const frac  = r / shingleRows;
       const rowY  = top - roofH + frac * roofH;
@@ -473,20 +473,14 @@ export class GameScene extends Phaser.Scene {
     const wh  = Math.round(ww * 1.4);
     const wy  = top + Math.round(bodyH * 0.18);
     const sw  = Math.round(ww * 0.40);
-    const wx1 = bx + Math.round(bw * 0.13);
-    const wx2 = bx + Math.round(bw * 0.69);
+    const wx1 = bx + Math.round(bw * 0.16);
+    const wx2 = bx + Math.round(bw * 0.66);
 
     for (const wxx of [wx1, wx2]) {
-      // Green shutters
+      // Green shutters (solid — louvres too small at this scale)
       gfx.fillStyle(0x265c22, 1);
       gfx.fillRect(wxx - sw - 1, wy, sw, wh);
       gfx.fillRect(wxx + ww + 1, wy, sw, wh);
-      // Shutter louvres
-      gfx.lineStyle(1, 0x163e14, 0.8);
-      for (let sl = 4; sl < wh - 2; sl += 4) {
-        gfx.moveTo(wxx - sw - 1, wy + sl).lineTo(wxx - 1, wy + sl).strokePath();
-        gfx.moveTo(wxx + ww + 1, wy + sl).lineTo(wxx + ww + sw + 1, wy + sl).strokePath();
-      }
       // White frame
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
