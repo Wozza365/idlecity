@@ -868,7 +868,7 @@ export class GameScene extends Phaser.Scene {
     // Shadow length: short at peak sun (high elevation), long at low sun.
     // Extends through road → verge → river at sunrise/sunset.
     const maxShadow = ROAD_H + VERGE_H + RIVER_H;
-    const shadowExtent = Math.max(6, Math.round(maxShadow * Math.pow(1 - elevation, 0.5)));
+    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5));
     const shadBot = this.groundY + shadowExtent;
 
     const NUM_SAMPLES = 11;
