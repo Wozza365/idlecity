@@ -407,7 +407,7 @@ export class GameScene extends Phaser.Scene {
     const bodyH  = h - foundH;  // wall height above foundation
 
     // ── Body (Light2D pipeline so it responds to the sun) ──────
-    const body = this.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xf2e0bf);
+    const body = this.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xf8f0e2);
     body.setPipeline('Light2D');
     container.add(body);
 
@@ -420,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     gfx.moveTo(bx, gy - foundH).lineTo(bx + bw, gy - foundH).strokePath();
 
     // ── Horizontal siding boards ───────────────────────────────
-    gfx.lineStyle(1, 0xd0c0a0, 0.65);
+    gfx.lineStyle(1, 0xddd0b8, 0.65);
     for (let ly = top + 4; ly < top + bodyH - 1; ly += 5) {
       gfx.moveTo(bx + 5, ly).lineTo(bx + bw - 5, ly).strokePath();
     }
@@ -433,17 +433,17 @@ export class GameScene extends Phaser.Scene {
     // ── Chimney — drawn BEFORE roof so roof occludes the base ──
     const cw  = Math.round(bw * 0.10);
     const chx = bx + Math.round(bw * 0.67);
-    const chimneyTopY = top - roofH - 10;
+    const chimneyTopY = top - roofH - 5;
     gfx.fillStyle(0x9a3e2e, 1);
     gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
 
-    // ── Roof triangle ──────────────────────────────────────────
-    gfx.fillStyle(0x3c3530, 1);
+    // ── Roof triangle (red clay tile colour) ───────────────────
+    gfx.fillStyle(0xb04030, 1);
     gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
 
     // Shingle rows
     const shingleRows = 7;
-    gfx.lineStyle(1, 0x5a4f44, 0.9);
+    gfx.lineStyle(1, 0x882c20, 0.9);
     for (let r = 1; r < shingleRows; r++) {
       const frac  = r / shingleRows;
       const rowY  = top - roofH + frac * roofH;
@@ -468,13 +468,13 @@ export class GameScene extends Phaser.Scene {
     gfx.fillStyle(0x7a6e64, 1);
     gfx.fillRect(chx - 2, chimneyTopY, cw + 4, 3);   // cap
 
-    // ── Windows ────────────────────────────────────────────────
-    const ww  = Math.round(bw * 0.18);
+    // ── Windows — smaller and inset from edges ─────────────────
+    const ww  = Math.round(bw * 0.15);
     const wh  = Math.round(ww * 1.4);
     const wy  = top + Math.round(bodyH * 0.18);
     const sw  = Math.round(ww * 0.40);
-    const wx1 = bx + Math.round(bw * 0.08);
-    const wx2 = bx + Math.round(bw * 0.74);
+    const wx1 = bx + Math.round(bw * 0.13);
+    const wx2 = bx + Math.round(bw * 0.69);
 
     for (const wxx of [wx1, wx2]) {
       // Green shutters
@@ -511,9 +511,9 @@ export class GameScene extends Phaser.Scene {
     const dh  = Math.round(bodyH * 0.52);
     const dx  = bx + Math.round((bw - dw) / 2);
     const dy  = gy - foundH - dh;
-    // White surround frame
+    // White surround frame (narrower)
     gfx.fillStyle(0xffffff, 1);
-    gfx.fillRect(dx - 4, dy - 2, dw + 8, dh + 2);
+    gfx.fillRect(dx - 2, dy - 2, dw + 4, dh + 2);
     // Door body (red — classic US suburban)
     gfx.fillStyle(0xb02e1e, 1);
     gfx.fillRect(dx, dy, dw, dh);
@@ -531,7 +531,7 @@ export class GameScene extends Phaser.Scene {
     gfx.fillCircle(dx + dw - 5, dy + Math.round(dh * 0.52), 2);
     // Lintel above door
     gfx.fillStyle(0xe8dcc8, 1);
-    gfx.fillRect(dx - 5, dy - 5, dw + 10, 5);
+    gfx.fillRect(dx - 3, dy - 5, dw + 6, 5);
     // Steps
     gfx.fillStyle(0xb0b0a4, 1);
     gfx.fillRect(dx - 3, gy - foundH, dw + 6, foundH);
