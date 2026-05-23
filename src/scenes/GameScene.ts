@@ -419,12 +419,6 @@ export class GameScene extends Phaser.Scene {
     gfx.lineStyle(1, 0x7e7870, 1);
     gfx.moveTo(bx, gy - foundH).lineTo(bx + bw, gy - foundH).strokePath();
 
-    // ── Horizontal siding boards ───────────────────────────────
-    gfx.lineStyle(1, 0xf0e8d8, 1);
-    for (let ly = top + 4; ly < top + bodyH - 1; ly += 5) {
-      gfx.moveTo(bx + 5, ly).lineTo(bx + bw - 5, ly).strokePath();
-    }
-
     // ── Roof params ────────────────────────────────────────────
     const roofH = Math.round(bw * 0.42);
     const ov    = 6;                      // eave overhang
@@ -441,15 +435,6 @@ export class GameScene extends Phaser.Scene {
     gfx.fillStyle(0xb04030, 1);
     gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
 
-    // Shingle rows (10% darker than roof colour 0xb04030)
-    const shingleRows = 7;
-    gfx.lineStyle(1, 0xa83e2f, 1);
-    for (let r = 1; r < shingleRows; r++) {
-      const frac  = r / shingleRows;
-      const rowY  = top - roofH + frac * roofH;
-      const halfW = (bw / 2 + ov) * frac;
-      gfx.moveTo(mid - halfW, rowY).lineTo(mid + halfW, rowY).strokePath();
-    }
     // Rake trim (sloped edges)
     gfx.lineStyle(2, 0xf0e4cc, 0.9);
     gfx.moveTo(bx - ov, top).lineTo(mid, top - roofH).strokePath();
