@@ -401,10 +401,13 @@ export class GameScene extends Phaser.Scene {
     x: number, w: number, h: number, top: number,
     level: number
   ): void {
-    const bw     = Math.round(w * 0.82);
-    const bx     = x + Math.round((w - bw) / 2);
-    const gy     = this.groundY;
-    const foundH = 6;
+    const bw      = Math.round(w * 0.82);
+    const bx      = x + Math.round((w - bw) / 2);
+    const gy      = this.groundY;
+    const foundH  = 6;
+    const YARD_H  = 20;
+    const buildGY = gy - YARD_H;   // building sits above the lawn strip
+    top -= YARD_H;                  // shift entire building up
     const bodyH  = h - foundH;
 
     // ── Body ──────────────────────────────────────────────────
@@ -416,16 +419,15 @@ export class GameScene extends Phaser.Scene {
 
     // ── Foundation ────────────────────────────────────────────
     gfx.fillStyle(0x9e9890, 1);
-    gfx.fillRect(bx, gy - foundH, bw, foundH);
+    gfx.fillRect(bx, buildGY - foundH, bw, foundH);
     gfx.lineStyle(1, 0x7e7870, 1);
-    gfx.moveTo(bx, gy - foundH).lineTo(bx + bw, gy - foundH).strokePath();
+    gfx.moveTo(bx, buildGY - foundH).lineTo(bx + bw, buildGY - foundH).strokePath();
 
-    // ── Front yard lawn ───────────────────────────────────────
-    const YARD_H = 20;
+    // ── Front yard lawn (between building and road) ───────────
     gfx.fillStyle(0x5a8c3a, 1);
-    gfx.fillRect(x, gy, w, YARD_H);
+    gfx.fillRect(x, buildGY, w, YARD_H);
     gfx.fillStyle(0x4a7a2e, 1);
-    gfx.fillRect(x, gy, w, 2);
+    gfx.fillRect(x, buildGY, w, 2);
 
     // ── Roof params ───────────────────────────────────────────
     const roofH = Math.round(bw * 0.42);
@@ -492,9 +494,9 @@ export class GameScene extends Phaser.Scene {
     if (level >= 4) {
       const hedgeH = level >= 10 ? 10 : 5;
       gfx.fillStyle(0x2d6a1e, 1);
-      gfx.fillRect(bx, gy, bw, hedgeH);
+      gfx.fillRect(bx, buildGY, bw, hedgeH);
       gfx.fillStyle(0x3a8428, 1);
-      gfx.fillRect(bx, gy, bw, 2);
+      gfx.fillRect(bx, buildGY, bw, 2);
     }
 
     // ── Windows ───────────────────────────────────────────────
@@ -529,7 +531,7 @@ export class GameScene extends Phaser.Scene {
     const dw  = Math.round(bw * 0.20);
     const dh  = Math.round(bodyH * 0.52);
     const dx  = bx + Math.round((bw - dw) / 2);
-    const dy  = gy - foundH - dh;
+    const dy  = buildGY - foundH - dh;
     gfx.fillStyle(0xffffff, 1);
     gfx.fillRect(dx - 2, dy - 2, dw + 4, dh + 2);
     gfx.fillStyle(0xb02e1e, 1);
@@ -547,9 +549,9 @@ export class GameScene extends Phaser.Scene {
     gfx.fillStyle(0xe8dcc8, 1);
     gfx.fillRect(dx - 3, dy - 5, dw + 6, 5);
     gfx.fillStyle(0xb0b0a4, 1);
-    gfx.fillRect(dx - 3, gy - foundH, dw + 6, foundH);
+    gfx.fillRect(dx - 3, buildGY - foundH, dw + 6, foundH);
     gfx.fillStyle(0xa0a094, 1);
-    gfx.fillRect(dx - 6, gy - 3, dw + 12, 3);
+    gfx.fillRect(dx - 6, buildGY - 3, dw + 12, 3);
 
     // Lv 9+: porch lantern above door
     if (level >= 9) {
@@ -588,7 +590,7 @@ export class GameScene extends Phaser.Scene {
       const pathW = dw - 4;
       const pathX = dx + 2;
       gfx.fillStyle(0xc8b898, 1);
-      for (let py = gy + 3; py < gy + YARD_H - 3; py += 7) {
+      for (let py = buildGY + 2; py < gy - 3; py += 7) {
         gfx.fillRect(pathX, py, pathW, 4);
       }
     }
@@ -596,7 +598,7 @@ export class GameScene extends Phaser.Scene {
     // Lv 6+: left bush (Lv 12+ becomes a tree)
     if (level >= 6) {
       const bshX = bx + 8;
-      const bshY = gy - foundH;
+      const bshY = buildGY - foundH;
       if (level >= 12) {
         gfx.fillStyle(0x5a3010, 1);
         gfx.fillRect(bshX - 1, bshY - 14, 3, 20);
@@ -618,7 +620,7 @@ export class GameScene extends Phaser.Scene {
     // Lv 7+: right bush
     if (level >= 7) {
       const bshX = bx + bw - 8;
-      const bshY = gy - foundH;
+      const bshY = buildGY - foundH;
       gfx.fillStyle(0x4a2808, 1);
       gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
       gfx.fillStyle(0x257018, 1);
@@ -627,21 +629,22 @@ export class GameScene extends Phaser.Scene {
       gfx.fillCircle(bshX + 2, bshY - 11, 3);
     }
 
-    // Lv 8+: picket fence across front of plot
+    // Lv 8+: picket fence at road edge of yard
     if (level >= 8) {
+      const fenceBot = gy - 2;
       gfx.fillStyle(0xe8e4d8, 1);
-      gfx.fillRect(x, gy + 5, w, 2);
+      gfx.fillRect(x, fenceBot - 7, w, 2);
       const spacing = Math.round(w / 6);
       for (let fx = x + 2; fx < x + w - 1; fx += spacing) {
-        gfx.fillRect(fx, gy + 2, 3, 10);
-        gfx.fillTriangle(fx, gy + 2, fx + 3, gy + 2, fx + 1, gy - 1);
+        gfx.fillRect(fx, fenceBot - 10, 3, 10);
+        gfx.fillTriangle(fx, fenceBot - 10, fx + 3, fenceBot - 10, fx + 1, fenceBot - 13);
       }
     }
 
-    // Lv 13+: mailbox at front-left of plot
+    // Lv 13+: mailbox at front-left of plot (near fence)
     if (level >= 13) {
       const mbX = x + 5;
-      const mbY = gy + 4;
+      const mbY = gy - 18;
       gfx.fillStyle(0x888880, 1);
       gfx.fillRect(mbX + 1, mbY + 3, 2, 6);
       gfx.fillStyle(0xcc3322, 1);
@@ -654,9 +657,9 @@ export class GameScene extends Phaser.Scene {
       gfx.fillRect(mbX + 10, mbY + 1, 4, 3);
     }
 
-    // Lv 15+: flower bed in front of house
+    // Lv 15+: flower bed in front of house (at building base)
     if (level >= 15) {
-      const fbY = gy + 5;
+      const fbY = buildGY + 2;
       const fbX = dx - 10;
       const fbW = dw + 20;
       gfx.fillStyle(0x4a2810, 1);
