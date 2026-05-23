@@ -420,6 +420,13 @@ export class GameScene extends Phaser.Scene {
     gfx.lineStyle(1, 0x7e7870, 1);
     gfx.moveTo(bx, gy - foundH).lineTo(bx + bw, gy - foundH).strokePath();
 
+    // ── Front yard lawn ───────────────────────────────────────
+    const YARD_H = 20;
+    gfx.fillStyle(0x5a8c3a, 1);
+    gfx.fillRect(x, gy, w, YARD_H);
+    gfx.fillStyle(0x4a7a2e, 1);
+    gfx.fillRect(x, gy, w, 2);
+
     // ── Roof params ───────────────────────────────────────────
     const roofH = Math.round(bw * 0.42);
     const ov    = 6;
@@ -581,8 +588,8 @@ export class GameScene extends Phaser.Scene {
       const pathW = dw - 4;
       const pathX = dx + 2;
       gfx.fillStyle(0xc8b898, 1);
-      for (let py = gy + 3; py < gy + 18; py += 7) {
-        gfx.fillRect(pathX, py, pathW, 5);
+      for (let py = gy + 3; py < gy + YARD_H - 3; py += 7) {
+        gfx.fillRect(pathX, py, pathW, 4);
       }
     }
 
@@ -592,7 +599,7 @@ export class GameScene extends Phaser.Scene {
       const bshY = gy - foundH;
       if (level >= 12) {
         gfx.fillStyle(0x5a3010, 1);
-        gfx.fillRect(bshX - 1, bshY - 14, 3, 14);
+        gfx.fillRect(bshX - 1, bshY - 14, 3, 20);
         gfx.fillStyle(0x217a10, 1);
         gfx.fillCircle(bshX, bshY - 18, 9);
         gfx.fillStyle(0x2e9a1a, 1);
@@ -600,7 +607,7 @@ export class GameScene extends Phaser.Scene {
         gfx.fillCircle(bshX + 4, bshY - 20, 6);
       } else {
         gfx.fillStyle(0x4a2808, 1);
-        gfx.fillRect(bshX - 1, bshY - 7, 2, 7);
+        gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
         gfx.fillStyle(0x257018, 1);
         gfx.fillCircle(bshX, bshY - 9, 6);
         gfx.fillStyle(0x308a20, 1);
@@ -613,7 +620,7 @@ export class GameScene extends Phaser.Scene {
       const bshX = bx + bw - 8;
       const bshY = gy - foundH;
       gfx.fillStyle(0x4a2808, 1);
-      gfx.fillRect(bshX - 1, bshY - 7, 2, 7);
+      gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
       gfx.fillStyle(0x257018, 1);
       gfx.fillCircle(bshX, bshY - 9, 6);
       gfx.fillStyle(0x308a20, 1);
