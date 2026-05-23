@@ -885,21 +885,51 @@ export class GameScene extends Phaser.Scene {
         const plot = this.state.plots[i];
         if (!plot.unlocked) continue;
 
-        const x = this.plotLeft(i);
-        const w = this.plotWidth;
-        const h = this.buildingHeight(plot.level);
-        const bw = plot.level <= 15 ? Math.round(w * 0.8) : w;
-        const bx = plot.level <= 15 ? x + (w - bw) / 2 : x;
+        const x   = this.plotLeft(i);
+        const w   = this.plotWidth;
+        const h   = this.buildingHeight(plot.level);
+        const bw  = plot.level <= 15 ? Math.round(w * 0.82) : w;
+        const bx  = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
+        const shadBot = this.groundY + shadowH;
 
-        const lean = leanRate * h;
+        if (plot.level <= 15) {
+          // Tier 1 house: elevated above road by YARD_H, triangular roof.
+          const YARD_H  = 20;
+          const buildGY = this.groundY - YARD_H;
+          const roofHVal = Math.round(bw * 0.42);
+          const mid      = bx + Math.round(bw / 2);
 
-        const p1x = bx,              p1y = this.groundY;
-        const p2x = bx + bw,         p2y = this.groundY;
-        const p3x = bx + bw + lean,  p3y = this.groundY + shadowH;
-        const p4x = bx + lean,       p4y = this.groundY + shadowH;
+          // Shadow lean accounts for the extra YARD_H elevation above the road.
+          const fullLean = leanRate * (h + YARD_H);
+          // Roof peak is roofHVal higher than the eave — extends shadow further.
+          const peakLean = leanRate * (h + YARD_H + roofHVal);
+          const peakShadX = mid + peakLean;
 
-        gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-        gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+          // Main body shadow: top edge starts at buildGY (on lawn), bottom at road end.
+          const p1x = bx,          p1y = buildGY;
+          const p2x = bx + bw,     p2y = buildGY;
+          const p3x = bx + bw + fullLean, p3y = shadBot;
+          const p4x = bx + fullLean,      p4y = shadBot;
+
+          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+
+          // Roof peak extension: pointed triangle beyond the wall shadow.
+          if (leanRate >= 0) {
+            gfx.fillTriangle(p2x, p2y, p3x, p3y, peakShadX, shadBot);
+          } else {
+            gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
+          }
+        } else {
+          const lean = leanRate * h;
+          const p1x = bx,              p1y = this.groundY;
+          const p2x = bx + bw,         p2y = this.groundY;
+          const p3x = bx + bw + lean,  p3y = shadBot;
+          const p4x = bx + lean,       p4y = shadBot;
+
+          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+        }
       }
     }
   }
