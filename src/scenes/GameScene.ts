@@ -623,12 +623,20 @@ export class GameScene extends Phaser.Scene {
     const NUM_SAMPLES = 5;
     const DISC_SPREAD = 0.10; // radians (~5.7°) — wider = softer penumbra
 
+    // Clamp the lean-to-height ratio so all buildings share the same shadow
+    // angle regardless of height. Equivalent to a minimum effective sun
+    // elevation of ~20° — prevents near-horizon runaway without inconsistency.
+    const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35); // ~2.74
+
     for (let s = 0; s < NUM_SAMPLES; s++) {
       const t = (s / (NUM_SAMPLES - 1)) - 0.5; // −0.5 … +0.5
       const sAngle = sunAngle + t * DISC_SPREAD;
       const sElev = Math.sin(sAngle);
       const sHoriz = Math.cos(sAngle);
       if (sElev <= 0.01) continue;
+
+      // Same lean angle for every building height (parallel-ray physics).
+      const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
 
       gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
 
@@ -642,10 +650,7 @@ export class GameScene extends Phaser.Scene {
         const bw = plot.level <= 15 ? Math.round(w * 0.8) : w;
         const bx = plot.level <= 15 ? x + (w - bw) / 2 : x;
 
-        // Parallel-ray lean: sun is infinitely distant so all rays are
-        // parallel. Sign: sun right (cos<0) → shadow left (lean<0), and vice versa.
-        const rawLean = (sHoriz / sElev) * h;
-        const lean = Math.max(-w * 4, Math.min(w * 4, rawLean));
+        const lean = leanRate * h;
 
         const p1x = bx,              p1y = this.groundY;
         const p2x = bx + bw,         p2y = this.groundY;
