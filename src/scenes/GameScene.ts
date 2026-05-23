@@ -420,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     gfx.moveTo(bx, gy - foundH).lineTo(bx + bw, gy - foundH).strokePath();
 
     // ── Horizontal siding boards ───────────────────────────────
-    gfx.lineStyle(1, 0xddd0b8, 0.32);
+    gfx.lineStyle(1, 0xddd0b8, 0.12);
     for (let ly = top + 4; ly < top + bodyH - 1; ly += 5) {
       gfx.moveTo(bx + 5, ly).lineTo(bx + bw - 5, ly).strokePath();
     }
@@ -443,7 +443,7 @@ export class GameScene extends Phaser.Scene {
 
     // Shingle rows (10% darker than roof colour 0xb04030)
     const shingleRows = 7;
-    gfx.lineStyle(1, 0x9e3a2b, 0.45);
+    gfx.lineStyle(1, 0x9e3a2b, 0.18);
     for (let r = 1; r < shingleRows; r++) {
       const frac  = r / shingleRows;
       const rowY  = top - roofH + frac * roofH;
