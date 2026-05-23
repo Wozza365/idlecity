@@ -63,7 +63,6 @@ export class GameScene extends Phaser.Scene {
   private masterClock!: Phaser.Tweens.Tween;
   private timeOffsetMs: number = 0;
 
-  private timeOfDay = 0;
   private sunAngle: number = Math.PI / 2;
   private sunCircle!: Phaser.GameObjects.Arc;
   private sunGlowArc!: Phaser.GameObjects.Arc;
@@ -157,7 +156,7 @@ export class GameScene extends Phaser.Scene {
     this.skyRect = this.add
       .rectangle(width / 2, this.groundY / 2, width, this.groundY, 0x4a7fb5)
       .setDepth(0);
-    this.skyRect.setPipeline('Light2D');
+    // Sky controls its own color directly; Light2D would multiply it dark
     this.panelBg = this.add
       .rectangle(width / 2, (this.panelTop + height) / 2, width, height - this.panelTop, 0x1e2433)
       .setDepth(1);
@@ -251,13 +250,9 @@ export class GameScene extends Phaser.Scene {
     // Sun completes one full orbit per 240s cycle
     this.sunAngle = Math.PI / 2 + (elapsed / 240_000) * Math.PI * 2;
 
-    // timeOfDay: 0 = noon (bright), 1 = midnight (dark). Cosine gives smooth
-    // natural transitions without needing a separate easing tween.
-    const phase = (elapsed / 240_000) * Math.PI * 2;
-    this.timeOfDay = (1 - Math.cos(phase)) / 2;
-
-    this.updateSkyColour();
-    this.nightOverlay?.setAlpha(this.timeOfDay * 0.55);
+    const elev = Math.sin(this.sunAngle);
+    this.updateSkyColour(elev);
+    this.updateSceneOverlay(elev);
     this.updateSun();
   }
 
@@ -790,8 +785,34 @@ export class GameScene extends Phaser.Scene {
 
   // ── Day/night helpers ──────────────────────────────────────────────────────
 
-  private updateSkyColour(): void {
-    this.skyRect?.setFillStyle(lerpColor(0x4a7fb5, 0x0a0a1a, this.timeOfDay));
+  private updateSkyColour(elev: number): void {
+    let skyColor: number;
+    if (elev <= -0.10) {
+      skyColor = 0x060612;
+    } else if (elev < 0) {
+      skyColor = lerpColor(0x060612, 0x7a1508, (elev + 0.10) / 0.10);
+    } else if (elev < 0.15) {
+      skyColor = lerpColor(0x7a1508, 0xff7733, elev / 0.15);
+    } else if (elev < 0.40) {
+      skyColor = lerpColor(0xff7733, 0x4a7fb5, (elev - 0.15) / 0.25);
+    } else {
+      skyColor = 0x4a7fb5;
+    }
+    this.skyRect?.setFillStyle(skyColor);
+  }
+
+  // Repurposes the night overlay: warm orange tint at sunrise/sunset, dark blue at night.
+  private updateSceneOverlay(elev: number): void {
+    if (elev > 0.25) {
+      this.nightOverlay.setAlpha(0);
+    } else if (elev > 0) {
+      this.nightOverlay.setFillStyle(0xff5500).setAlpha(0.28 * (1 - elev / 0.25));
+    } else if (elev > -0.15) {
+      const t = -elev / 0.15;
+      this.nightOverlay.setFillStyle(lerpColor(0xff4400, 0x000022, t)).setAlpha(0.28 + t * 0.27);
+    } else {
+      this.nightOverlay.setFillStyle(0x000022).setAlpha(0.55);
+    }
   }
 
   // ── Sun & lighting ─────────────────────────────────────────────────────────
@@ -848,7 +869,9 @@ export class GameScene extends Phaser.Scene {
     this.sunGlowArc.setFillStyle(sunColor, 0.3);
     this.sunLight.setColor(sunColor);
 
-    const amb = Math.max(0.08, elevation * 0.55 + 0.14);
+    // At low elevation keep ambient bright enough to show warm tint on buildings
+    const ambMin = elevation >= 0 ? Math.max(0.08, 0.28 - elevation) : 0.08;
+    const amb = Math.max(ambMin, elevation * 0.55 + 0.14);
     // Warm orange ambient tint at low sun, neutral white at high sun
     const ambTint = lerpColor(0xff8833, 0xffffff, Math.min(1, elevation * 3));
     const ar = Math.round(((ambTint >> 16) & 0xff) * amb);
