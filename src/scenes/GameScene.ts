@@ -327,6 +327,7 @@ export class GameScene extends Phaser.Scene {
   // ── Height helper ──────────────────────────────────────────────────────────
 
   private buildingHeight(level: number): number {
+    if (level <= 15) return PLOT_BASE_HEIGHT; // tier 1: static visual height
     const clamped = Math.max(1, Math.min(level, MAX_LEVEL));
     return PLOT_BASE_HEIGHT + (clamped - 1) * HEIGHT_PER_LEVEL;
   }
@@ -399,36 +400,148 @@ export class GameScene extends Phaser.Scene {
     container: Phaser.GameObjects.Container,
     x: number, w: number, h: number, top: number
   ): void {
-    const bw = Math.round(w * 0.8);
-    const bx = x + (w - bw) / 2;
+    const bw   = Math.round(w * 0.82);
+    const bx   = x + Math.round((w - bw) / 2);
+    const gy   = this.groundY;
+    const foundH = 6;
+    const bodyH  = h - foundH;  // wall height above foundation
 
-    const body = this.add.rectangle(bx + bw / 2, top + h / 2, bw, h, 0xb5651d);
+    // ── Body (Light2D pipeline so it responds to the sun) ──────
+    const body = this.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xf2e0bf);
     body.setPipeline('Light2D');
     container.add(body);
 
     const gfx = this.add.graphics();
-    const roofHeight = Math.round(bw * 0.45);
-    gfx.fillStyle(0x7a3b10, 1);
-    gfx.fillTriangle(bx - 4, top, bx + bw + 4, top, bx + bw / 2, top - roofHeight);
 
-    const chimneyW = Math.round(bw * 0.12);
-    const chimneyH = Math.round(roofHeight * 0.6);
-    const chimneyX = bx + Math.round(bw * 0.65);
-    gfx.fillStyle(0x8b4513, 1);
-    gfx.fillRect(chimneyX, top - roofHeight + Math.round(roofHeight * 0.3) - chimneyH, chimneyW, chimneyH);
+    // ── Foundation ─────────────────────────────────────────────
+    gfx.fillStyle(0x9e9890, 1);
+    gfx.fillRect(bx, gy - foundH, bw, foundH);
+    gfx.lineStyle(1, 0x7e7870, 1);
+    gfx.moveTo(bx, gy - foundH).lineTo(bx + bw, gy - foundH).strokePath();
 
-    const winSize = Math.round(bw * 0.18);
-    const winY = top + Math.round(h * 0.45);
-    const winSpacing = Math.round(bw * 0.28);
-    const winBaseX = bx + Math.round((bw - winSpacing - winSize) / 2);
-    gfx.fillStyle(0xffe8a0, 1);
-    gfx.fillRect(winBaseX, winY, winSize, winSize);
-    gfx.fillRect(winBaseX + winSpacing, winY, winSize, winSize);
+    // ── Horizontal siding boards ───────────────────────────────
+    gfx.lineStyle(1, 0xd0c0a0, 0.65);
+    for (let ly = top + 4; ly < top + bodyH - 1; ly += 5) {
+      gfx.moveTo(bx + 5, ly).lineTo(bx + bw - 5, ly).strokePath();
+    }
 
-    const doorW = Math.round(bw * 0.22);
-    const doorH = Math.round(h * 0.28);
-    gfx.fillStyle(0x5c3317, 1);
-    gfx.fillRect(bx + Math.round((bw - doorW) / 2), this.groundY - doorH, doorW, doorH);
+    // ── Roof params ────────────────────────────────────────────
+    const roofH = Math.round(bw * 0.42);
+    const ov    = 6;                      // eave overhang
+    const mid   = bx + Math.round(bw / 2);
+
+    // ── Chimney — drawn BEFORE roof so roof occludes the base ──
+    const cw  = Math.round(bw * 0.10);
+    const chx = bx + Math.round(bw * 0.67);
+    const chimneyTopY = top - roofH - 10;
+    gfx.fillStyle(0x9a3e2e, 1);
+    gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
+
+    // ── Roof triangle ──────────────────────────────────────────
+    gfx.fillStyle(0x3c3530, 1);
+    gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
+
+    // Shingle rows
+    const shingleRows = 7;
+    gfx.lineStyle(1, 0x5a4f44, 0.9);
+    for (let r = 1; r < shingleRows; r++) {
+      const frac  = r / shingleRows;
+      const rowY  = top - roofH + frac * roofH;
+      const halfW = (bw / 2 + ov) * frac;
+      gfx.moveTo(mid - halfW, rowY).lineTo(mid + halfW, rowY).strokePath();
+    }
+    // Rake trim (sloped edges)
+    gfx.lineStyle(2, 0xf0e4cc, 0.9);
+    gfx.moveTo(bx - ov, top).lineTo(mid, top - roofH).strokePath();
+    gfx.moveTo(bx + bw + ov, top).lineTo(mid, top - roofH).strokePath();
+    // Eave soffit
+    gfx.lineStyle(2, 0xede0c8, 1);
+    gfx.moveTo(bx - ov, top).lineTo(bx + bw + ov, top).strokePath();
+
+    // ── Chimney brick detail above the roof slope ───────────────
+    const slopeT  = Math.max(0, (chx - mid) / (bw / 2 + ov));
+    const slopeY  = top - roofH + slopeT * roofH;
+    gfx.lineStyle(1, 0x6e2818, 0.9);
+    for (let cy = chimneyTopY + 4; cy < slopeY - 2; cy += 5) {
+      gfx.moveTo(chx, cy).lineTo(chx + cw, cy).strokePath();
+    }
+    gfx.fillStyle(0x7a6e64, 1);
+    gfx.fillRect(chx - 2, chimneyTopY, cw + 4, 3);   // cap
+
+    // ── Windows ────────────────────────────────────────────────
+    const ww  = Math.round(bw * 0.18);
+    const wh  = Math.round(ww * 1.4);
+    const wy  = top + Math.round(bodyH * 0.18);
+    const sw  = Math.round(ww * 0.40);
+    const wx1 = bx + Math.round(bw * 0.08);
+    const wx2 = bx + Math.round(bw * 0.74);
+
+    for (const wxx of [wx1, wx2]) {
+      // Green shutters
+      gfx.fillStyle(0x265c22, 1);
+      gfx.fillRect(wxx - sw - 1, wy, sw, wh);
+      gfx.fillRect(wxx + ww + 1, wy, sw, wh);
+      // Shutter louvres
+      gfx.lineStyle(1, 0x163e14, 0.8);
+      for (let sl = 4; sl < wh - 2; sl += 4) {
+        gfx.moveTo(wxx - sw - 1, wy + sl).lineTo(wxx - 1, wy + sl).strokePath();
+        gfx.moveTo(wxx + ww + 1, wy + sl).lineTo(wxx + ww + sw + 1, wy + sl).strokePath();
+      }
+      // White frame
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
+      // Upper sash glass
+      const sashH = Math.round(wh / 2) - 1;
+      gfx.fillStyle(0x8ab4cc, 0.85);
+      gfx.fillRect(wxx, wy, ww, sashH);
+      // Lower sash glass (slightly lighter)
+      gfx.fillStyle(0x9ec2d8, 0.85);
+      gfx.fillRect(wxx, wy + sashH + 2, ww, wh - sashH - 2);
+      // Sash rail (horizontal divider between upper/lower)
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillRect(wxx, wy + sashH, ww, 2);
+      // Vertical muntin
+      gfx.fillRect(wxx + Math.round(ww / 2) - 1, wy, 2, wh);
+      // Sill
+      gfx.fillRect(wxx - 3, wy + wh + 2, ww + 6, 3);
+    }
+
+    // ── Door ───────────────────────────────────────────────────
+    const dw  = Math.round(bw * 0.20);
+    const dh  = Math.round(bodyH * 0.52);
+    const dx  = bx + Math.round((bw - dw) / 2);
+    const dy  = gy - foundH - dh;
+    // White surround frame
+    gfx.fillStyle(0xffffff, 1);
+    gfx.fillRect(dx - 4, dy - 2, dw + 8, dh + 2);
+    // Door body (red — classic US suburban)
+    gfx.fillStyle(0xb02e1e, 1);
+    gfx.fillRect(dx, dy, dw, dh);
+    // Raised panels
+    const pInset = Math.round(dw * 0.12);
+    const ph     = Math.round(dh * 0.32);
+    gfx.fillStyle(0xc84030, 1);
+    gfx.fillRect(dx + pInset, dy + 4,        dw - pInset * 2, ph);
+    gfx.fillRect(dx + pInset, dy + ph + 8,   dw - pInset * 2, ph);
+    gfx.lineStyle(1, 0x7a1e10, 1);
+    gfx.strokeRect(dx + pInset, dy + 4,      dw - pInset * 2, ph);
+    gfx.strokeRect(dx + pInset, dy + ph + 8, dw - pInset * 2, ph);
+    // Knob
+    gfx.fillStyle(0xd4a820, 1);
+    gfx.fillCircle(dx + dw - 5, dy + Math.round(dh * 0.52), 2);
+    // Lintel above door
+    gfx.fillStyle(0xe8dcc8, 1);
+    gfx.fillRect(dx - 5, dy - 5, dw + 10, 5);
+    // Steps
+    gfx.fillStyle(0xb0b0a4, 1);
+    gfx.fillRect(dx - 3, gy - foundH, dw + 6, foundH);
+    gfx.fillStyle(0xa0a094, 1);
+    gfx.fillRect(dx - 6, gy - 3, dw + 12, 3);
+
+    // ── Corner trim boards (drawn last — sits over shutters) ───
+    gfx.fillStyle(0xffffff, 1);
+    gfx.fillRect(bx, top, 4, bodyH);
+    gfx.fillRect(bx + bw - 4, top, 4, bodyH);
 
     container.add(gfx);
   }
