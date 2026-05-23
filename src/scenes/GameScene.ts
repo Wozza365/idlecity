@@ -617,7 +617,7 @@ export class GameScene extends Phaser.Scene {
     gfx.clear();
     if (elevation <= 0.02) return;
 
-    const totalAlpha = Math.min(0.66, elevation * 0.84 + 0.12);
+    const totalAlpha = Math.min(0.792, elevation * 1.008 + 0.144);
     const shadowH = ROAD_H - 4;
 
     const NUM_SAMPLES = 5;
