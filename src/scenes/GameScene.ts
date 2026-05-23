@@ -95,7 +95,7 @@ export class GameScene extends Phaser.Scene {
     // Persistent graphics layers — depth-ordered, never destroyed
     this.vergeRiverGraphics = this.add.graphics().setDepth(6);
     this.roadGraphics       = this.add.graphics().setDepth(7);
-    this.buildingShadowGfx  = this.add.graphics().setDepth(8);
+    this.buildingShadowGfx  = this.add.graphics().setDepth(9.5);
     this.panelChromeGfx     = this.add.graphics().setDepth(10);
 
     // Build all layout-dependent visuals
