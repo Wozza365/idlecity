@@ -10,6 +10,8 @@ const MAX_LEVEL = 100;
 const UI_HEIGHT = 200;    // fixed UI panel height at the bottom
 const STATS_BAR_H = 54;   // top strip of UI panel (road + income + balance)
 const ROAD_H = 48;        // road strip between sky and UI panel
+const VERGE_H = 24;       // grass verge below road (half road height)
+const RIVER_H = 48;       // river below verge (same as road height)
 
 /** Gold required to unlock each building slot (index = building id). */
 const UNLOCK_COSTS: readonly number[] = [0, 500, 2_500, 15_000, 100_000];
@@ -38,6 +40,7 @@ export class GameScene extends Phaser.Scene {
 
   // Graphics layers created once in create(), redrawn on layout changes
   private roadGraphics!: Phaser.GameObjects.Graphics;
+  private vergeRiverGraphics!: Phaser.GameObjects.Graphics;
   private buildingShadowGfx!: Phaser.GameObjects.Graphics;
   private panelChromeGfx!: Phaser.GameObjects.Graphics;
 
@@ -78,7 +81,7 @@ export class GameScene extends Phaser.Scene {
   // after any browser resize or orientation change.
 
   private get plotWidth(): number { return this.scale.width / PLOT_COUNT; }
-  private get groundY(): number { return this.scale.height - UI_HEIGHT - ROAD_H; }
+  private get groundY(): number { return this.scale.height - UI_HEIGHT - ROAD_H - VERGE_H - RIVER_H; }
   private get panelTop(): number { return this.scale.height - UI_HEIGHT; }
   private get colTop(): number { return this.panelTop + STATS_BAR_H; }
   private get sectionW(): number { return this.scale.width / PLOT_COUNT; }
@@ -90,9 +93,10 @@ export class GameScene extends Phaser.Scene {
     this.lights.setAmbientColor(0x888888);
 
     // Persistent graphics layers — depth-ordered, never destroyed
-    this.roadGraphics      = this.add.graphics().setDepth(7);
-    this.buildingShadowGfx = this.add.graphics().setDepth(8);
-    this.panelChromeGfx    = this.add.graphics().setDepth(10);
+    this.vergeRiverGraphics = this.add.graphics().setDepth(6);
+    this.roadGraphics       = this.add.graphics().setDepth(7);
+    this.buildingShadowGfx  = this.add.graphics().setDepth(8);
+    this.panelChromeGfx     = this.add.graphics().setDepth(10);
 
     // Build all layout-dependent visuals
     this.buildLayout();
@@ -159,6 +163,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(1);
 
     this.renderRoad();
+    this.renderVergeAndRiver();
 
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);
@@ -914,10 +919,12 @@ export class GameScene extends Phaser.Scene {
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
-          // Roof peak extension: pointed triangle beyond the wall shadow.
-          if (leanRate >= 0) {
+          // Roof peak extension — only when peak shadow genuinely reaches
+          // beyond the wall edge. Skipped at high sun to avoid a degenerate
+          // triangle that doubles alpha and creates a dark notch.
+          if (leanRate >= 0 && peakShadX > p3x) {
             gfx.fillTriangle(p2x, p2y, p3x, p3y, peakShadX, shadBot);
-          } else {
+          } else if (leanRate < 0 && peakShadX < p4x) {
             gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
           }
         } else {
@@ -1162,6 +1169,20 @@ export class GameScene extends Phaser.Scene {
       const dy = Math.round(gy + ROAD_H * frac) - 1;
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, dy, 20, 2);
     }
+  }
+
+  private renderVergeAndRiver(): void {
+    const gfx = this.vergeRiverGraphics;
+    gfx.clear();
+    const { width } = this.scale;
+    const vergeY = this.groundY + ROAD_H;
+    const riverY = vergeY + VERGE_H;
+
+    gfx.fillStyle(0x4a8c3a, 1);
+    gfx.fillRect(0, vergeY, width, VERGE_H);
+
+    gfx.fillStyle(0x2a6ab5, 1);
+    gfx.fillRect(0, riverY, width, RIVER_H);
   }
 
   // ── Road UI ────────────────────────────────────────────────────────────────
