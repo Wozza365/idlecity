@@ -903,36 +903,36 @@ export class GameScene extends Phaser.Scene {
 
         if (plot.level <= 15) {
           // Tier 1 house: sits on buildGY (YARD_H above road), triangular roof.
-          // Physically correct parallelogram: the top edge is wider than the
-          // building footprint by leanRate*h because the wall tops cast shadow
-          // to one side even at y=buildGY.
+          // Shadow is a parallelogram with the same width as the building (bw),
+          // leaned horizontally by leanRate × full depth from buildGY to shadBot.
           const YARD_H   = 20;
           const buildGY  = this.groundY - YARD_H;
           const roofHVal = Math.round(bw * 0.42);
           const mid      = bx + Math.round(bw / 2);
-          const depth    = shadowExtent + YARD_H; // shadow depth from buildGY
+          const lean     = leanRate * (shadowExtent + YARD_H);
 
-          const p1x = bx,                               p1y = buildGY;
-          const p2x = bx + bw + leanRate * h,           p2y = buildGY;
-          const p3x = bx + bw + leanRate * (depth + h), p3y = shadBot;
-          const p4x = bx + leanRate * depth,            p4y = shadBot;
+          const p1x = bx,        p1y = buildGY;
+          const p2x = bx + bw,   p2y = buildGY;
+          const p3x = bx + bw + lean, p3y = shadBot;
+          const p4x = bx + lean,      p4y = shadBot;
 
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
-          // Roof peak extension — only when peak genuinely reaches beyond wall.
-          const peakShadX = mid + leanRate * (depth + h + roofHVal);
+          // Roof peak casts shadow further than wall edges at low sun angles.
+          const peakShadX = mid + leanRate * (shadowExtent + YARD_H + h + roofHVal);
           if (leanRate >= 0 && peakShadX > p3x) {
             gfx.fillTriangle(p2x, p2y, p3x, p3y, peakShadX, shadBot);
           } else if (leanRate < 0 && peakShadX < p4x) {
             gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
           }
         } else {
-          // Taller tiers sit at road level; same physically correct shape.
-          const p1x = bx,                                       p1y = this.groundY;
-          const p2x = bx + bw + leanRate * h,                   p2y = this.groundY;
-          const p3x = bx + bw + leanRate * (shadowExtent + h),  p3y = shadBot;
-          const p4x = bx + leanRate * shadowExtent,             p4y = shadBot;
+          // Taller tiers sit at road level; same-width parallelogram.
+          const lean = leanRate * shadowExtent;
+          const p1x = bx,        p1y = this.groundY;
+          const p2x = bx + bw,   p2y = this.groundY;
+          const p3x = bx + bw + lean, p3y = shadBot;
+          const p4x = bx + lean,      p4y = shadBot;
 
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
