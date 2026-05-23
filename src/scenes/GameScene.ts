@@ -842,9 +842,19 @@ export class GameScene extends Phaser.Scene {
     this.sunLight.y = sunY;
     this.sunLight.intensity = Math.max(0, elevation * 3.2);
 
+    // Dynamic sun color: deep orange-red at horizon → golden yellow → warm white at noon
+    const sunColor = sunColorAtElevation(elevation);
+    this.sunCircle.setFillStyle(sunColor);
+    this.sunGlowArc.setFillStyle(sunColor, 0.3);
+    this.sunLight.setColor(sunColor);
+
     const amb = Math.max(0.08, elevation * 0.55 + 0.14);
-    const av = Math.round(amb * 255);
-    this.lights.setAmbientColor((av << 16) | (av << 8) | av);
+    // Warm orange ambient tint at low sun, neutral white at high sun
+    const ambTint = lerpColor(0xff8833, 0xffffff, Math.min(1, elevation * 3));
+    const ar = Math.round(((ambTint >> 16) & 0xff) * amb);
+    const ag = Math.round(((ambTint >> 8) & 0xff) * amb);
+    const ab = Math.round((ambTint & 0xff) * amb);
+    this.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
 
     this.drawBuildingShadows(a, elevation);
   }
@@ -869,7 +879,7 @@ export class GameScene extends Phaser.Scene {
     // Extends through road → verge → river at sunrise/sunset.
     const maxShadow = ROAD_H + VERGE_H + RIVER_H;
     const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5));
-    const shadBot = this.groundY + shadowExtent;
+    const shadBot = Math.min(this.groundY + shadowExtent, this.panelTop);
 
     const NUM_SAMPLES = 11;
     const DISC_SPREAD = 0.10; // radians (~5.7°) — wider = softer penumbra
@@ -1261,6 +1271,13 @@ function lerpColor(a: number, b: number, t: number): number {
   const g = Math.round(((a >> 8) & 0xff) * (1 - t) + ((b >> 8) & 0xff) * t);
   const bl = Math.round((a & 0xff) * (1 - t) + (b & 0xff) * t);
   return (r << 16) | (g << 8) | bl;
+}
+
+function sunColorAtElevation(elev: number): number {
+  const t = Math.max(0, Math.min(1, elev));
+  if (t < 0.20) return lerpColor(0xff3300, 0xffaa33, t / 0.20);
+  if (t < 0.50) return lerpColor(0xffaa33, 0xffe066, (t - 0.20) / 0.30);
+  return lerpColor(0xffe066, 0xfff8e0, (t - 0.50) / 0.50);
 }
 
 function fmt(n: number): string {
