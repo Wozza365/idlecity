@@ -168,8 +168,8 @@ export class SunMoon {
           const signWidth = 48;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
-          const shadowGapDistance = 16;
-          const fixedShadowLength = 15;
+          const shadowGapDistance = 22;
+          const fixedShadowLength = 8;
 
           // Raycast from light position through sign to ground plane
           // Light is at (sunX, sunY - 300), sign base at buildGY
@@ -179,9 +179,16 @@ export class SunMoon {
             const t1 = (buildGY + shadowGapDistance - lightY) / (buildGY - lightY);
             const shadowStartLeftX = sunX + t1 * (signLeft - sunX);
             const shadowStartRightX = sunX + t1 * (signRight - sunX);
+            const postShadowX = sunX + t1 * (cx - sunX);
 
-            // Calculate where shadow extends to
+            // Shadow for the wooden post (thicker, starts where sign shadow begins)
             const t2 = (buildGY + shadowGapDistance + fixedShadowLength - lightY) / (buildGY - lightY);
+            const postShadowEndX = sunX + t2 * (cx - sunX);
+
+            gfx.fillTriangle(postShadowX - 2, buildGY + shadowGapDistance, postShadowX + 2, buildGY + shadowGapDistance, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength);
+            gfx.fillTriangle(postShadowX - 2, buildGY + shadowGapDistance, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength);
+
+            // Calculate where sign shadow extends to
             const shadowEndLeftX = sunX + t2 * (signLeft - sunX);
             const shadowEndRightX = sunX + t2 * (signRight - sunX);
 
