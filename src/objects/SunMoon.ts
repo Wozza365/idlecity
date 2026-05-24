@@ -198,6 +198,10 @@ export class SunMoon {
               this.debugGfx.strokePath();
             }
           } else if (peakShadX > p4x && leanRate < 0) {
+            if (this.DEBUG_SHADOWS && s === 5) {
+              console.log(`  Roof condition 2 (peakShadX > p4x && leanRate < 0): ${peakShadX > p4x && leanRate < 0}`);
+              console.log(`    Drawing roof shadow: p1x=${p1x.toFixed(0)}, p4x=${p4x.toFixed(0)}, peakShadX=${peakShadX.toFixed(0)}, shadBot=${shadBot.toFixed(0)}`);
+            }
             gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
             if (this.DEBUG_SHADOWS) {
               this.debugGfx.lineStyle(2, 0x00ff00, 1);
