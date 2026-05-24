@@ -160,14 +160,14 @@ export class SunMoon {
         const w  = plotWidth;
         const buildGY = groundY - YARD_H;
 
-        // Shadow for empty plot sign (small object, minimal shadow)
+        // Shadow for empty plot sign (small object, just height-based lean)
         if (!plot.unlocked) {
           const cx = x + Math.round(w * 0.5);
           const signWidth = 48;
           const signHeight = 2;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
-          const signLean = leanRate * (shadowExtent + signHeight);
+          const signLean = Math.min(20, leanRate * signHeight);
 
           gfx.fillTriangle(signLeft, buildGY, signRight, buildGY, signRight + signLean, shadBot);
           gfx.fillTriangle(signLeft, buildGY, signRight + signLean, shadBot, signLeft + signLean, shadBot);
