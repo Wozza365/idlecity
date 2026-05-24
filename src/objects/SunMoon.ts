@@ -160,11 +160,11 @@ export class SunMoon {
         const w  = plotWidth;
         const buildGY = groundY - YARD_H;
 
-        // Shadow for empty plot sign (elevated, so casts longer shadow)
+        // Shadow for empty plot sign (small object, minimal shadow)
         if (!plot.unlocked) {
           const cx = x + Math.round(w * 0.5);
           const signWidth = 48;
-          const signHeight = 46;
+          const signHeight = 12;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
           const signLean = leanRate * (shadowExtent + signHeight);
