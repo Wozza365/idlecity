@@ -5,7 +5,7 @@ export class PanelChrome {
   private gfx: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.gfx = scene.add.graphics().setDepth(10);
+    this.gfx = scene.add.graphics().setDepth(10).setLighting(false);
   }
 
   draw(width: number, height: number, panelTop: number, colTop: number, sectionW: number): void {

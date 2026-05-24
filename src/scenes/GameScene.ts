@@ -123,7 +123,8 @@ export class GameScene extends Phaser.Scene {
     this.panelBg?.destroy();
     this.panelBg = this.add
       .rectangle(width / 2, (this.panelTop + height) / 2, width, height - this.panelTop, 0x1e2433)
-      .setDepth(1);
+      .setDepth(1)
+      .setLighting(false);
 
     this.road.render(this.state.road.level, width, this.groundY);
     this.vergeRiver.render(width, this.groundY);
