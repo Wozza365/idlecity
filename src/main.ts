@@ -10,6 +10,11 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.NO_CENTER,
   },
+  render: {
+    clearBeforeRender: true,
+    antialias: false,
+    roundPixels: true,
+  },
 };
 
 new Phaser.Game(config);
