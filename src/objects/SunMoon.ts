@@ -121,11 +121,11 @@ export class SunMoon {
     const ov = 6;
 
     return [
-      { x: bx, y: buildGY, height: 0 },
-      { x: bx + bw, y: buildGY, height: 0 },
-      { x: bx + bw + ov, y: top, height: h + YARD_H },
-      { x: mid, y: top - roofH, height: h + YARD_H + roofH },
-      { x: bx - ov, y: top, height: h + YARD_H },
+      { x: bx, y: buildGY, height: YARD_H },
+      { x: bx + bw, y: buildGY, height: YARD_H },
+      { x: bx + bw + ov, y: top, height: YARD_H + h },
+      { x: mid, y: top - roofH, height: YARD_H + h + roofH },
+      { x: bx - ov, y: top, height: YARD_H + h },
     ];
   }
 
