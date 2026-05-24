@@ -156,21 +156,38 @@ export class SunMoon {
           const buildGY  = groundY - YARD_H;
           const roofHVal = Math.round(bw * 0.42);
           const mid      = bx + Math.round(bw / 2);
-          const lean     = leanRate * (shadowExtent + YARD_H);
+          const chx      = bx + Math.round(bw * 0.67);
+          const chimneyH = roofHVal + 2;
 
-          const p1x = bx,             p1y = buildGY;
-          const p2x = bx + bw,        p2y = buildGY;
-          const p3x = bx + bw + lean, p3y = shadBot;
-          const p4x = bx + lean,      p4y = shadBot;
+          // Total building height including roof and chimney
+          const totalH = h + roofHVal + chimneyH;
+          const maxLean = leanRate * (shadowExtent + YARD_H + totalH);
 
+          const p1x = bx,              p1y = buildGY;
+          const p2x = bx + bw,         p2y = buildGY;
+          const p3x = bx + bw + maxLean, p3y = shadBot;
+          const p4x = bx + maxLean,      p4y = shadBot;
+
+          // Main shadow trapezoid (accounts for full building height including roof and chimney)
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
-          const peakShadX = mid + leanRate * (shadowExtent + YARD_H + h + roofHVal);
-          if (leanRate >= 0 && peakShadX > p3x) {
-            gfx.fillTriangle(p2x, p2y, p3x, p3y, peakShadX, shadBot);
-          } else if (leanRate < 0 && peakShadX < p4x) {
+          // Roof peak adds an extra wedge from building top to roof peak shadow
+          const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
+          const peakShadX = mid + peakLean;
+          if (peakShadX < p3x && leanRate >= 0) {
+            gfx.fillTriangle(p2x, p2y, peakShadX, shadBot, p3x, p3y);
+          } else if (peakShadX > p4x && leanRate < 0) {
             gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
+          }
+
+          // Chimney adds an extra wedge from roof peak to chimney shadow
+          const chimneyLean = maxLean;
+          const chimneyShadX = chx + chimneyLean;
+          if (chimneyShadX > peakShadX && leanRate >= 0) {
+            gfx.fillTriangle(peakShadX, shadBot, p3x, p3y, chimneyShadX, shadBot);
+          } else if (chimneyShadX < peakShadX && leanRate < 0) {
+            gfx.fillTriangle(peakShadX, shadBot, p4x, p4y, chimneyShadX, shadBot);
           }
         } else {
           const lean = leanRate * shadowExtent;
