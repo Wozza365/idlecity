@@ -103,20 +103,16 @@ export class SunMoon {
     this.moonGlowGfx.clear();
     const moonAbove = moonElev > 0.02;
     if (moonAbove) {
-      // Draw moon glow with multiple concentric circles
-      const glowAlpha = moonElev * 0.12;
+      const maxGlowRadius = 70;
+      const glowAlpha = moonElev * 0.08;
 
-      // Outer glow
-      this.moonGlowGfx.fillStyle(0xc8d8ff, glowAlpha * 0.25);
-      this.moonGlowGfx.fillCircle(moonX, moonY, 60);
-
-      // Mid glow
-      this.moonGlowGfx.fillStyle(0xc8d8ff, glowAlpha * 0.5);
-      this.moonGlowGfx.fillCircle(moonX, moonY, 35);
-
-      // Inner glow
-      this.moonGlowGfx.fillStyle(0xc8d8ff, glowAlpha);
-      this.moonGlowGfx.fillCircle(moonX, moonY, 18);
+      // Draw many concentric circles for smooth gradient falloff
+      for (let r = maxGlowRadius; r > 14; r -= 3) {
+        const t = (maxGlowRadius - r) / maxGlowRadius;
+        const alpha = glowAlpha * (1 - t * t);
+        this.moonGlowGfx.fillStyle(0xc8d8ff, alpha);
+        this.moonGlowGfx.fillCircle(moonX, moonY, r);
+      }
     }
 
     this.moonLight.x         = moonX;
