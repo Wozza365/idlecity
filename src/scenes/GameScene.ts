@@ -1,26 +1,12 @@
 import Phaser from 'phaser';
 import { type GameState, type PlotState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-const PLOT_COUNT = 5;
-const PLOT_BASE_HEIGHT = 60;
-const HEIGHT_PER_LEVEL = 6;
-const MAX_LEVEL = 100;
-const UI_HEIGHT = 200;    // fixed UI panel height at the bottom
-const STATS_BAR_H = 54;   // top strip of UI panel (road + income + balance)
-const ROAD_H = 48;        // road strip between sky and UI panel
-const VERGE_H = 24;       // grass verge below road (half road height)
-const RIVER_H = 48;       // river below verge (same as road height)
-const YARD_H = 20;        // front-yard lawn strip height (also dirt depth for empty plots)
-
-/** Gold required to unlock each building slot (index = building id). */
-const UNLOCK_COSTS: readonly number[] = [0, 500, 2_500, 15_000, 100_000];
-
-/** Gold required to upgrade from `level` to `level + 1`. Quadratic scaling. */
-function upgradeCost(level: number): number {
-  return level * level * 10;
-}
+import {
+  PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_H, VERGE_H, RIVER_H, YARD_H,
+  UNLOCK_COSTS,
+  upgradeCost, buildingHeight, perBuildingIncome, lerpColor, sunColorAtElevation, fmt,
+} from '../constants';
+import { createBuilding, EmptyPlot } from '../buildings';
+import { Sky } from '../objects/Sky';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -50,12 +36,10 @@ export class GameScene extends Phaser.Scene {
   private taxRateText!: Phaser.GameObjects.Text;
   private saveNotification!: Phaser.GameObjects.Text;
 
-  // Background — destroyed and recreated on resize
-  private skyGfx!: Phaser.GameObjects.Graphics;
+  // Sky manager: owns skyGfx (rebuilt on layout) + nightOverlay (persistent tween target)
+  private sky!: Sky;
+  // Panel background — destroyed and recreated on resize
   private panelBg!: Phaser.GameObjects.Rectangle;
-
-  // Night overlay — repositioned on resize, never recreated (tween target)
-  private nightOverlay!: Phaser.GameObjects.Rectangle;
 
   // Dev panel
   private devPanelContainer!: Phaser.GameObjects.Container;
@@ -77,8 +61,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ── Dynamic layout getters ─────────────────────────────────────────────────
-  // All positions are computed from the live canvas size so they stay correct
-  // after any browser resize or orientation change.
 
   private get plotWidth(): number { return this.scale.width / PLOT_COUNT; }
   private get groundY(): number { return this.scale.height - UI_HEIGHT - ROAD_H - VERGE_H - RIVER_H; }
@@ -98,19 +80,16 @@ export class GameScene extends Phaser.Scene {
     this.buildingShadowGfx  = this.add.graphics().setDepth(9.5);
     this.panelChromeGfx     = this.add.graphics().setDepth(10);
 
+    // Sky manager — creates nightOverlay (persistent) and initial skyGfx
+    this.sky = new Sky(this);
+
     // Build all layout-dependent visuals
     this.buildLayout();
 
     // Sun/moon objects — created once after layout (sun reads groundY)
     this.setupSun();
 
-    const { width, height } = this.scale;
-
-    // Night overlay: kept alive across resizes so the day/night tween continues
-    this.nightOverlay = this.add
-      .rectangle(width / 2, height / 2, width, height, 0x000022)
-      .setAlpha(0)
-      .setDepth(50);
+    const { width } = this.scale;
 
     // Save notification
     this.saveNotification = this.add
@@ -133,9 +112,7 @@ export class GameScene extends Phaser.Scene {
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
 
-    // Master clock: 0→240_000 ms, linear, loops forever.
-    // All day/night state is derived from (clock + timeOffsetMs) % 240_000
-    // so advanceTime() can simply add to timeOffsetMs with no tween seeking.
+    // Master clock: 0→240_000 ms, linear, loops forever
     this.masterClock = this.tweens.addCounter({
       from: 0,
       to: 240_000,
@@ -151,10 +128,10 @@ export class GameScene extends Phaser.Scene {
   private buildLayout(): void {
     const { width, height } = this.scale;
 
-    // Sky + panel backgrounds (destroy old ones first)
-    this.skyGfx?.destroy();
+    // Sky rebuild: destroys old skyGfx and creates a fresh one at depth 0
+    this.sky.rebuild();
+
     this.panelBg?.destroy();
-    this.skyGfx = this.add.graphics().setDepth(0);
     this.panelBg = this.add
       .rectangle(width / 2, (this.panelTop + height) / 2, width, height - this.panelTop, 0x1e2433)
       .setDepth(1);
@@ -181,7 +158,7 @@ export class GameScene extends Phaser.Scene {
 
     this.refreshButtons();
     this.updateStats();
-    this.updateSkyGradient(Math.sin(this.sunAngle));
+    this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY);
     this.updateSun();
   }
 
@@ -190,8 +167,7 @@ export class GameScene extends Phaser.Scene {
   private onResize(): void {
     const { width, height } = this.scale;
 
-    // Reposition persistent objects that are never destroyed
-    this.nightOverlay?.setPosition(width / 2, height / 2).setSize(width, height);
+    this.sky.resize(width, height);
     this.saveNotification?.setPosition(width - 12, 12);
     if (this.sunGroundGlow) this.sunGroundGlow.setDisplaySize(Math.round(width * 0.5), 22);
     if (this.sunLight) this.sunLight.radius = Math.max(800, width * 2);
@@ -210,8 +186,8 @@ export class GameScene extends Phaser.Scene {
     const row2Y = 42;
     container.add(this.add.rectangle(width / 2, 29, width, 58, 0x000000, 0.6));
 
-    const btnW = 120;
-    const gap = 8;
+    const btnW  = 120;
+    const gap   = 8;
     const leftX = (width - btnW * 2 - gap) / 2 + btnW / 2;
     const rightX = leftX + btnW + gap;
 
@@ -223,7 +199,7 @@ export class GameScene extends Phaser.Scene {
       this.add.text(leftX, row1Y, '+$100K', { fontSize: '13px', color: '#88ff88' }).setOrigin(0.5)
     );
     btn1.on('pointerover', () => btn1.setFillStyle(0x285e00));
-    btn1.on('pointerout', () => btn1.setFillStyle(0x1a4400));
+    btn1.on('pointerout',  () => btn1.setFillStyle(0x1a4400));
     btn1.on('pointerdown', () => {
       this.state.gold += 100_000;
       this.updateStats();
@@ -238,7 +214,7 @@ export class GameScene extends Phaser.Scene {
       this.add.text(rightX, row1Y, '+1 hr', { fontSize: '13px', color: '#88aaff' }).setOrigin(0.5)
     );
     btn2.on('pointerover', () => btn2.setFillStyle(0x001e5e));
-    btn2.on('pointerout', () => btn2.setFillStyle(0x001444));
+    btn2.on('pointerout',  () => btn2.setFillStyle(0x001444));
     btn2.on('pointerdown', () => this.advanceTime());
 
     // Row 2: clock (left) + reset (right)
@@ -257,14 +233,14 @@ export class GameScene extends Phaser.Scene {
       this.add.text(width / 2 + 60, row2Y, 'Reset All', { fontSize: '12px', color: '#ff8888' }).setOrigin(0.5)
     );
     resetBtn.on('pointerover', () => resetBtn.setFillStyle(0x661111));
-    resetBtn.on('pointerout', () => resetBtn.setFillStyle(0x440000));
+    resetBtn.on('pointerout',  () => resetBtn.setFillStyle(0x440000));
     resetBtn.on('pointerdown', () => this.resetGame());
 
     this.devPanelContainer = container;
   }
 
   private gameTimeString(): string {
-    const elapsed = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
+    const elapsed  = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
     const totalMins = (elapsed / 240_000) * 24 * 60;
     const hour = Math.floor(12 + totalMins / 60) % 24;
     const min  = Math.floor(totalMins) % 60;
@@ -281,18 +257,16 @@ export class GameScene extends Phaser.Scene {
     if (!this.masterClock) return;
     const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
 
-    // Sun completes one full orbit per 240s cycle
     this.sunAngle = Math.PI / 2 + (elapsed / 240_000) * Math.PI * 2;
 
     const elev = Math.sin(this.sunAngle);
-    this.updateSkyGradient(elev);
-    this.updateSceneOverlay(elev);
+    this.sky.updateGradient(elev, this.scale.width, this.groundY);
+    this.sky.updateOverlay(elev);
     this.updateSun();
     this.clockText?.setText(this.gameTimeString());
   }
 
   private advanceTime(): void {
-    // Advance by 1/24 of the 240s cycle (= 1 game hour = 10s real time)
     this.timeOffsetMs = (this.timeOffsetMs + 240_000 / 24) % 240_000;
   }
 
@@ -359,14 +333,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ── Height helper ──────────────────────────────────────────────────────────
-
-  private buildingHeight(level: number): number {
-    if (level <= 15) return PLOT_BASE_HEIGHT; // tier 1: static visual height
-    const clamped = Math.max(1, Math.min(level, MAX_LEVEL));
-    return PLOT_BASE_HEIGHT + (clamped - 1) * HEIGHT_PER_LEVEL;
-  }
-
   // ── Layout helpers ─────────────────────────────────────────────────────────
 
   private plotLeft(index: number): number {
@@ -405,538 +371,34 @@ export class GameScene extends Phaser.Scene {
 
   private renderPlot(index: number): Phaser.GameObjects.Container {
     this.plotContainers[index]?.destroy();
-    const x = this.plotLeft(index);
-    const container = this.add.container(0, 0).setDepth(9);
-    if (this.state.plots[index].unlocked) {
-      this.buildBuilding(container, x, this.state.plots[index].level);
-    } else {
-      this.buildEmptyPlot(container, x);
-    }
-    return container;
+    const x    = this.plotLeft(index);
+    const plot = this.state.plots[index];
+
+    const building = plot.unlocked
+      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level)
+      : new EmptyPlot(this, x, this.plotWidth, this.groundY);
+
+    building.setDepth(9);
+    this.add.existing(building);
+    return building;
   }
 
-  private buildBuilding(container: Phaser.GameObjects.Container, x: number, level: number): void {
-    const w = this.plotWidth;
-    const h = this.buildingHeight(level);
-    const top = this.groundY - h;
-
-    if (level <= 15) {
-      this.buildTier1House(container, x, w, h, top, level);
-    } else if (level <= 35) {
-      this.buildTier2Apartment(container, x, w, h, top);
-    } else if (level <= 65) {
-      this.buildTier3Office(container, x, w, h, top);
-    } else {
-      this.buildTier4Skyscraper(container, x, w, h, top);
-    }
-  }
-
-  private buildTier1House(
-    container: Phaser.GameObjects.Container,
-    x: number, w: number, h: number, top: number,
-    level: number
-  ): void {
-    const bw      = Math.round(w * 0.82);
-    const bx      = x + Math.round((w - bw) / 2);
-    const gy      = this.groundY;
-    const foundH  = 6;
-    const buildGY = gy - YARD_H;   // building sits above the lawn strip
-    top -= YARD_H;                  // shift entire building up
-    const bodyH  = h - foundH;
-
-    // ── Body ──────────────────────────────────────────────────
-    const body = this.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xfdf7ed);
-    body.setPipeline('Light2D');
-    container.add(body);
-
-    const gfx = this.add.graphics();
-
-    // ── Foundation ────────────────────────────────────────────
-    gfx.fillStyle(0x9e9890, 1);
-    gfx.fillRect(bx, buildGY - foundH, bw, foundH);
-    gfx.lineStyle(1, 0x7e7870, 1);
-    gfx.moveTo(bx, buildGY - foundH).lineTo(bx + bw, buildGY - foundH).strokePath();
-
-    // ── Front yard lawn (between building and road) ───────────
-    gfx.fillStyle(0x5a8c3a, 1);
-    gfx.fillRect(x, buildGY, w, YARD_H);
-    gfx.fillStyle(0x4a7a2e, 1);
-    gfx.fillRect(x, buildGY, w, 2);
-
-    // ── Roof params ───────────────────────────────────────────
-    const roofH = Math.round(bw * 0.42);
-    const ov    = 6;
-    const mid   = bx + Math.round(bw / 2);
-
-    // ── Chimney (drawn before roof so roof occludes base) ─────
-    const cw  = Math.round(bw * 0.10);
-    const chx = bx + Math.round(bw * 0.67);
-    const chimneyTopY = top - roofH - 2;
-    gfx.fillStyle(0x9a3e2e, 1);
-    gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
-
-    // ── Roof ──────────────────────────────────────────────────
-    gfx.fillStyle(0xb04030, 1);
-    gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
-
-    // Lv 5+: gable window in roof (attic / second-floor light)
-    if (level >= 5) {
-      const dw2 = Math.round(bw * 0.18);
-      const dh2 = Math.round(roofH * 0.28);
-      const dx2 = mid - Math.round(dw2 / 2);
-      const dy2 = top - roofH + Math.round(roofH * 0.24);
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(dx2, dy2, dw2, dh2);
-      gfx.fillStyle(0x8ab4cc, 1);
-      gfx.fillRect(dx2 + 2, dy2 + 2, dw2 - 4, dh2 - 4);
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(dx2 + 2, dy2 + 2 + Math.round((dh2 - 4) / 2), dw2 - 4, 2);
-      gfx.fillRect(dx2 + 2 + Math.round((dw2 - 4) / 2), dy2 + 2, 2, dh2 - 4);
-    }
-
-    // Lv 14+: satellite dish on left roof slope
-    if (level >= 14) {
-      const dishX   = bx + Math.round(bw * 0.28);
-      const dSlopeT = Math.max(0, (mid - dishX) / (bw / 2 + ov));
-      const dishY   = Math.round(top - roofH + dSlopeT * roofH);
-      gfx.fillStyle(0x888880, 1);
-      gfx.fillRect(dishX - 1, dishY - 6, 2, 6);
-      gfx.fillStyle(0xd0d0c0, 1);
-      gfx.fillCircle(dishX, dishY - 8, 4);
-      gfx.fillStyle(0x909088, 1);
-      gfx.fillCircle(dishX + 1, dishY - 9, 2);
-    }
-
-    // Rake trim + eave soffit
-    gfx.lineStyle(2, 0xf0e4cc, 1);
-    gfx.moveTo(bx - ov, top).lineTo(mid, top - roofH).strokePath();
-    gfx.moveTo(bx + bw + ov, top).lineTo(mid, top - roofH).strokePath();
-    gfx.lineStyle(2, 0xede0c8, 1);
-    gfx.moveTo(bx - ov, top).lineTo(bx + bw + ov, top).strokePath();
-
-    // ── Chimney brick detail above roof slope ─────────────────
-    const slopeT = Math.max(0, (chx - mid) / (bw / 2 + ov));
-    const slopeY = top - roofH + slopeT * roofH;
-    gfx.lineStyle(1, 0x6e2818, 1);
-    for (let cy = chimneyTopY + 4; cy < slopeY - 2; cy += 5) {
-      gfx.moveTo(chx, cy).lineTo(chx + cw, cy).strokePath();
-    }
-    gfx.fillStyle(0x7a6e64, 1);
-    gfx.fillRect(chx - 2, chimneyTopY, cw + 4, 3);
-
-    // Lv 4+: low front hedge; Lv 10+ it grows taller
-    if (level >= 4) {
-      const hedgeH = level >= 10 ? 10 : 5;
-      gfx.fillStyle(0x2d6a1e, 1);
-      gfx.fillRect(bx, buildGY, bw, hedgeH);
-      gfx.fillStyle(0x3a8428, 1);
-      gfx.fillRect(bx, buildGY, bw, 2);
-    }
-
-    // ── Windows ───────────────────────────────────────────────
-    const ww  = Math.round(bw * 0.15);
-    const wh  = Math.round(ww * 1.4);
-    const wy  = top + Math.round(bodyH * 0.18);
-    const sw  = Math.round(ww * 0.40);
-    const wx1 = bx + Math.round(bw * 0.16);
-    const wx2 = bx + Math.round(bw * 0.66);
-
-    for (const wxx of [wx1, wx2]) {
-      // Lv 2+: green shutters
-      if (level >= 2) {
-        gfx.fillStyle(0x265c22, 1);
-        gfx.fillRect(wxx - sw - 1, wy, sw, wh);
-        gfx.fillRect(wxx + ww + 1, wy, sw, wh);
-      }
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
-      const sashH = Math.round(wh / 2) - 1;
-      gfx.fillStyle(0x8ab4cc, 1);
-      gfx.fillRect(wxx, wy, ww, sashH);
-      gfx.fillStyle(0x9ec2d8, 1);
-      gfx.fillRect(wxx, wy + sashH + 2, ww, wh - sashH - 2);
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(wxx, wy + sashH, ww, 2);
-      gfx.fillRect(wxx + Math.round(ww / 2) - 1, wy, 2, wh);
-      gfx.fillRect(wxx - 3, wy + wh + 2, ww + 6, 3);
-    }
-
-    // ── Door ──────────────────────────────────────────────────
-    const dw  = Math.round(bw * 0.20);
-    const dh  = Math.round(bodyH * 0.52);
-    const dx  = bx + Math.round((bw - dw) / 2);
-    const dy  = buildGY - foundH - dh;
-    gfx.fillStyle(0xffffff, 1);
-    gfx.fillRect(dx - 2, dy - 2, dw + 4, dh + 2);
-    gfx.fillStyle(0xb02e1e, 1);
-    gfx.fillRect(dx, dy, dw, dh);
-    const pInset = Math.round(dw * 0.12);
-    const ph     = Math.round(dh * 0.32);
-    gfx.fillStyle(0xc84030, 1);
-    gfx.fillRect(dx + pInset, dy + 4,      dw - pInset * 2, ph);
-    gfx.fillRect(dx + pInset, dy + ph + 8, dw - pInset * 2, ph);
-    gfx.lineStyle(1, 0x7a1e10, 1);
-    gfx.strokeRect(dx + pInset, dy + 4,      dw - pInset * 2, ph);
-    gfx.strokeRect(dx + pInset, dy + ph + 8, dw - pInset * 2, ph);
-    gfx.fillStyle(0xd4a820, 1);
-    gfx.fillCircle(dx + dw - 5, dy + Math.round(dh * 0.52), 2);
-    gfx.fillStyle(0xe8dcc8, 1);
-    gfx.fillRect(dx - 3, dy - 5, dw + 6, 5);
-    gfx.fillStyle(0xb0b0a4, 1);
-    gfx.fillRect(dx - 3, buildGY - foundH, dw + 6, foundH);
-    gfx.fillStyle(0xa0a094, 1);
-    gfx.fillRect(dx - 6, buildGY - 3, dw + 12, 3);
-
-    // Lv 9+: porch lantern above door
-    if (level >= 9) {
-      const lx = dx + Math.round(dw / 2);
-      gfx.fillStyle(0x404038, 1);
-      gfx.fillRect(lx - 3, dy - 10, 6, 8);
-      gfx.fillStyle(0xffdd88, 1);
-      gfx.fillRect(lx - 2, dy - 9, 4, 6);
-      gfx.fillStyle(0x606058, 1);
-      gfx.fillRect(lx - 1, dy - 2, 2, 3);
-    }
-
-    // ── Corner trim boards ────────────────────────────────────
-    gfx.fillStyle(0xffffff, 1);
-    gfx.fillRect(bx, top, 4, bodyH);
-    gfx.fillRect(bx + bw - 4, top, 4, bodyH);
-
-    // Lv 3+: flower boxes under each window
-    if (level >= 3) {
-      for (const wxx of [wx1, wx2]) {
-        const fbY = wy + wh + 6;
-        const fbX = wxx - 3;
-        const fbW = ww + 6;
-        gfx.fillStyle(0x5c3818, 1);
-        gfx.fillRect(fbX, fbY, fbW, 5);
-        const flowerColors = [0xe83030, 0xffcc00, 0xff88aa];
-        for (let f = 0; f < 3; f++) {
-          gfx.fillStyle(flowerColors[f % 3], 1);
-          gfx.fillCircle(fbX + Math.round(fbW * (f + 0.5) / 3), fbY - 2, 2);
-        }
-      }
-    }
-
-    // Lv 11+: stepping-stone path to door
-    if (level >= 11) {
-      const pathW = dw - 4;
-      const pathX = dx + 2;
-      gfx.fillStyle(0xc8b898, 1);
-      for (let py = buildGY + 2; py < gy - 3; py += 7) {
-        gfx.fillRect(pathX, py, pathW, 4);
-      }
-    }
-
-    // Lv 6+: left bush (Lv 12+ becomes a tree)
-    if (level >= 6) {
-      const bshX = bx + 8;
-      const bshY = buildGY - foundH;
-      if (level >= 12) {
-        gfx.fillStyle(0x5a3010, 1);
-        gfx.fillRect(bshX - 1, bshY - 14, 3, 20);
-        gfx.fillStyle(0x217a10, 1);
-        gfx.fillCircle(bshX, bshY - 18, 9);
-        gfx.fillStyle(0x2e9a1a, 1);
-        gfx.fillCircle(bshX - 3, bshY - 21, 5);
-        gfx.fillCircle(bshX + 4, bshY - 20, 6);
-      } else {
-        gfx.fillStyle(0x4a2808, 1);
-        gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
-        gfx.fillStyle(0x257018, 1);
-        gfx.fillCircle(bshX, bshY - 9, 6);
-        gfx.fillStyle(0x308a20, 1);
-        gfx.fillCircle(bshX - 2, bshY - 11, 3);
-      }
-    }
-
-    // Lv 7+: right bush
-    if (level >= 7) {
-      const bshX = bx + bw - 8;
-      const bshY = buildGY - foundH;
-      gfx.fillStyle(0x4a2808, 1);
-      gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
-      gfx.fillStyle(0x257018, 1);
-      gfx.fillCircle(bshX, bshY - 9, 6);
-      gfx.fillStyle(0x308a20, 1);
-      gfx.fillCircle(bshX + 2, bshY - 11, 3);
-    }
-
-    // Lv 8+: picket fence at road edge of yard
-    if (level >= 8) {
-      const fenceBot = gy - 2;
-      gfx.fillStyle(0xe8e4d8, 1);
-      gfx.fillRect(x, fenceBot - 7, w, 2);
-      const spacing = Math.round(w / 6);
-      for (let fx = x + 2; fx < x + w - 1; fx += spacing) {
-        gfx.fillRect(fx, fenceBot - 10, 3, 10);
-        gfx.fillTriangle(fx, fenceBot - 10, fx + 3, fenceBot - 10, fx + 1, fenceBot - 13);
-      }
-    }
-
-    // Lv 13+: mailbox at front-left of plot (near fence)
-    if (level >= 13) {
-      const mbX = x + 5;
-      const mbY = gy - 18;
-      gfx.fillStyle(0x888880, 1);
-      gfx.fillRect(mbX + 1, mbY + 3, 2, 6);
-      gfx.fillStyle(0xcc3322, 1);
-      gfx.fillRect(mbX, mbY, 9, 6);
-      gfx.fillStyle(0xaa2818, 1);
-      gfx.fillRect(mbX, mbY, 9, 2);
-      gfx.fillStyle(0x888880, 1);
-      gfx.fillRect(mbX + 9, mbY + 1, 1, 4);
-      gfx.fillStyle(0xff6622, 1);
-      gfx.fillRect(mbX + 10, mbY + 1, 4, 3);
-    }
-
-    // Lv 15+: flower bed in front of house (at building base)
-    if (level >= 15) {
-      const fbY = buildGY + 2;
-      const fbX = dx - 10;
-      const fbW = dw + 20;
-      gfx.fillStyle(0x4a2810, 1);
-      gfx.fillRect(fbX, fbY, fbW, 4);
-      const colors = [0xff4040, 0xffbb00, 0xff88cc, 0x88ee44, 0xff6600];
-      for (let f = 0; f < 5; f++) {
-        gfx.fillStyle(colors[f], 1);
-        gfx.fillCircle(fbX + Math.round(fbW * (f + 0.5) / 5), fbY - 2, 2);
-      }
-    }
-
-    container.add(gfx);
-  }
-
-  private buildTier2Apartment(
-    container: Phaser.GameObjects.Container,
-    x: number, w: number, h: number, top: number
-  ): void {
-    const body = this.add.rectangle(x + w / 2, top + h / 2, w, h, 0xd4a96a);
-    body.setPipeline('Light2D');
-    container.add(body);
-
-    const gfx = this.add.graphics();
-    const parapetH = 10;
-    gfx.fillStyle(0xbf8c50, 1);
-    gfx.fillRect(x, top, w, parapetH);
-
-    const winW = Math.round(w * 0.18);
-    const winH = Math.round(winW * 1.5);
-    const cols = 3;
-    const hPad = Math.round(w / (cols + 1));
-    const vSpacing = Math.round(h / 4);
-    const rows = Math.max(2, Math.floor((h - parapetH - 20) / vSpacing));
-
-    gfx.fillStyle(0x88aacc, 1);
-    for (let row = 0; row < rows; row++) {
-      const wy = top + parapetH + 16 + row * vSpacing;
-      if (wy + winH > this.groundY - 8) continue;
-      for (let col = 0; col < cols; col++) {
-        const wx = x + hPad * (col + 1) - winW / 2;
-        gfx.fillRect(Math.round(wx), Math.round(wy), winW, winH);
-      }
-    }
-    container.add(gfx);
-  }
-
-  private buildTier3Office(
-    container: Phaser.GameObjects.Container,
-    x: number, w: number, h: number, top: number
-  ): void {
-    const body = this.add.rectangle(x + w / 2, top + h / 2, w, h, 0x5a7a8a);
-    body.setPipeline('Light2D');
-    container.add(body);
-
-    const gfx = this.add.graphics();
-    const floorH = 22;
-    const numFloors = Math.floor(h / floorH);
-    gfx.lineStyle(1, 0x3d5a66, 1);
-    for (let f = 1; f < numFloors; f++) {
-      const ly = top + f * floorH;
-      gfx.moveTo(x, ly).lineTo(x + w, ly).strokePath();
-    }
-
-    const cols = 4;
-    const winW = Math.round(w * 0.12);
-    const winH = Math.round(floorH * 0.55);
-    const hGap = Math.round(w / (cols + 1));
-    gfx.fillStyle(0xaad4e8, 0.85);
-    for (let f = 0; f < numFloors; f++) {
-      const wy = top + f * floorH + Math.round((floorH - winH) / 2);
-      if (wy + winH > this.groundY - 4) continue;
-      for (let c = 0; c < cols; c++) {
-        const wx = x + hGap * (c + 1) - winW / 2;
-        gfx.fillRect(Math.round(wx), Math.round(wy), winW, winH);
-      }
-    }
-    container.add(gfx);
-  }
-
-  private buildTier4Skyscraper(
-    container: Phaser.GameObjects.Container,
-    x: number, w: number, h: number, top: number
-  ): void {
-    const body = this.add.rectangle(x + w / 2, top + h / 2, w, h, 0x1a2a3a);
-    body.setPipeline('Light2D');
-    container.add(body);
-
-    const gfx = this.add.graphics();
-    const antennaW = 4;
-    const antennaH = 24;
-    gfx.fillStyle(0x8899aa, 1);
-    gfx.fillRect(x + Math.round((w - antennaW) / 2), top - antennaH, antennaW, antennaH);
-
-    const floorH = 16;
-    const numFloors = Math.floor(h / floorH);
-    const cols = 5;
-    const winW = Math.round(w * 0.1);
-    const winH = Math.round(floorH * 0.6);
-    const hGap = Math.round(w / (cols + 1));
-    for (let f = 0; f < numFloors; f++) {
-      const wy = top + f * floorH + Math.round((floorH - winH) / 2);
-      if (wy + winH > this.groundY - 4) continue;
-      const isAccentRow = f % 3 === 0;
-      gfx.fillStyle(0x88ccff, isAccentRow ? 0.55 : 0.25);
-      for (let c = 0; c < cols; c++) {
-        const wx = x + hGap * (c + 1) - winW / 2;
-        gfx.fillRect(Math.round(wx), Math.round(wy), winW, winH);
-      }
-    }
-    gfx.fillStyle(0x446688, 1);
-    gfx.fillRect(x, top, w, 4);
-    container.add(gfx);
-  }
-
-  private buildEmptyPlot(container: Phaser.GameObjects.Container, x: number): void {
-    const gfx     = this.add.graphics();
-    const gy      = this.groundY;
-    const w       = this.plotWidth;
-    const dirtTop = gy - YARD_H;
-
-    // ── Dirt plot (same depth as tier-1 front yard) ───────────────
-    gfx.fillStyle(0x7a5228, 1);
-    gfx.fillRect(x, dirtTop, w, YARD_H);
-    gfx.fillStyle(0x5c3c18, 1);
-    gfx.fillRect(x, dirtTop, w, 2);          // topsoil edge
-    // Scattered soil clumps for texture
-    gfx.fillStyle(0x5c3c18, 1);
-    for (let i = 0; i < 5; i++) {
-      const px = x + Math.round(((i + 0.5) / 5) * w);
-      gfx.fillRect(px - 2, dirtTop + 5, 5, 2);
-      gfx.fillRect(px + 4, dirtTop + 13, 4, 2);
-    }
-
-    // ── Wooden post ───────────────────────────────────────────────
-    const cx    = x + Math.round(w * 0.5);
-    const postTop = dirtTop - 24;
-    gfx.fillStyle(0xb08040, 1);
-    gfx.fillRect(cx - 1, postTop, 3, 24 + 10);   // 10 px buried in dirt
-    gfx.fillStyle(0x806028, 1);
-    gfx.fillRect(cx + 1, postTop, 1, 24 + 10);   // right-edge shadow
-
-    // ── Sign board ────────────────────────────────────────────────
-    const bW = 48, bH = 26;
-    const bX = cx - Math.round(bW / 2);
-    const bY = postTop - bH + 4;              // overlaps post top slightly
-
-    gfx.fillStyle(0x909090, 1);               // grey border / frame
-    gfx.fillRect(bX - 1, bY - 1, bW + 2, bH + 2);
-
-    gfx.fillStyle(0xcc2020, 1);               // red header band
-    gfx.fillRect(bX, bY, bW, 9);
-
-    gfx.fillStyle(0xf8f4ee, 1);               // cream sign body
-    gfx.fillRect(bX, bY + 9, bW, bH - 9);
-
-    // White pixel blocks in red header — suggest "FOR SALE"
-    gfx.fillStyle(0xffcccc, 1);
-    for (const ox of [3, 11, 20, 30, 39]) {
-      gfx.fillRect(bX + ox, bY + 3, 5, 3);
-    }
-
-    // Red pixel rows in cream body — two lines of illegible estate-agent text
-    gfx.fillStyle(0xcc2020, 1);
-    gfx.fillRect(bX + 3,  bY + 13, 8, 2);
-    gfx.fillRect(bX + 14, bY + 13, 6, 2);
-    gfx.fillRect(bX + 23, bY + 13, 8, 2);
-    gfx.fillRect(bX + 34, bY + 13, 8, 2);
-    gfx.fillStyle(0xaaaaaa, 1);              // grey sub-line (phone number / URL)
-    gfx.fillRect(bX + 3,  bY + 19, 11, 1);
-    gfx.fillRect(bX + 17, bY + 19, 9,  1);
-    gfx.fillRect(bX + 29, bY + 19, 12, 1);
-
-    container.add(gfx);
-  }
-
-  // ── Day/night helpers ──────────────────────────────────────────────────────
-
-  private updateSkyGradient(elev: number): void {
-    if (!this.skyGfx) return;
-    const { width } = this.scale;
-    const h = this.groundY;
-
-    let zenith: number;
-    let horizon: number;
-
-    if (elev <= -0.15) {
-      zenith = 0x04040f; horizon = 0x08082a;
-    } else if (elev <= -0.02) {
-      const t = (elev + 0.15) / 0.13;
-      zenith  = lerpColor(0x04040f, 0x160c2a, t);
-      horizon = lerpColor(0x08082a, 0x3a100a, t);
-    } else if (elev <= 0.10) {
-      const t = (elev + 0.02) / 0.12;
-      zenith  = lerpColor(0x160c2a, 0x1e3878, t);
-      horizon = lerpColor(0x3a100a, 0xc85c14, t);
-    } else if (elev <= 0.30) {
-      const t = (elev - 0.10) / 0.20;
-      zenith  = lerpColor(0x1e3878, 0x2255aa, t);
-      horizon = lerpColor(0xc85c14, 0x78aac8, t);
-    } else if (elev <= 0.50) {
-      const t = (elev - 0.30) / 0.20;
-      zenith  = lerpColor(0x2255aa, 0x2a6aa0, t);
-      horizon = lerpColor(0x78aac8, 0x6aaad0, t);
-    } else {
-      zenith = 0x2a6aa0; horizon = 0x6aaad0;
-    }
-
-    this.skyGfx.clear();
-    this.skyGfx.fillGradientStyle(zenith, zenith, horizon, horizon, 1);
-    this.skyGfx.fillRect(0, 0, width, h);
-  }
-
-  private updateSceneOverlay(elev: number): void {
-    this.nightOverlay.setFillStyle(0x000022);
-    if (elev > 0.12) {
-      this.nightOverlay.setAlpha(0);
-    } else if (elev > 0) {
-      this.nightOverlay.setAlpha(0.22 * (1 - elev / 0.12));
-    } else if (elev > -0.15) {
-      const t = -elev / 0.15;
-      this.nightOverlay.setAlpha(0.22 + t * 0.13);
-    } else {
-      this.nightOverlay.setAlpha(0.35);
-    }
-  }
-
-  // ── Sun & lighting ─────────────────────────────────────────────────────────
+  // ── Day/night: sun & lighting ──────────────────────────────────────────────
 
   private setupSun(): void {
     const { width } = this.scale;
     const cx = width / 2;
-    const gy = this.groundY;
 
     // Glow texture: opaque Gaussian from white (centre) → black (edge).
     // Black pixels add nothing in ADD blend mode, bypassing premultiplied-alpha
     // banding. 30 stops trace a smooth Gaussian so there are no visible kinks.
-    const texSize = 512;
+    const texSize   = 512;
     const glowCanvas = document.createElement('canvas');
     glowCanvas.width  = texSize;
     glowCanvas.height = texSize;
     const ctx2d = glowCanvas.getContext('2d')!;
-    const half = texSize / 2;
-    const grad = ctx2d.createRadialGradient(half, half, 0, half, half, half);
+    const half  = texSize / 2;
+    const grad  = ctx2d.createRadialGradient(half, half, 0, half, half, half);
     for (let i = 0; i <= 30; i++) {
       const t = i / 30;
       const v = Math.round(Math.exp(-t * t * 7) * 255);
@@ -946,14 +408,14 @@ export class GameScene extends Phaser.Scene {
     ctx2d.fillRect(0, 0, texSize, texSize);
     this.textures.addCanvas('sun-glow', glowCanvas);
 
-    this.moonCircle    = this.add.arc(cx, gy, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
+    this.moonCircle    = this.add.arc(cx, this.groundY, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
     this.sunGlowSprite = this.add.image(cx, 80, 'sun-glow')
       .setDisplaySize(300, 300)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(3);
     this.sunCircle     = this.add.arc(cx, 80, 20, 0, 360, false, 0xfff8aa, 1).setDepth(5);
     this.sunGroundGlow = this.add
-      .ellipse(cx, gy + 6, Math.round(width * 0.5), 22, 0xfffae0, 0)
+      .ellipse(cx, this.groundY + 6, Math.round(width * 0.5), 22, 0xfffae0, 0)
       .setDepth(6);
     this.sunLight = this.lights.addLight(cx, 80, Math.max(800, width * 2), 0xffeeaa, 3.2);
   }
@@ -962,18 +424,18 @@ export class GameScene extends Phaser.Scene {
     if (!this.sunCircle) return;
     const a = this.sunAngle;
     const { width } = this.scale;
-    const cx = width / 2;
+    const cx     = width / 2;
     const orbitX = width * 0.95;
     const orbitY = Math.round(this.groundY * 0.90);
 
     const elevation = Math.sin(a);
-    const sunX = cx - Math.cos(a) * orbitX;
-    const sunY = this.groundY - elevation * orbitY;
-    const sunAbove = elevation > 0.02;
+    const sunX      = cx - Math.cos(a) * orbitX;
+    const sunY      = this.groundY - elevation * orbitY;
+    const sunAbove  = elevation > 0.02;
 
     const moonElev = Math.sin(a + Math.PI);
-    const moonX = cx - Math.cos(a + Math.PI) * orbitX;
-    const moonY = this.groundY - moonElev * orbitY;
+    const moonX    = cx - Math.cos(a + Math.PI) * orbitX;
+    const moonY    = this.groundY - moonElev * orbitY;
 
     this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
     this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
@@ -984,37 +446,31 @@ export class GameScene extends Phaser.Scene {
       .setVisible(sunAbove)
       .setAlpha(Math.max(0, elevation * 0.22));
 
-    this.sunLight.x = sunX;
-    this.sunLight.y = sunY;
+    this.sunLight.x         = sunX;
+    this.sunLight.y         = sunY;
     this.sunLight.intensity = Math.max(0, elevation * 3.2);
 
-    // Dynamic sun color: deep orange-red at horizon → golden yellow → warm white at noon
     const sunColor = sunColorAtElevation(elevation);
     this.sunCircle.setFillStyle(sunColor);
     this.sunGlowSprite.setTint(sunColor);
     this.sunLight.setColor(sunColor);
 
-    // At low elevation keep ambient bright enough to show warm tint on buildings
-    const ambMin = elevation >= 0 ? Math.max(0.08, 0.28 - elevation) : 0.08;
-    const amb = Math.max(ambMin, elevation * 0.55 + 0.14);
-    // Warm orange ambient tint at low sun, neutral white at high sun
+    const ambMin  = elevation >= 0 ? Math.max(0.08, 0.28 - elevation) : 0.08;
+    const amb     = Math.max(ambMin, elevation * 0.55 + 0.14);
     const ambTint = lerpColor(0xff8833, 0xffffff, Math.min(1, elevation * 3));
     const ar = Math.round(((ambTint >> 16) & 0xff) * amb);
-    const ag = Math.round(((ambTint >> 8) & 0xff) * amb);
-    const ab = Math.round((ambTint & 0xff) * amb);
+    const ag = Math.round(((ambTint >> 8)  & 0xff) * amb);
+    const ab = Math.round( (ambTint        & 0xff) * amb);
     this.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
 
     this.drawBuildingShadows(a, elevation);
   }
 
   /**
-   * Draws soft ground shadows using parallel sun rays (accurate for a
-   * distant light source) with multi-sample penumbra simulation.
-   *
-   * The sun is treated as an extended disc of angular width DISC_SPREAD.
-   * NUM_SAMPLES point lights are spread across that disc; each casts a
-   * shadow at 1/N alpha. Overlapping umbra regions reach full alpha while
-   * the non-overlapping penumbra edges appear softer.
+   * Draws soft ground shadows using parallel sun rays with multi-sample
+   * penumbra simulation. NUM_SAMPLES point lights are spread across the
+   * sun disc; each casts a shadow at 1/N alpha. Overlapping umbra regions
+   * reach full alpha while penumbra edges appear softer.
    */
   private drawBuildingShadows(sunAngle: number, elevation: number): void {
     const gfx = this.buildingShadowGfx;
@@ -1023,30 +479,22 @@ export class GameScene extends Phaser.Scene {
 
     const totalAlpha = Math.min(0.99, elevation * 1.26 + 0.18);
 
-    // Shadow length: short at peak sun (high elevation), long at low sun.
-    // Extends through road → verge → river at sunrise/sunset.
-    const maxShadow = ROAD_H + VERGE_H + RIVER_H;
+    const maxShadow   = ROAD_H + VERGE_H + RIVER_H;
     const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5));
-    const shadBot = Math.min(this.groundY + shadowExtent, this.panelTop);
+    const shadBot      = Math.min(this.groundY + shadowExtent, this.panelTop);
 
-    const NUM_SAMPLES = 11;
-    const DISC_SPREAD = 0.10; // radians (~5.7°) — wider = softer penumbra
-
-    // Clamp the lean-to-height ratio so all buildings share the same shadow
-    // angle regardless of height. Equivalent to a minimum effective sun
-    // elevation of ~20° — prevents near-horizon runaway without inconsistency.
-    const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35); // ~2.74
+    const NUM_SAMPLES  = 11;
+    const DISC_SPREAD  = 0.10;
+    const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
 
     for (let s = 0; s < NUM_SAMPLES; s++) {
-      const t = (s / (NUM_SAMPLES - 1)) - 0.5; // −0.5 … +0.5
+      const t      = (s / (NUM_SAMPLES - 1)) - 0.5;
       const sAngle = sunAngle + t * DISC_SPREAD;
-      const sElev = Math.sin(sAngle);
+      const sElev  = Math.sin(sAngle);
       const sHoriz = Math.cos(sAngle);
       if (sElev <= 0.01) continue;
 
-      // Same lean angle for every building height (parallel-ray physics).
       const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
-
       gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
 
       for (let i = 0; i < PLOT_COUNT; i++) {
@@ -1055,28 +503,24 @@ export class GameScene extends Phaser.Scene {
 
         const x  = this.plotLeft(i);
         const w  = this.plotWidth;
-        const h  = this.buildingHeight(plot.level);
+        const h  = buildingHeight(plot.level);
         const bw = plot.level <= 15 ? Math.round(w * 0.82) : w;
         const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
 
         if (plot.level <= 15) {
-          // Tier 1 house: sits on buildGY (YARD_H above road), triangular roof.
-          // Shadow is a parallelogram with the same width as the building (bw),
-          // leaned horizontally by leanRate × full depth from buildGY to shadBot.
           const buildGY  = this.groundY - YARD_H;
           const roofHVal = Math.round(bw * 0.42);
           const mid      = bx + Math.round(bw / 2);
           const lean     = leanRate * (shadowExtent + YARD_H);
 
-          const p1x = bx,        p1y = buildGY;
-          const p2x = bx + bw,   p2y = buildGY;
+          const p1x = bx,            p1y = buildGY;
+          const p2x = bx + bw,       p2y = buildGY;
           const p3x = bx + bw + lean, p3y = shadBot;
           const p4x = bx + lean,      p4y = shadBot;
 
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
-          // Roof peak casts shadow further than wall edges at low sun angles.
           const peakShadX = mid + leanRate * (shadowExtent + YARD_H + h + roofHVal);
           if (leanRate >= 0 && peakShadX > p3x) {
             gfx.fillTriangle(p2x, p2y, p3x, p3y, peakShadX, shadBot);
@@ -1084,10 +528,9 @@ export class GameScene extends Phaser.Scene {
             gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
           }
         } else {
-          // Taller tiers sit at road level; same-width parallelogram.
           const lean = leanRate * shadowExtent;
-          const p1x = bx,        p1y = this.groundY;
-          const p2x = bx + bw,   p2y = this.groundY;
+          const p1x = bx,            p1y = this.groundY;
+          const p2x = bx + bw,       p2y = this.groundY;
           const p3x = bx + bw + lean, p3y = shadBot;
           const p4x = bx + lean,      p4y = shadBot;
 
@@ -1098,7 +541,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-
   // ── UI panel columns ───────────────────────────────────────────────────────
 
   private renderUISection(index: number): Phaser.GameObjects.Container {
@@ -1106,8 +548,8 @@ export class GameScene extends Phaser.Scene {
     this.actionRefs[index] = null;
 
     const container = this.add.container(0, 0).setDepth(11);
-    const cx = index * this.sectionW + this.sectionW / 2;
-    const plot = this.state.plots[index];
+    const cx        = index * this.sectionW + this.sectionW / 2;
+    const plot      = this.state.plots[index];
 
     container.add(
       this.add
@@ -1131,13 +573,12 @@ export class GameScene extends Phaser.Scene {
     index: number
   ): void {
     const atMax = plot.level >= MAX_LEVEL;
-    const cost = upgradeCost(plot.level);
+    const cost  = upgradeCost(plot.level);
 
     container.add(
       this.add
         .text(cx, this.colTop + 40, `Lv ${plot.level}/${MAX_LEVEL}`, {
-          fontSize: '14px',
-          color: '#ddeeff',
+          fontSize: '14px', color: '#ddeeff',
         })
         .setOrigin(0.5)
     );
@@ -1145,8 +586,7 @@ export class GameScene extends Phaser.Scene {
     container.add(
       this.add
         .text(cx, this.colTop + 62, `${fmt(perBuildingIncome(plot.level))}/s`, {
-          fontSize: '12px',
-          color: '#88ddaa',
+          fontSize: '12px', color: '#88ddaa',
         })
         .setOrigin(0.5)
     );
@@ -1154,8 +594,7 @@ export class GameScene extends Phaser.Scene {
     container.add(
       this.add
         .text(cx, this.colTop + 82, atMax ? '' : `${fmt(cost)}`, {
-          fontSize: '12px',
-          color: '#99aabb',
+          fontSize: '12px', color: '#99aabb',
         })
         .setOrigin(0.5)
     );
@@ -1168,21 +607,20 @@ export class GameScene extends Phaser.Scene {
     container.add(
       this.add
         .text(cx, this.colTop + 118, atMax ? 'Max' : '▲ Upgrade', {
-          fontSize: '12px',
-          color: atMax ? '#555566' : '#cce8ff',
+          fontSize: '12px', color: atMax ? '#555566' : '#cce8ff',
         })
         .setOrigin(0.5)
     );
 
     if (!atMax) {
       btn.on('pointerover', () => btn.setFillStyle(0x2471a3));
-      btn.on('pointerout', () => btn.setFillStyle(0x1a5276));
+      btn.on('pointerout',  () => btn.setFillStyle(0x1a5276));
       btn.on('pointerdown', (): void => {
         if (this.state.gold < cost) return;
         this.state.gold -= cost;
         this.state.plots[index].level = Math.min(plot.level + 1, MAX_LEVEL);
         this.plotContainers[index] = this.renderPlot(index);
-        this.uiContainers[index] = this.renderUISection(index);
+        this.uiContainers[index]   = this.renderUISection(index);
         this.updateStats();
         this.refreshButtons();
       });
@@ -1221,14 +659,14 @@ export class GameScene extends Phaser.Scene {
     );
 
     btn.on('pointerover', () => btn.setFillStyle(0x3d8a22));
-    btn.on('pointerout', () => btn.setFillStyle(0x2d6b1a));
+    btn.on('pointerout',  () => btn.setFillStyle(0x2d6b1a));
     btn.on('pointerdown', (): void => {
       if (this.state.gold < cost) return;
       this.state.gold -= cost;
       this.state.plots[index].unlocked = true;
-      this.state.plots[index].level = 1;
+      this.state.plots[index].level    = 1;
       this.plotContainers[index] = this.renderPlot(index);
-      this.uiContainers[index] = this.renderUISection(index);
+      this.uiContainers[index]   = this.renderUISection(index);
       this.updateStats();
       this.refreshButtons();
     });
@@ -1244,11 +682,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderRoad(): void {
-    const gfx = this.roadGraphics;
+    const gfx   = this.roadGraphics;
     gfx.clear();
     const { width } = this.scale;
     const level = this.state.road.level;
-    const gy = this.groundY;
+    const gy    = this.groundY;
 
     if (level === 0) {
       gfx.fillStyle(0x555e6b, 1);
@@ -1293,7 +731,7 @@ export class GameScene extends Phaser.Scene {
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
       return;
     }
-    // Level 9-10 — Highway
+    // Level 9–10: Highway
     gfx.fillStyle(0x222222, 1);
     gfx.fillRect(0, gy, width, ROAD_H);
     gfx.fillStyle(0xffd700, 1);
@@ -1307,7 +745,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderVergeAndRiver(): void {
-    const gfx = this.vergeRiverGraphics;
+    const gfx    = this.vergeRiverGraphics;
     gfx.clear();
     const { width } = this.scale;
     const vergeY = this.groundY + ROAD_H;
@@ -1324,11 +762,11 @@ export class GameScene extends Phaser.Scene {
 
   private roadTierName(): string {
     const lvl = this.state.road.level;
-    if (lvl === 0) return 'None';
-    if (lvl <= 2) return 'Dirt Track';
-    if (lvl <= 4) return 'Gravel';
-    if (lvl <= 6) return 'Paved';
-    if (lvl <= 8) return 'Two-Lane';
+    if (lvl === 0)  return 'None';
+    if (lvl <= 2)   return 'Dirt Track';
+    if (lvl <= 4)   return 'Gravel';
+    if (lvl <= 6)   return 'Paved';
+    if (lvl <= 8)   return 'Two-Lane';
     return 'Highway';
   }
 
@@ -1338,15 +776,14 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(0, 0).setDepth(11);
     const { width } = this.scale;
-    const midY = this.panelTop + STATS_BAR_H / 2;
-    const atMax = this.state.road.level >= 10;
-    const cost = this.roadUpgradeCost();
+    const midY      = this.panelTop + STATS_BAR_H / 2;
+    const atMax     = this.state.road.level >= 10;
+    const cost      = this.roadUpgradeCost();
 
     container.add(
       this.add
         .text(width / 2, midY - 13, `Road: ${this.roadTierName()}`, {
-          fontSize: '12px',
-          color: '#aabbcc',
+          fontSize: '12px', color: '#aabbcc',
         })
         .setOrigin(0.5, 0.5)
     );
@@ -1368,7 +805,7 @@ export class GameScene extends Phaser.Scene {
 
     if (!atMax) {
       btn.on('pointerover', () => btn.setFillStyle(0x7a5500));
-      btn.on('pointerout', () => btn.setFillStyle(0x5a3e00));
+      btn.on('pointerout',  () => btn.setFillStyle(0x5a3e00));
       btn.on('pointerdown', (): void => {
         if (this.state.gold < cost) return;
         this.state.gold -= cost;
@@ -1383,30 +820,4 @@ export class GameScene extends Phaser.Scene {
 
     return container;
   }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function perBuildingIncome(level: number): number {
-  return Math.floor(Math.pow(level, 0.75) * 10);
-}
-
-function lerpColor(a: number, b: number, t: number): number {
-  const r = Math.round(((a >> 16) & 0xff) * (1 - t) + ((b >> 16) & 0xff) * t);
-  const g = Math.round(((a >> 8) & 0xff) * (1 - t) + ((b >> 8) & 0xff) * t);
-  const bl = Math.round((a & 0xff) * (1 - t) + (b & 0xff) * t);
-  return (r << 16) | (g << 8) | bl;
-}
-
-function sunColorAtElevation(elev: number): number {
-  const t = Math.max(0, Math.min(1, elev));
-  if (t < 0.20) return lerpColor(0xff3300, 0xffaa33, t / 0.20);
-  if (t < 0.50) return lerpColor(0xffaa33, 0xffe066, (t - 0.20) / 0.30);
-  return lerpColor(0xffe066, 0xfff8e0, (t - 0.50) / 0.50);
-}
-
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
 }
