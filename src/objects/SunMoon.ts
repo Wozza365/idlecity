@@ -9,8 +9,8 @@ export class SunMoon {
   private sunCircle:    Phaser.GameObjects.Arc;
   private moonCircle:   Phaser.GameObjects.Arc;
   private sunGlowSprite: Phaser.GameObjects.Image;
+  private moonGlowSprite: Phaser.GameObjects.Image;
   private sunGroundGlow: Phaser.GameObjects.Ellipse;
-  private moonGlowGfx:  Phaser.GameObjects.Graphics;
   private shadowGfx:    Phaser.GameObjects.Graphics;
   private debugGfx:     Phaser.GameObjects.Graphics;
   readonly sunLight:    Phaser.GameObjects.Light;
@@ -42,8 +42,11 @@ export class SunMoon {
 
     this.shadowGfx    = scene.add.graphics().setDepth(9.5);
     this.debugGfx     = scene.add.graphics().setDepth(9.6);
-    this.moonGlowGfx  = scene.add.graphics().setDepth(2.5);
     this.moonCircle   = scene.add.arc(cx, groundY, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(3);
+    this.moonGlowSprite = scene.add.image(cx, groundY, 'sun-glow')
+      .setDisplaySize(180, 180)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(2);
     this.sunGlowSprite = scene.add.image(cx, 80, 'sun-glow')
       .setDisplaySize(300, 300)
       .setBlendMode(Phaser.BlendModes.ADD)
@@ -82,6 +85,7 @@ export class SunMoon {
 
     this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
     this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
+    this.moonGlowSprite.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
     this.sunGlowSprite.setPosition(sunX, sunY).setVisible(sunAbove);
 
     this.sunGroundGlow
@@ -100,20 +104,8 @@ export class SunMoon {
     this.sunLight.setColor(sunColor);
 
     // Moon glow and light
-    this.moonGlowGfx.clear();
-    const moonAbove = moonElev > 0.02;
-    if (moonAbove) {
-      const maxGlowRadius = 70;
-      const glowAlpha = moonElev * 0.08;
-
-      // Draw many concentric circles for smooth gradient falloff
-      for (let r = maxGlowRadius; r > 14; r -= 3) {
-        const t = (maxGlowRadius - r) / maxGlowRadius;
-        const alpha = glowAlpha * (1 - t * t);
-        this.moonGlowGfx.fillStyle(0xc8d8ff, alpha);
-        this.moonGlowGfx.fillCircle(moonX, moonY, r);
-      }
-    }
+    this.moonGlowSprite.setTint(0xc8d8ff);
+    this.moonGlowSprite.setAlpha(Math.max(0, moonElev * 0.6));
 
     this.moonLight.x         = moonX;
     this.moonLight.y         = moonY;
