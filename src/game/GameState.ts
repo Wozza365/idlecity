@@ -39,6 +39,10 @@ export function saveGame(state: GameState): void {
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
 }
 
+export function clearSave(): void {
+  localStorage.removeItem(SAVE_KEY);
+}
+
 /**
  * Loads state from localStorage. Returns the default if nothing is saved,
  * the data is unreadable, or the plot count has changed.

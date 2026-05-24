@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { type GameState, type PlotState, loadGame, saveGame } from '../game/GameState';
+import { type GameState, type PlotState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,7 @@ export class GameScene extends Phaser.Scene {
 
   // Dev panel
   private devPanelContainer!: Phaser.GameObjects.Container;
+  private clockText?: Phaser.GameObjects.Text;
 
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
@@ -204,19 +205,21 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const container = this.add.container(0, 0).setDepth(90);
 
-    container.add(this.add.rectangle(width / 2, 22, width, 44, 0x000000, 0.6));
+    const row1Y = 16;
+    const row2Y = 42;
+    container.add(this.add.rectangle(width / 2, 29, width, 58, 0x000000, 0.6));
 
-    const btnW = 130;
+    const btnW = 120;
     const gap = 8;
     const leftX = (width - btnW * 2 - gap) / 2 + btnW / 2;
     const rightX = leftX + btnW + gap;
 
     const btn1 = this.add
-      .rectangle(leftX, 22, btnW, 30, 0x1a4400)
+      .rectangle(leftX, row1Y, btnW, 26, 0x1a4400)
       .setInteractive({ useHandCursor: true });
     container.add(btn1);
     container.add(
-      this.add.text(leftX, 22, '+$100K', { fontSize: '13px', color: '#88ff88' }).setOrigin(0.5)
+      this.add.text(leftX, row1Y, '+$100K', { fontSize: '13px', color: '#88ff88' }).setOrigin(0.5)
     );
     btn1.on('pointerover', () => btn1.setFillStyle(0x285e00));
     btn1.on('pointerout', () => btn1.setFillStyle(0x1a4400));
@@ -227,17 +230,50 @@ export class GameScene extends Phaser.Scene {
     });
 
     const btn2 = this.add
-      .rectangle(rightX, 22, btnW, 30, 0x001444)
+      .rectangle(rightX, row1Y, btnW, 26, 0x001444)
       .setInteractive({ useHandCursor: true });
     container.add(btn2);
     container.add(
-      this.add.text(rightX, 22, '+1 hr', { fontSize: '13px', color: '#88aaff' }).setOrigin(0.5)
+      this.add.text(rightX, row1Y, '+1 hr', { fontSize: '13px', color: '#88aaff' }).setOrigin(0.5)
     );
     btn2.on('pointerover', () => btn2.setFillStyle(0x001e5e));
     btn2.on('pointerout', () => btn2.setFillStyle(0x001444));
     btn2.on('pointerdown', () => this.advanceTime());
 
+    // Row 2: clock (left) + reset (right)
+    this.clockText = this.add
+      .text(width / 2 - 70, row2Y, this.gameTimeString(), {
+        fontSize: '13px', color: '#aaccff', fontFamily: 'monospace',
+      })
+      .setOrigin(0.5);
+    container.add(this.clockText);
+
+    const resetBtn = this.add
+      .rectangle(width / 2 + 60, row2Y, 110, 22, 0x440000)
+      .setInteractive({ useHandCursor: true });
+    container.add(resetBtn);
+    container.add(
+      this.add.text(width / 2 + 60, row2Y, 'Reset All', { fontSize: '12px', color: '#ff8888' }).setOrigin(0.5)
+    );
+    resetBtn.on('pointerover', () => resetBtn.setFillStyle(0x661111));
+    resetBtn.on('pointerout', () => resetBtn.setFillStyle(0x440000));
+    resetBtn.on('pointerdown', () => this.resetGame());
+
     this.devPanelContainer = container;
+  }
+
+  private gameTimeString(): string {
+    const elapsed = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
+    const totalMins = (elapsed / 240_000) * 24 * 60;
+    const hour = Math.floor(12 + totalMins / 60) % 24;
+    const min  = Math.floor(totalMins) % 60;
+    return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  }
+
+  private resetGame(): void {
+    clearSave();
+    this.state = defaultState(PLOT_COUNT);
+    this.buildLayout();
   }
 
   private onClockTick(): void {
@@ -251,6 +287,7 @@ export class GameScene extends Phaser.Scene {
     this.updateSkyGradient(elev);
     this.updateSceneOverlay(elev);
     this.updateSun();
+    this.clockText?.setText(this.gameTimeString());
   }
 
   private advanceTime(): void {
