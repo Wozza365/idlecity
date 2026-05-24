@@ -164,7 +164,7 @@ export class SunMoon {
         if (!plot.unlocked) {
           const cx = x + Math.round(w * 0.5);
           const signWidth = 48;
-          const signHeight = 12;
+          const signHeight = 2;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
           const signLean = leanRate * (shadowExtent + signHeight);
