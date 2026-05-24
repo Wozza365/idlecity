@@ -116,16 +116,19 @@ export class SunMoon {
     const bx = x + Math.round((w - bw) / 2);
     const buildGY = groundY - YARD_H;
     const top = groundY - h - YARD_H;
-    const roofH = Math.round(bw * 0.42);
-    const mid = bx + Math.round(bw / 2);
+    const roofHVal = Math.round(bw * 0.42);
     const ov = 6;
 
+    // Building body outline (without roof peak)
+    // Use the full building height (including roof and chimney) for the lean calculation
+    const totalH = h + roofHVal + (roofHVal + 2); // chimney height
+    const height = YARD_H + totalH;
+
     return [
-      { x: bx, y: buildGY, height: YARD_H },
-      { x: bx + bw, y: buildGY, height: YARD_H },
-      { x: bx + bw + ov, y: top, height: YARD_H + h },
-      { x: mid, y: top - roofH, height: YARD_H + h + roofH },
-      { x: bx - ov, y: top, height: YARD_H + h },
+      { x: bx, y: buildGY, height },
+      { x: bx + bw, y: buildGY, height },
+      { x: bx + bw + ov, y: top, height },
+      { x: bx - ov, y: top, height },
     ];
   }
 
@@ -176,36 +179,46 @@ export class SunMoon {
         const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
 
         if (plot.level <= 15) {
-          // Tier1House: use polygon projection for accurate shadows
-          const outline = this.getTier1HouseOutline(x, plotWidth, groundY, h);
+          // Tier1House: polygon projection with fixed base
+          const buildGY = groundY - YARD_H;
+          const top = groundY - h - YARD_H;
+          const roofHVal = Math.round(bw * 0.42);
+          const mid = bx + Math.round(bw / 2);
+          const ov = 6;
 
-          // Project each outline point to the ground plane
-          const shadowPolygon: Array<{ x: number; y: number }> = [];
-          for (const point of outline) {
-            const lean = leanRate * (shadowExtent + point.height);
-            shadowPolygon.push({
-              x: point.x + lean,
-              y: point.y === (groundY - YARD_H) ? point.y : shadBot, // base stays at buildGY, rest goes to shadBot
-            });
-          }
+          // Project outline points: base stays fixed, points with height lean outward
+          // Points: [bottom-left, bottom-right, right-eave, peak, left-eave]
+          const outline = [
+            { x: bx, y: buildGY, height: 0 },
+            { x: bx + bw, y: buildGY, height: 0 },
+            { x: bx + bw + ov, y: top, height: h + YARD_H },
+            { x: mid, y: top - roofHVal, height: h + YARD_H + roofHVal },
+            { x: bx - ov, y: top, height: h + YARD_H },
+          ];
 
-          // Render the shadow polygon as triangles (fan triangulation from first point)
-          const firstPoint = shadowPolygon[0];
-          for (let j = 1; j < shadowPolygon.length - 1; j++) {
+          // Project each point: lean only based on height
+          const shadowPoints = outline.map(pt => ({
+            x: pt.x + leanRate * (shadowExtent + pt.height),
+            y: pt.height === 0 ? buildGY : shadBot,
+          }));
+
+          // Fan triangulation from first point (bottom-left)
+          const p0 = shadowPoints[0];
+          for (let j = 1; j < shadowPoints.length - 1; j++) {
             gfx.fillTriangle(
-              firstPoint.x, firstPoint.y,
-              shadowPolygon[j].x, shadowPolygon[j].y,
-              shadowPolygon[j + 1].x, shadowPolygon[j + 1].y
+              p0.x, p0.y,
+              shadowPoints[j].x, shadowPoints[j].y,
+              shadowPoints[j + 1].x, shadowPoints[j + 1].y
             );
           }
 
           if (this.DEBUG_SHADOWS) {
             this.debugGfx.lineStyle(2, 0xffffff, 1);
-            this.debugGfx.moveTo(shadowPolygon[0].x, shadowPolygon[0].y);
-            for (let j = 1; j < shadowPolygon.length; j++) {
-              this.debugGfx.lineTo(shadowPolygon[j].x, shadowPolygon[j].y);
+            this.debugGfx.moveTo(shadowPoints[0].x, shadowPoints[0].y);
+            for (let j = 1; j < shadowPoints.length; j++) {
+              this.debugGfx.lineTo(shadowPoints[j].x, shadowPoints[j].y);
             }
-            this.debugGfx.lineTo(shadowPolygon[0].x, shadowPolygon[0].y);
+            this.debugGfx.lineTo(shadowPoints[0].x, shadowPoints[0].y);
             this.debugGfx.strokePath();
           }
         } else {
