@@ -165,9 +165,9 @@ export class SunMoon {
             { x: bx - ov, y: top, height: h + YARD_H },
           ];
 
-          // Project each point: lean only based on height
+          // Project each point: base stays fixed, only tip leans
           const shadowPoints = outline.map(pt => ({
-            x: pt.x + leanRate * (shadowExtent + pt.height),
+            x: pt.height === 0 ? pt.x : pt.x + leanRate * (shadowExtent + pt.height),
             y: pt.height === 0 ? buildGY : shadBot,
           }));
 
