@@ -298,7 +298,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     for (const wxx of [wx1, wx2]) {
       const wcx = wxx + Math.round(ww / 2);
       const wcy = wy + Math.round(wh / 2);
-      const light = scene.lights.addLight(wcx, wcy, 160, 0xffcc66, 0);
+      const light = scene.lights.addLight(wcx, wcy, 160, 0xffaa44, 0);
       this.windowLights.push(light);
     }
 
@@ -311,7 +311,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
   updateWindowLights(elevation: number): void {
     // Fade in as sun approaches horizon; fully on at/below elevation 0
-    const intensity = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3)) * 1.8;
+    const intensity = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3)) * 0.9;
     for (const light of this.windowLights) {
       light.intensity = intensity;
     }
