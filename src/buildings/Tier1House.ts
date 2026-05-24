@@ -3,6 +3,7 @@ import { YARD_H, buildingHeight } from '../constants';
 
 export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
+  private windowLights: Phaser.GameObjects.Light[] = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -293,22 +294,27 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Window glow (ADD blend — subtle at day, warm at night) ───
-    const glowGfx = scene.add.graphics()
-      .setBlendMode(Phaser.BlendModes.ADD)
-      .setLighting(false);
-    const gc = 0xffcc66;
+    // ── Window lights ─────────────────────────────────────────────
     for (const wxx of [wx1, wx2]) {
       const wcx = wxx + Math.round(ww / 2);
       const wcy = wy + Math.round(wh / 2);
-      glowGfx.fillStyle(gc, 0.06);
-      glowGfx.fillEllipse(wcx, wcy, ww * 5, wh * 4);
-      glowGfx.fillStyle(gc, 0.12);
-      glowGfx.fillEllipse(wcx, wcy, ww * 3, wh * 2.5);
-      glowGfx.fillStyle(gc, 0.22);
-      glowGfx.fillEllipse(wcx, wcy, ww * 1.5, wh * 1.5);
+      const light = scene.lights.addLight(wcx, wcy, 160, 0xffcc66, 0);
+      this.windowLights.push(light);
     }
-    this.add(glowGfx);
+
+    this.on(Phaser.GameObjects.Events.DESTROY, () => {
+      for (const light of this.windowLights) {
+        scene.lights.removeLight(light);
+      }
+    });
+  }
+
+  updateWindowLights(elevation: number): void {
+    // Fade in as sun approaches horizon; fully on at/below elevation 0
+    const intensity = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3)) * 1.8;
+    for (const light of this.windowLights) {
+      light.intensity = intensity;
+    }
   }
 
   getOutlinePoints() {

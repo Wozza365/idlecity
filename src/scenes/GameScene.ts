@@ -303,6 +303,9 @@ export class GameScene extends Phaser.Scene {
     this.sky.updateOverlay(elev);
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
     this.stars.update(elev, this.sunAngle, this.scale.width);
+    for (const c of this.plotContainers) {
+      if (c && 'updateWindowLights' in c) (c as any).updateWindowLights(elev);
+    }
     this.devPanel?.updateClock(this.gameTimeString());
   }
 
