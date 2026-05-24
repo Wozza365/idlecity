@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
+import { type PlotState } from '../game/GameState';
 import {
-  lerpColor, sunColorAtElevation,
+  PLOT_COUNT, ROAD_H, VERGE_H, RIVER_H, YARD_H,
+  buildingHeight, lerpColor, sunColorAtElevation,
 } from '../constants';
 
 export class SunMoon {
@@ -8,6 +10,7 @@ export class SunMoon {
   private moonCircle:   Phaser.GameObjects.Arc;
   private sunGlowSprite: Phaser.GameObjects.Image;
   private sunGroundGlow: Phaser.GameObjects.Ellipse;
+  private shadowGfx:    Phaser.GameObjects.Graphics;
   readonly sunLight:    Phaser.GameObjects.Light;
 
   constructor(private scene: Phaser.Scene, groundY: number) {
@@ -33,6 +36,7 @@ export class SunMoon {
     ctx2d.fillRect(0, 0, texSize, texSize);
     scene.textures.addCanvas('sun-glow', glowCanvas);
 
+    this.shadowGfx    = scene.add.graphics().setDepth(9.5);
     this.moonCircle   = scene.add.arc(cx, groundY, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
     this.sunGlowSprite = scene.add.image(cx, 80, 'sun-glow')
       .setDisplaySize(300, 300)
@@ -50,6 +54,9 @@ export class SunMoon {
     sunAngle: number,
     width: number,
     groundY: number,
+    panelTop: number,
+    plots: PlotState[],
+    plotWidth: number,
   ): void {
     const a      = sunAngle;
     const cx     = width / 2;
@@ -92,7 +99,95 @@ export class SunMoon {
     const ab = Math.round( (ambTint        & 0xff) * amb);
     this.scene.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
 
-    // Phaser 4 handles shadows automatically - no manual shadow drawing needed
+    this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth);
+  }
+
+  private drawShadows(
+    sunAngle: number,
+    elevation: number,
+    groundY: number,
+    panelTop: number,
+    plots: PlotState[],
+    plotWidth: number,
+  ): void {
+    const gfx = this.shadowGfx;
+    gfx.clear();
+    if (elevation <= 0.02) return;
+
+    const totalAlpha  = Math.min(0.99, elevation * 1.26 + 0.18);
+    const maxShadow   = ROAD_H + VERGE_H + RIVER_H;
+    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5));
+    const shadBot      = Math.min(groundY + shadowExtent, panelTop);
+
+    const NUM_SAMPLES    = 11;
+    const DISC_SPREAD    = 0.10;
+    const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
+
+    for (let s = 0; s < NUM_SAMPLES; s++) {
+      const t      = (s / (NUM_SAMPLES - 1)) - 0.5;
+      const sAngle = sunAngle + t * DISC_SPREAD;
+      const sElev  = Math.sin(sAngle);
+      const sHoriz = Math.cos(sAngle);
+      if (sElev <= 0.01) continue;
+
+      const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
+      gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
+
+      for (let i = 0; i < PLOT_COUNT; i++) {
+        const plot = plots[i];
+        if (!plot.unlocked) continue;
+
+        const x  = i * plotWidth;
+        const w  = plotWidth;
+        const h  = buildingHeight(plot.level);
+        const bw = plot.level <= 15 ? Math.round(w * 0.82) : w;
+        const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
+
+        if (plot.level <= 15) {
+          const buildGY  = groundY - YARD_H;
+          const roofHVal = Math.round(bw * 0.42);
+          const mid      = bx + Math.round(bw / 2);
+          const chx      = bx + Math.round(bw * 0.67);
+          const chimneyH = roofHVal + 2;
+
+          const totalH = h + roofHVal + chimneyH;
+          const maxLean = leanRate * (shadowExtent + YARD_H + totalH);
+
+          const p1x = bx,              p1y = buildGY;
+          const p2x = bx + bw,         p2y = buildGY;
+          const p3x = bx + bw + maxLean, p3y = shadBot;
+          const p4x = bx + maxLean,      p4y = shadBot;
+
+          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+
+          const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
+          const peakShadX = mid + peakLean;
+          if (peakShadX < p3x && leanRate >= 0) {
+            gfx.fillTriangle(p2x, p2y, peakShadX, shadBot, p3x, p3y);
+          } else if (peakShadX > p4x && leanRate < 0) {
+            gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
+          }
+
+          const chimneyLean = maxLean;
+          const chimneyShadX = chx + chimneyLean;
+          if (chimneyShadX > peakShadX && leanRate >= 0) {
+            gfx.fillTriangle(peakShadX, shadBot, p3x, p3y, chimneyShadX, shadBot);
+          } else if (chimneyShadX < peakShadX && leanRate < 0) {
+            gfx.fillTriangle(peakShadX, shadBot, p4x, p4y, chimneyShadX, shadBot);
+          }
+        } else {
+          const lean = leanRate * shadowExtent;
+          const p1x = bx,             p1y = groundY;
+          const p2x = bx + bw,        p2y = groundY;
+          const p3x = bx + bw + lean, p3y = shadBot;
+          const p4x = bx + lean,      p4y = shadBot;
+
+          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+        }
+      }
+    }
   }
 
   resize(width: number): void {
