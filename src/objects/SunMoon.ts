@@ -119,7 +119,7 @@ export class SunMoon {
     const ab = Math.round( (ambTint        & 0xff) * amb);
     this.scene.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
 
-    this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth);
+    this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth, sunX, sunY);
   }
 
   private drawShadows(
@@ -129,6 +129,8 @@ export class SunMoon {
     panelTop: number,
     plots: PlotState[],
     plotWidth: number,
+    sunX: number,
+    sunY: number,
   ): void {
     const gfx = this.shadowGfx;
     gfx.clear();
