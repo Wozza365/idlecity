@@ -123,7 +123,7 @@ export class SunMoon {
     const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5));
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
-    const NUM_SAMPLES    = 11;
+    const NUM_SAMPLES    = 1; // TEMP: Disabled penumbra sampling for debugging
     const DISC_SPREAD    = 0.10;
     const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
 
