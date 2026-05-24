@@ -160,17 +160,26 @@ export class SunMoon {
         const w  = plotWidth;
         const buildGY = groundY - YARD_H;
 
-        // Shadow for empty plot sign (small object, just height-based lean)
+        // Shadow for empty plot sign using raycasting
         if (!plot.unlocked) {
           const cx = x + Math.round(w * 0.5);
           const signWidth = 48;
-          const signHeight = 2;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
-          const signLean = Math.min(20, leanRate * signHeight);
+          const fixedShadowLength = 30;
 
-          gfx.fillTriangle(signLeft, buildGY, signRight, buildGY, signRight + signLean, shadBot);
-          gfx.fillTriangle(signLeft, buildGY, signRight + signLean, shadBot, signLeft + signLean, shadBot);
+          // Raycast from light position through sign to ground
+          // Light is at (sunX, sunY - 300), sign base at buildGY
+          const lightY = sunY - 300;
+          if (lightY < buildGY) {
+            // Light is above sign, can cast shadow
+            const t = (buildGY + fixedShadowLength - lightY) / (buildGY - lightY);
+            const shadowLeftX = sunX + t * (signLeft - sunX);
+            const shadowRightX = sunX + t * (signRight - sunX);
+
+            gfx.fillTriangle(signLeft, buildGY, signRight, buildGY, shadowRightX, buildGY + fixedShadowLength);
+            gfx.fillTriangle(signLeft, buildGY, shadowRightX, buildGY + fixedShadowLength, shadowLeftX, buildGY + fixedShadowLength);
+          }
           continue;
         }
 
