@@ -105,33 +105,6 @@ export class SunMoon {
     this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth);
   }
 
-  private getTier1HouseOutline(
-    x: number,
-    plotWidth: number,
-    groundY: number,
-    h: number,
-  ): Array<{ x: number; y: number; height: number }> {
-    const w = plotWidth;
-    const bw = Math.round(w * 0.82);
-    const bx = x + Math.round((w - bw) / 2);
-    const buildGY = groundY - YARD_H;
-    const top = groundY - h - YARD_H;
-    const roofHVal = Math.round(bw * 0.42);
-    const ov = 6;
-
-    // Building body outline (without roof peak)
-    // Use the full building height (including roof and chimney) for the lean calculation
-    const totalH = h + roofHVal + (roofHVal + 2); // chimney height
-    const height = YARD_H + totalH;
-
-    return [
-      { x: bx, y: buildGY, height },
-      { x: bx + bw, y: buildGY, height },
-      { x: bx + bw + ov, y: top, height },
-      { x: bx - ov, y: top, height },
-    ];
-  }
-
   private drawShadows(
     sunAngle: number,
     elevation: number,
@@ -154,9 +127,6 @@ export class SunMoon {
     const DISC_SPREAD    = 0.10;
     const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
 
-    // Capture first sample geometry for debug rendering
-    let firstSampleLeanRate = 0;
-
     for (let s = 0; s < NUM_SAMPLES; s++) {
       const t      = (s / (NUM_SAMPLES - 1)) - 0.5;
       const sAngle = sunAngle + t * DISC_SPREAD;
@@ -165,7 +135,6 @@ export class SunMoon {
       if (sElev <= 0.01) continue;
 
       const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
-      if (s === 0 || (s === 1 && sElev <= 0.01)) firstSampleLeanRate = leanRate;
       gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
 
       for (let i = 0; i < PLOT_COUNT; i++) {
@@ -255,12 +224,8 @@ export class SunMoon {
           if (plot.level <= 15) {
             const buildGY = groundY - YARD_H;
             const roofHVal = Math.round(bw * 0.42);
-            const mid = bx + Math.round(bw / 2);
-            const chx = bx + Math.round(bw * 0.67);
-            const chimneyH = roofHVal + 2;
-            const totalH = h + roofHVal + chimneyH;
+            const totalH = h + roofHVal + (roofHVal + 2);
             const maxLean = leanRate * (shadowExtent + YARD_H + totalH);
-            const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
 
             const p1x = bx, p1y = buildGY;
             const p2x = bx + bw, p2y = buildGY;
