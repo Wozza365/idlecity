@@ -169,8 +169,10 @@ export class SunMoon {
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
-          // Roof shadow: triangle pointing down from roof line to shadow bottom
-          gfx.fillTriangle(p4x, buildGY, p3x, buildGY, mid, shadBot);
+          // Roof shadow: triangle at bottom of main shadow pointing further down
+          const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
+          const peakShadX = mid - peakLean;
+          gfx.fillTriangle(p4x, shadBot, p3x, shadBot, peakShadX, panelTop);
 
           if (this.DEBUG_SHADOWS) {
             this.debugGfx.lineStyle(2, 0xffffff, 1);
