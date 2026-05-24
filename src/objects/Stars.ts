@@ -13,10 +13,10 @@ export class Stars {
   private gfx: Phaser.GameObjects.Graphics;
   private readonly STAR_COUNT = 40;
 
-  constructor(private scene: Phaser.Scene, groundY: number) {
+  constructor(scene: Phaser.Scene, groundY: number) {
     this.gfx = scene.add.graphics().setDepth(2);
 
-    const { width, height } = scene.scale;
+    const { width } = scene.scale;
     const skyTop = 0;
     const skyHeight = groundY;
 
@@ -79,8 +79,7 @@ export class Stars {
     }
   }
 
-  resize(width: number, groundY: number): void {
-    // Stars are repositioned each frame during update, so resize just keeps gfx valid
-    // If needed, could regenerate star pattern on large resize
+  resize(): void {
+    // Stars are repositioned each frame during update via parallax
   }
 }

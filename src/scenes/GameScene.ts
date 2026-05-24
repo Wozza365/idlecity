@@ -181,7 +181,7 @@ export class GameScene extends Phaser.Scene {
 
     this.sky.resize(width, height);
     this.sunMoon.resize(width);
-    this.stars.resize(width, this.groundY);
+    this.stars.resize();
     this.saveNotification?.setPosition(width - 12, 12);
 
     this.buildLayout();
