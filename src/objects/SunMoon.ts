@@ -168,8 +168,8 @@ export class SunMoon {
           const signWidth = 48;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
-          const shadowGapDistance = 8;
-          const fixedShadowLength = 30;
+          const shadowGapDistance = 16;
+          const fixedShadowLength = 15;
 
           // Raycast from light position through sign to ground plane
           // Light is at (sunX, sunY - 300), sign base at buildGY
