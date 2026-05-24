@@ -11,13 +11,15 @@ export class Stars {
   private stars: Star[] = [];
   private gfx: Phaser.GameObjects.Graphics;
   private readonly STAR_COUNT = 50;
+  private groundY: number;
 
   constructor(scene: Phaser.Scene, groundY: number) {
     this.gfx = scene.add.graphics().setDepth(2);
+    this.groundY = groundY;
 
     const { width } = scene.scale;
     const skyTop = 0;
-    const skyHeight = groundY * 0.35;
+    const skyHeight = groundY * 0.65;
 
     // Generate stars across the sky (higher up, only in upper portion)
     for (let i = 0; i < this.STAR_COUNT; i++) {
@@ -52,9 +54,25 @@ export class Stars {
       // Wrap stars around screen for continuous scrolling
       const wrappedX = ((x % (width * 1.5)) + (width * 1.5)) % (width * 1.5) - width * 0.25;
 
-      // Draw glow (larger semi-transparent circle behind star)
-      this.gfx.fillStyle(0xffeedd, starAlpha * 0.15);
-      this.gfx.fillCircle(wrappedX, star.y, star.radius * 4);
+      const isInBottomHalf = star.y > this.groundY * 0.5;
+
+      // Draw glow only for stars in upper half (prevents light spillage on lower buildings)
+      if (!isInBottomHalf) {
+        // Soft gradient glow with multiple concentric circles
+        const glowAlpha = starAlpha * 0.08;
+
+        // Outer glow (largest, faintest)
+        this.gfx.fillStyle(0xffeedd, glowAlpha * 0.3);
+        this.gfx.fillCircle(wrappedX, star.y, star.radius * 2.5);
+
+        // Mid glow
+        this.gfx.fillStyle(0xffeedd, glowAlpha * 0.6);
+        this.gfx.fillCircle(wrappedX, star.y, star.radius * 1.6);
+
+        // Inner glow
+        this.gfx.fillStyle(0xffeedd, glowAlpha);
+        this.gfx.fillCircle(wrappedX, star.y, star.radius * 0.8);
+      }
 
       // Draw star core
       this.gfx.fillStyle(0xffeedd, starAlpha * star.brightness);
