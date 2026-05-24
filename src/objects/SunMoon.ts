@@ -85,7 +85,7 @@ export class SunMoon {
       .setAlpha(Math.max(0, elevation * 0.22));
 
     this.sunLight.x         = sunX;
-    this.sunLight.y         = sunY;
+    this.sunLight.y         = sunY - 300;
     this.sunLight.height = Math.max(100, 500 * Math.max(0, elevation));
     this.sunLight.intensity = Math.max(0, elevation * 3.2);
 
