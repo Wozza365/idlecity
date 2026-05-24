@@ -17,7 +17,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "phaser": "^3.88.2"
+    "phaser": "^4.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",

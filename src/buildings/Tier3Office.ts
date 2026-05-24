@@ -10,7 +10,6 @@ export class Tier3Office extends Phaser.GameObjects.Container {
     const top = groundY - h;
 
     const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, 0x5a7a8a);
-    body.setPipeline('Light2D');
     this.add(body);
 
     const gfx      = scene.add.graphics();
