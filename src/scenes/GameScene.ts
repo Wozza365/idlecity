@@ -1,12 +1,15 @@
 import Phaser from 'phaser';
 import { type GameState, type PlotState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
-  PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_H, VERGE_H, RIVER_H, YARD_H,
+  PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_H, VERGE_H, RIVER_H,
   UNLOCK_COSTS,
-  upgradeCost, buildingHeight, perBuildingIncome, lerpColor, sunColorAtElevation, fmt,
+  upgradeCost, perBuildingIncome, fmt,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
 import { Sky } from '../objects/Sky';
+import { SunMoon } from '../objects/SunMoon';
+import { Road } from '../objects/Road';
+import { VergeRiver } from '../objects/VergeRiver';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -25,10 +28,7 @@ export class GameScene extends Phaser.Scene {
   private uiContainers: Phaser.GameObjects.Container[] = [];
   private actionRefs: (ActionRef | null)[] = new Array(PLOT_COUNT + 1).fill(null);
 
-  // Graphics layers created once in create(), redrawn on layout changes
-  private roadGraphics!: Phaser.GameObjects.Graphics;
-  private vergeRiverGraphics!: Phaser.GameObjects.Graphics;
-  private buildingShadowGfx!: Phaser.GameObjects.Graphics;
+  // Persistent graphics layer — depth-ordered, never destroyed
   private panelChromeGfx!: Phaser.GameObjects.Graphics;
 
   private roadUiContainer!: Phaser.GameObjects.Container;
@@ -36,8 +36,12 @@ export class GameScene extends Phaser.Scene {
   private taxRateText!: Phaser.GameObjects.Text;
   private saveNotification!: Phaser.GameObjects.Text;
 
-  // Sky manager: owns skyGfx (rebuilt on layout) + nightOverlay (persistent tween target)
+  // World-layer managers
   private sky!: Sky;
+  private sunMoon!: SunMoon;
+  private road!: Road;
+  private vergeRiver!: VergeRiver;
+
   // Panel background — destroyed and recreated on resize
   private panelBg!: Phaser.GameObjects.Rectangle;
 
@@ -50,11 +54,6 @@ export class GameScene extends Phaser.Scene {
   private timeOffsetMs: number = 0;
 
   private sunAngle: number = Math.PI / 2;
-  private sunCircle!: Phaser.GameObjects.Arc;
-  private moonCircle!: Phaser.GameObjects.Arc;
-  private sunGlowSprite!: Phaser.GameObjects.Image;
-  private sunGroundGlow!: Phaser.GameObjects.Ellipse;
-  private sunLight!: Phaser.GameObjects.Light;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -74,20 +73,16 @@ export class GameScene extends Phaser.Scene {
     this.lights.enable();
     this.lights.setAmbientColor(0x888888);
 
-    // Persistent graphics layers — depth-ordered, never destroyed
-    this.vergeRiverGraphics = this.add.graphics().setDepth(6);
-    this.roadGraphics       = this.add.graphics().setDepth(7);
-    this.buildingShadowGfx  = this.add.graphics().setDepth(9.5);
-    this.panelChromeGfx     = this.add.graphics().setDepth(10);
+    this.panelChromeGfx = this.add.graphics().setDepth(10);
 
-    // Sky manager — creates nightOverlay (persistent) and initial skyGfx
-    this.sky = new Sky(this);
+    // World-layer managers — each owns its own graphics/objects
+    this.sky        = new Sky(this);
+    this.road       = new Road(this);
+    this.vergeRiver = new VergeRiver(this);
+    this.sunMoon    = new SunMoon(this, this.groundY);
 
     // Build all layout-dependent visuals
     this.buildLayout();
-
-    // Sun/moon objects — created once after layout (sun reads groundY)
-    this.setupSun();
 
     const { width } = this.scale;
 
@@ -128,7 +123,6 @@ export class GameScene extends Phaser.Scene {
   private buildLayout(): void {
     const { width, height } = this.scale;
 
-    // Sky rebuild: destroys old skyGfx and creates a fresh one at depth 0
     this.sky.rebuild();
 
     this.panelBg?.destroy();
@@ -136,8 +130,8 @@ export class GameScene extends Phaser.Scene {
       .rectangle(width / 2, (this.panelTop + height) / 2, width, height - this.panelTop, 0x1e2433)
       .setDepth(1);
 
-    this.renderRoad();
-    this.renderVergeAndRiver();
+    this.road.render(this.state.road.level, width, this.groundY);
+    this.vergeRiver.render(width, this.groundY);
 
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);
@@ -159,7 +153,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshButtons();
     this.updateStats();
     this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY);
-    this.updateSun();
+    this.sunMoon.update(this.sunAngle, width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
   }
 
   // ── Resize handler ─────────────────────────────────────────────────────────
@@ -168,9 +162,8 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     this.sky.resize(width, height);
+    this.sunMoon.resize(width);
     this.saveNotification?.setPosition(width - 12, 12);
-    if (this.sunGroundGlow) this.sunGroundGlow.setDisplaySize(Math.round(width * 0.5), 22);
-    if (this.sunLight) this.sunLight.radius = Math.max(800, width * 2);
 
     this.buildLayout();
   }
@@ -182,13 +175,13 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const container = this.add.container(0, 0).setDepth(90);
 
-    const row1Y = 16;
-    const row2Y = 42;
+    const row1Y  = 16;
+    const row2Y  = 42;
     container.add(this.add.rectangle(width / 2, 29, width, 58, 0x000000, 0.6));
 
-    const btnW  = 120;
-    const gap   = 8;
-    const leftX = (width - btnW * 2 - gap) / 2 + btnW / 2;
+    const btnW   = 120;
+    const gap    = 8;
+    const leftX  = (width - btnW * 2 - gap) / 2 + btnW / 2;
     const rightX = leftX + btnW + gap;
 
     const btn1 = this.add
@@ -240,7 +233,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private gameTimeString(): string {
-    const elapsed  = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
+    const elapsed   = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
     const totalMins = (elapsed / 240_000) * 24 * 60;
     const hour = Math.floor(12 + totalMins / 60) % 24;
     const min  = Math.floor(totalMins) % 60;
@@ -262,7 +255,7 @@ export class GameScene extends Phaser.Scene {
     const elev = Math.sin(this.sunAngle);
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
     this.sky.updateOverlay(elev);
-    this.updateSun();
+    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
     this.clockText?.setText(this.gameTimeString());
   }
 
@@ -381,164 +374,6 @@ export class GameScene extends Phaser.Scene {
     building.setDepth(9);
     this.add.existing(building);
     return building;
-  }
-
-  // ── Day/night: sun & lighting ──────────────────────────────────────────────
-
-  private setupSun(): void {
-    const { width } = this.scale;
-    const cx = width / 2;
-
-    // Glow texture: opaque Gaussian from white (centre) → black (edge).
-    // Black pixels add nothing in ADD blend mode, bypassing premultiplied-alpha
-    // banding. 30 stops trace a smooth Gaussian so there are no visible kinks.
-    const texSize   = 512;
-    const glowCanvas = document.createElement('canvas');
-    glowCanvas.width  = texSize;
-    glowCanvas.height = texSize;
-    const ctx2d = glowCanvas.getContext('2d')!;
-    const half  = texSize / 2;
-    const grad  = ctx2d.createRadialGradient(half, half, 0, half, half, half);
-    for (let i = 0; i <= 30; i++) {
-      const t = i / 30;
-      const v = Math.round(Math.exp(-t * t * 7) * 255);
-      grad.addColorStop(t, `rgb(${v},${v},${v})`);
-    }
-    ctx2d.fillStyle = grad;
-    ctx2d.fillRect(0, 0, texSize, texSize);
-    this.textures.addCanvas('sun-glow', glowCanvas);
-
-    this.moonCircle    = this.add.arc(cx, this.groundY, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
-    this.sunGlowSprite = this.add.image(cx, 80, 'sun-glow')
-      .setDisplaySize(300, 300)
-      .setBlendMode(Phaser.BlendModes.ADD)
-      .setDepth(3);
-    this.sunCircle     = this.add.arc(cx, 80, 20, 0, 360, false, 0xfff8aa, 1).setDepth(5);
-    this.sunGroundGlow = this.add
-      .ellipse(cx, this.groundY + 6, Math.round(width * 0.5), 22, 0xfffae0, 0)
-      .setDepth(6);
-    this.sunLight = this.lights.addLight(cx, 80, Math.max(800, width * 2), 0xffeeaa, 3.2);
-  }
-
-  private updateSun(): void {
-    if (!this.sunCircle) return;
-    const a = this.sunAngle;
-    const { width } = this.scale;
-    const cx     = width / 2;
-    const orbitX = width * 0.95;
-    const orbitY = Math.round(this.groundY * 0.90);
-
-    const elevation = Math.sin(a);
-    const sunX      = cx - Math.cos(a) * orbitX;
-    const sunY      = this.groundY - elevation * orbitY;
-    const sunAbove  = elevation > 0.02;
-
-    const moonElev = Math.sin(a + Math.PI);
-    const moonX    = cx - Math.cos(a + Math.PI) * orbitX;
-    const moonY    = this.groundY - moonElev * orbitY;
-
-    this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
-    this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
-    this.sunGlowSprite.setPosition(sunX, sunY).setVisible(sunAbove);
-
-    this.sunGroundGlow
-      .setPosition(sunX, this.groundY + 6)
-      .setVisible(sunAbove)
-      .setAlpha(Math.max(0, elevation * 0.22));
-
-    this.sunLight.x         = sunX;
-    this.sunLight.y         = sunY;
-    this.sunLight.intensity = Math.max(0, elevation * 3.2);
-
-    const sunColor = sunColorAtElevation(elevation);
-    this.sunCircle.setFillStyle(sunColor);
-    this.sunGlowSprite.setTint(sunColor);
-    this.sunLight.setColor(sunColor);
-
-    const ambMin  = elevation >= 0 ? Math.max(0.08, 0.28 - elevation) : 0.08;
-    const amb     = Math.max(ambMin, elevation * 0.55 + 0.14);
-    const ambTint = lerpColor(0xff8833, 0xffffff, Math.min(1, elevation * 3));
-    const ar = Math.round(((ambTint >> 16) & 0xff) * amb);
-    const ag = Math.round(((ambTint >> 8)  & 0xff) * amb);
-    const ab = Math.round( (ambTint        & 0xff) * amb);
-    this.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
-
-    this.drawBuildingShadows(a, elevation);
-  }
-
-  /**
-   * Draws soft ground shadows using parallel sun rays with multi-sample
-   * penumbra simulation. NUM_SAMPLES point lights are spread across the
-   * sun disc; each casts a shadow at 1/N alpha. Overlapping umbra regions
-   * reach full alpha while penumbra edges appear softer.
-   */
-  private drawBuildingShadows(sunAngle: number, elevation: number): void {
-    const gfx = this.buildingShadowGfx;
-    gfx.clear();
-    if (elevation <= 0.02) return;
-
-    const totalAlpha = Math.min(0.99, elevation * 1.26 + 0.18);
-
-    const maxShadow   = ROAD_H + VERGE_H + RIVER_H;
-    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5));
-    const shadBot      = Math.min(this.groundY + shadowExtent, this.panelTop);
-
-    const NUM_SAMPLES  = 11;
-    const DISC_SPREAD  = 0.10;
-    const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
-
-    for (let s = 0; s < NUM_SAMPLES; s++) {
-      const t      = (s / (NUM_SAMPLES - 1)) - 0.5;
-      const sAngle = sunAngle + t * DISC_SPREAD;
-      const sElev  = Math.sin(sAngle);
-      const sHoriz = Math.cos(sAngle);
-      if (sElev <= 0.01) continue;
-
-      const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
-      gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
-
-      for (let i = 0; i < PLOT_COUNT; i++) {
-        const plot = this.state.plots[i];
-        if (!plot.unlocked) continue;
-
-        const x  = this.plotLeft(i);
-        const w  = this.plotWidth;
-        const h  = buildingHeight(plot.level);
-        const bw = plot.level <= 15 ? Math.round(w * 0.82) : w;
-        const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
-
-        if (plot.level <= 15) {
-          const buildGY  = this.groundY - YARD_H;
-          const roofHVal = Math.round(bw * 0.42);
-          const mid      = bx + Math.round(bw / 2);
-          const lean     = leanRate * (shadowExtent + YARD_H);
-
-          const p1x = bx,            p1y = buildGY;
-          const p2x = bx + bw,       p2y = buildGY;
-          const p3x = bx + bw + lean, p3y = shadBot;
-          const p4x = bx + lean,      p4y = shadBot;
-
-          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
-
-          const peakShadX = mid + leanRate * (shadowExtent + YARD_H + h + roofHVal);
-          if (leanRate >= 0 && peakShadX > p3x) {
-            gfx.fillTriangle(p2x, p2y, p3x, p3y, peakShadX, shadBot);
-          } else if (leanRate < 0 && peakShadX < p4x) {
-            gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
-          }
-        } else {
-          const lean = leanRate * shadowExtent;
-          const p1x = bx,            p1y = this.groundY;
-          const p2x = bx + bw,       p2y = this.groundY;
-          const p3x = bx + bw + lean, p3y = shadBot;
-          const p4x = bx + lean,      p4y = shadBot;
-
-          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
-        }
-      }
-    }
   }
 
   // ── UI panel columns ───────────────────────────────────────────────────────
@@ -674,91 +509,12 @@ export class GameScene extends Phaser.Scene {
     this.actionRefs[index] = { btn, getCost: (): number => cost, activeColor: 0x2d6b1a };
   }
 
-  // ── Road rendering ─────────────────────────────────────────────────────────
+  // ── Road UI ────────────────────────────────────────────────────────────────
 
   private roadUpgradeCost(): number {
     const lvl = this.state.road.level;
     return lvl === 0 ? 200 : lvl * lvl * 50;
   }
-
-  private renderRoad(): void {
-    const gfx   = this.roadGraphics;
-    gfx.clear();
-    const { width } = this.scale;
-    const level = this.state.road.level;
-    const gy    = this.groundY;
-
-    if (level === 0) {
-      gfx.fillStyle(0x555e6b, 1);
-      gfx.fillRect(0, gy, width, ROAD_H);
-      return;
-    }
-    if (level <= 2) {
-      gfx.fillStyle(0x6b4c2a, 1);
-      gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0x8a6040, 1);
-      for (let px = 10; px < width; px += 28) {
-        gfx.fillCircle(px, gy + 8, 2);
-        gfx.fillCircle(px + 14, gy + 16, 2);
-      }
-      return;
-    }
-    if (level <= 4) {
-      gfx.fillStyle(0x555555, 1);
-      gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0x6e6e6e, 1);
-      for (let px = 5; px < width; px += 18) {
-        gfx.fillRect(px, gy + 5, 3, 2);
-        gfx.fillRect(px + 9, gy + 14, 3, 2);
-      }
-      return;
-    }
-    if (level <= 6) {
-      const midY = gy + ROAD_H / 2;
-      gfx.fillStyle(0x333333, 1);
-      gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0xffffff, 1);
-      for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
-      return;
-    }
-    if (level <= 8) {
-      const midY = gy + ROAD_H / 2;
-      gfx.fillStyle(0x333333, 1);
-      gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(0, gy + 2, width, 2);
-      gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
-      for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
-      return;
-    }
-    // Level 9–10: Highway
-    gfx.fillStyle(0x222222, 1);
-    gfx.fillRect(0, gy, width, ROAD_H);
-    gfx.fillStyle(0xffd700, 1);
-    gfx.fillRect(0, gy + 2, width, 2);
-    gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
-    gfx.fillStyle(0xffffff, 1);
-    for (const frac of [0.25, 0.5, 0.75]) {
-      const dy = Math.round(gy + ROAD_H * frac) - 1;
-      for (let px = 0; px < width; px += 34) gfx.fillRect(px, dy, 20, 2);
-    }
-  }
-
-  private renderVergeAndRiver(): void {
-    const gfx    = this.vergeRiverGraphics;
-    gfx.clear();
-    const { width } = this.scale;
-    const vergeY = this.groundY + ROAD_H;
-    const riverY = vergeY + VERGE_H;
-
-    gfx.fillStyle(0x4a8c3a, 1);
-    gfx.fillRect(0, vergeY, width, VERGE_H);
-
-    gfx.fillStyle(0x2a6ab5, 1);
-    gfx.fillRect(0, riverY, width, RIVER_H);
-  }
-
-  // ── Road UI ────────────────────────────────────────────────────────────────
 
   private roadTierName(): string {
     const lvl = this.state.road.level;
@@ -810,7 +566,7 @@ export class GameScene extends Phaser.Scene {
         if (this.state.gold < cost) return;
         this.state.gold -= cost;
         this.state.road.level = Math.min(this.state.road.level + 1, 10);
-        this.renderRoad();
+        this.road.render(this.state.road.level, this.scale.width, this.groundY);
         this.roadUiContainer = this.renderRoadUI();
         this.updateStats();
         this.refreshButtons();
