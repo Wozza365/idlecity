@@ -49,8 +49,8 @@ export class GameScene extends Phaser.Scene {
   private taxRateText!: Phaser.GameObjects.Text;
   private saveNotification!: Phaser.GameObjects.Text;
 
-  // Background rects — destroyed and recreated on resize
-  private skyRect!: Phaser.GameObjects.Rectangle;
+  // Background — destroyed and recreated on resize
+  private skyGfx!: Phaser.GameObjects.Graphics;
   private panelBg!: Phaser.GameObjects.Rectangle;
 
   // Night overlay — repositioned on resize, never recreated (tween target)
@@ -65,7 +65,6 @@ export class GameScene extends Phaser.Scene {
 
   private sunAngle: number = Math.PI / 2;
   private sunCircle!: Phaser.GameObjects.Arc;
-  private sunGlowArc!: Phaser.GameObjects.Arc;
   private moonCircle!: Phaser.GameObjects.Arc;
   private sunRaysGfx!: Phaser.GameObjects.Graphics;
   private sunGroundGlow!: Phaser.GameObjects.Ellipse;
@@ -151,12 +150,9 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     // Sky + panel backgrounds (destroy old ones first)
-    this.skyRect?.destroy();
+    this.skyGfx?.destroy();
     this.panelBg?.destroy();
-    this.skyRect = this.add
-      .rectangle(width / 2, this.groundY / 2, width, this.groundY, 0x4a7fb5)
-      .setDepth(0);
-    // Sky controls its own color directly; Light2D would multiply it dark
+    this.skyGfx = this.add.graphics().setDepth(0);
     this.panelBg = this.add
       .rectangle(width / 2, (this.panelTop + height) / 2, width, height - this.panelTop, 0x1e2433)
       .setDepth(1);
@@ -183,6 +179,7 @@ export class GameScene extends Phaser.Scene {
 
     this.refreshButtons();
     this.updateStats();
+    this.updateSkyGradient(Math.sin(this.sunAngle));
     this.updateSun();
   }
 
@@ -251,7 +248,7 @@ export class GameScene extends Phaser.Scene {
     this.sunAngle = Math.PI / 2 + (elapsed / 240_000) * Math.PI * 2;
 
     const elev = Math.sin(this.sunAngle);
-    this.updateSkyColour(elev);
+    this.updateSkyGradient(elev);
     this.updateSceneOverlay(elev);
     this.updateSun();
   }
@@ -785,33 +782,52 @@ export class GameScene extends Phaser.Scene {
 
   // ── Day/night helpers ──────────────────────────────────────────────────────
 
-  private updateSkyColour(elev: number): void {
-    let skyColor: number;
-    if (elev <= -0.10) {
-      skyColor = 0x060612;
-    } else if (elev < 0) {
-      skyColor = lerpColor(0x060612, 0x7a1508, (elev + 0.10) / 0.10);
-    } else if (elev < 0.15) {
-      skyColor = lerpColor(0x7a1508, 0xff7733, elev / 0.15);
-    } else if (elev < 0.40) {
-      skyColor = lerpColor(0xff7733, 0x4a7fb5, (elev - 0.15) / 0.25);
+  private updateSkyGradient(elev: number): void {
+    if (!this.skyGfx) return;
+    const { width } = this.scale;
+    const h = this.groundY;
+
+    let zenith: number;
+    let horizon: number;
+
+    if (elev <= -0.15) {
+      zenith = 0x04040f; horizon = 0x08082a;
+    } else if (elev <= -0.02) {
+      const t = (elev + 0.15) / 0.13;
+      zenith  = lerpColor(0x04040f, 0x160c2a, t);
+      horizon = lerpColor(0x08082a, 0x3a100a, t);
+    } else if (elev <= 0.10) {
+      const t = (elev + 0.02) / 0.12;
+      zenith  = lerpColor(0x160c2a, 0x1e3878, t);
+      horizon = lerpColor(0x3a100a, 0xc85c14, t);
+    } else if (elev <= 0.30) {
+      const t = (elev - 0.10) / 0.20;
+      zenith  = lerpColor(0x1e3878, 0x2255aa, t);
+      horizon = lerpColor(0xc85c14, 0x78aac8, t);
+    } else if (elev <= 0.50) {
+      const t = (elev - 0.30) / 0.20;
+      zenith  = lerpColor(0x2255aa, 0x2a6aa0, t);
+      horizon = lerpColor(0x78aac8, 0x6aaad0, t);
     } else {
-      skyColor = 0x4a7fb5;
+      zenith = 0x2a6aa0; horizon = 0x6aaad0;
     }
-    this.skyRect?.setFillStyle(skyColor);
+
+    this.skyGfx.clear();
+    this.skyGfx.fillGradientStyle(zenith, zenith, horizon, horizon, 1);
+    this.skyGfx.fillRect(0, 0, width, h);
   }
 
-  // Repurposes the night overlay: warm orange tint at sunrise/sunset, dark blue at night.
   private updateSceneOverlay(elev: number): void {
-    if (elev > 0.25) {
+    this.nightOverlay.setFillStyle(0x000022);
+    if (elev > 0.12) {
       this.nightOverlay.setAlpha(0);
     } else if (elev > 0) {
-      this.nightOverlay.setFillStyle(0xff5500).setAlpha(0.28 * (1 - elev / 0.25));
+      this.nightOverlay.setAlpha(0.22 * (1 - elev / 0.12));
     } else if (elev > -0.15) {
       const t = -elev / 0.15;
-      this.nightOverlay.setFillStyle(lerpColor(0xff4400, 0x000022, t)).setAlpha(0.28 + t * 0.27);
+      this.nightOverlay.setAlpha(0.22 + t * 0.13);
     } else {
-      this.nightOverlay.setFillStyle(0x000022).setAlpha(0.55);
+      this.nightOverlay.setAlpha(0.35);
     }
   }
 
@@ -824,7 +840,6 @@ export class GameScene extends Phaser.Scene {
 
     this.moonCircle   = this.add.arc(cx, gy, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
     this.sunRaysGfx   = this.add.graphics().setDepth(3);
-    this.sunGlowArc   = this.add.arc(cx, 80, 44, 0, 360, false, 0xffe066, 0.3).setDepth(4);
     this.sunCircle    = this.add.arc(cx, 80, 20, 0, 360, false, 0xfff8aa, 1).setDepth(5);
     this.sunGroundGlow = this.add
       .ellipse(cx, gy + 6, Math.round(width * 0.5), 22, 0xfffae0, 0)
@@ -850,9 +865,8 @@ export class GameScene extends Phaser.Scene {
     const moonY = this.groundY - moonElev * orbitY;
 
     this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
-    this.sunGlowArc.setPosition(sunX, sunY).setVisible(sunAbove);
     this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
-    this.drawSunRays(sunX, sunY, sunAbove);
+    this.drawSunGlow(sunX, sunY, sunAbove, sunColorAtElevation(elevation), Math.min(1, elevation * 2.5 + 0.4));
 
     this.sunGroundGlow
       .setPosition(sunX, this.groundY + 6)
@@ -866,7 +880,6 @@ export class GameScene extends Phaser.Scene {
     // Dynamic sun color: deep orange-red at horizon → golden yellow → warm white at noon
     const sunColor = sunColorAtElevation(elevation);
     this.sunCircle.setFillStyle(sunColor);
-    this.sunGlowArc.setFillStyle(sunColor, 0.3);
     this.sunLight.setColor(sunColor);
 
     // At low elevation keep ambient bright enough to show warm tint on buildings
@@ -974,26 +987,23 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private drawSunRays(cx: number, cy: number, visible: boolean): void {
+  private drawSunGlow(cx: number, cy: number, visible: boolean, color: number, intensity: number): void {
     const gfx = this.sunRaysGfx;
     gfx.clear();
-    if (!visible) return;
+    if (!visible || intensity <= 0) return;
 
-    const numRays = 12;
-    const innerR = 24;
-    const outerR = 72;
-    const halfAngle = 0.11;
-    gfx.fillStyle(0xffe066, 0.22);
-    for (let i = 0; i < numRays; i++) {
-      const angle = (i / numRays) * Math.PI * 2;
-      gfx.fillTriangle(
-        cx + Math.cos(angle - halfAngle) * innerR,
-        cy + Math.sin(angle - halfAngle) * innerR,
-        cx + Math.cos(angle + halfAngle) * innerR,
-        cy + Math.sin(angle + halfAngle) * innerR,
-        cx + Math.cos(angle) * outerR,
-        cy + Math.sin(angle) * outerR
-      );
+    // Radial glow: largest (faintest) first so inner circles composite on top.
+    const layers: { r: number; a: number }[] = [
+      { r: 110, a: 0.012 },
+      { r: 85,  a: 0.025 },
+      { r: 65,  a: 0.050 },
+      { r: 48,  a: 0.090 },
+      { r: 34,  a: 0.150 },
+      { r: 24,  a: 0.220 },
+    ];
+    for (const { r, a } of layers) {
+      gfx.fillStyle(color, Math.min(1, a * intensity));
+      gfx.fillCircle(cx, cy, r);
     }
   }
 
