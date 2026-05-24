@@ -331,10 +331,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
   updateWindowLights(elevation: number): void {
     const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
     for (const light of this.windowLights) {
-      light.intensity = t * 0.75;
+      light.intensity = t * 0.375;
     }
     for (const glow of this.windowGlows) {
-      glow.setAlpha(t * 0.85);
+      glow.setAlpha(t * 0.425);
     }
   }
 
