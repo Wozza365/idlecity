@@ -10,6 +10,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
     const top = groundY - h;
 
     const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, 0x1a2a3a);
+    (body as any).setLighting(true);
     this.add(body);
 
     const gfx      = scene.add.graphics();

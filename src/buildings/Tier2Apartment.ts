@@ -10,6 +10,7 @@ export class Tier2Apartment extends Phaser.GameObjects.Container {
     const top = groundY - h;
 
     const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, 0xd4a96a);
+    (body as any).setLighting(true);
     this.add(body);
 
     const gfx      = scene.add.graphics();

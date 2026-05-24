@@ -168,7 +168,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshButtons();
     this.statsBar.update(this.state.gold, this.taxRate);
     this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY);
-    this.sunMoon.update(this.sunAngle, width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
+    this.sunMoon.update(this.sunAngle, width, this.groundY);
   }
 
   // ── Resize handler ─────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ export class GameScene extends Phaser.Scene {
     const elev = Math.sin(this.sunAngle);
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
     this.sky.updateOverlay(elev);
-    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
+    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY);
     this.devPanel?.updateClock(this.gameTimeString());
   }
 
