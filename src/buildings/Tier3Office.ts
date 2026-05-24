@@ -10,6 +10,7 @@ export class Tier3Office extends Phaser.GameObjects.Container {
     const top = groundY - h;
 
     const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, 0x5a7a8a);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (body as any).setLighting(true);
     this.add(body);
 

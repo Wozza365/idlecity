@@ -43,6 +43,7 @@ export class SunMoon {
       .ellipse(cx, groundY + 6, Math.round(width * 0.5), 22, 0xfffae0, 0)
       .setDepth(6);
     this.sunLight = scene.lights.addLight(cx, 80, Math.max(800, width * 2), 0xffeeaa, 3.2);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.sunLight as any).height = 400;
   }
 
@@ -76,6 +77,7 @@ export class SunMoon {
 
     this.sunLight.x         = sunX;
     this.sunLight.y         = sunY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.sunLight as any).height = Math.max(100, 500 * Math.max(0, elevation));
     this.sunLight.intensity = Math.max(0, elevation * 3.2);
 
