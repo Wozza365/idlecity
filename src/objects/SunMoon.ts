@@ -169,20 +169,8 @@ export class SunMoon {
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
-          // Roof shadow: extends at the bottom level of the main shadow, stretching outward
-          // The roof overhangs 6 pixels beyond the building on each side
-          const roofOverhang = 6;
-          const roofLeftX = bx - roofOverhang;
-          const roofRightX = bx + bw + roofOverhang;
-
-          // Overhang base lean (no roof height, just yard level)
-          const baseOvrhangLean = leanRate * (shadowExtent + YARD_H);
-          const roofLeftShadX = roofLeftX + baseOvrhangLean;
-          const roofRightShadX = roofRightX + baseOvrhangLean;
-
-          // Roof shadow extends the main shadow trapezoid further along the ground
-          gfx.fillTriangle(p4x, p4y, p3x, p3y, roofRightShadX, shadBot);
-          gfx.fillTriangle(p4x, p4y, roofRightShadX, shadBot, roofLeftShadX, shadBot);
+          // Roof shadow: triangle pointing down from roof line to shadow bottom
+          gfx.fillTriangle(p4x, buildGY, p3x, buildGY, mid, shadBot);
 
           if (this.DEBUG_SHADOWS) {
             this.debugGfx.lineStyle(2, 0xffffff, 1);
