@@ -139,7 +139,7 @@ export class SunMoon {
 
       const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
       if (s === 0 || (s === 1 && sElev <= 0.01)) firstSampleLeanRate = leanRate;
-      gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
+      gfx.fillStyle(0x000022, (totalAlpha * 2) / NUM_SAMPLES); // TEMP: 2x shadow strength for debugging
 
       for (let i = 0; i < PLOT_COUNT; i++) {
         const plot = plots[i];
