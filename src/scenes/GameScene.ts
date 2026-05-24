@@ -875,28 +875,28 @@ export class GameScene extends Phaser.Scene {
     const cx = width / 2;
     const gy = this.groundY;
 
-    // Build a smooth radial gradient texture once using the Canvas 2D API,
-    // then render it as an additive-blended sprite so there are no hard rings.
-    const texSize = 256;
+    // Glow texture: opaque Gaussian from white (centre) → black (edge).
+    // Black pixels add nothing in ADD blend mode, bypassing premultiplied-alpha
+    // banding. 30 stops trace a smooth Gaussian so there are no visible kinks.
+    const texSize = 512;
     const glowCanvas = document.createElement('canvas');
     glowCanvas.width  = texSize;
     glowCanvas.height = texSize;
     const ctx2d = glowCanvas.getContext('2d')!;
     const half = texSize / 2;
     const grad = ctx2d.createRadialGradient(half, half, 0, half, half, half);
-    grad.addColorStop(0.00, 'rgba(255,255,255,1.00)');
-    grad.addColorStop(0.12, 'rgba(255,255,255,0.80)');
-    grad.addColorStop(0.28, 'rgba(255,255,255,0.35)');
-    grad.addColorStop(0.50, 'rgba(255,255,255,0.10)');
-    grad.addColorStop(0.75, 'rgba(255,255,255,0.02)');
-    grad.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+    for (let i = 0; i <= 30; i++) {
+      const t = i / 30;
+      const v = Math.round(Math.exp(-t * t * 7) * 255);
+      grad.addColorStop(t, `rgb(${v},${v},${v})`);
+    }
     ctx2d.fillStyle = grad;
     ctx2d.fillRect(0, 0, texSize, texSize);
     this.textures.addCanvas('sun-glow', glowCanvas);
 
     this.moonCircle    = this.add.arc(cx, gy, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
     this.sunGlowSprite = this.add.image(cx, 80, 'sun-glow')
-      .setDisplaySize(220, 220)
+      .setDisplaySize(300, 300)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(3);
     this.sunCircle     = this.add.arc(cx, 80, 20, 0, 360, false, 0xfff8aa, 1).setDepth(5);
