@@ -285,7 +285,7 @@ export class GameScene extends Phaser.Scene {
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
     this.sky.updateOverlay(elev);
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
-    this.stars.update(elev, this.sunAngle, this.scale.width, this.groundY);
+    this.stars.update(elev, this.sunAngle, this.scale.width);
     this.devPanel?.updateClock(this.gameTimeString());
   }
 
