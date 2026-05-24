@@ -11,7 +11,9 @@ export class SunMoon {
   private sunGlowSprite: Phaser.GameObjects.Image;
   private sunGroundGlow: Phaser.GameObjects.Ellipse;
   private shadowGfx:    Phaser.GameObjects.Graphics;
+  private debugGfx:     Phaser.GameObjects.Graphics;
   readonly sunLight:    Phaser.GameObjects.Light;
+  private DEBUG_SHADOWS = true;
 
   constructor(private scene: Phaser.Scene, groundY: number) {
     const { width } = scene.scale;
@@ -37,6 +39,7 @@ export class SunMoon {
     scene.textures.addCanvas('sun-glow', glowCanvas);
 
     this.shadowGfx    = scene.add.graphics().setDepth(9.5);
+    this.debugGfx     = scene.add.graphics().setDepth(9.6);
     this.moonCircle   = scene.add.arc(cx, groundY, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
     this.sunGlowSprite = scene.add.image(cx, 80, 'sun-glow')
       .setDisplaySize(300, 300)
@@ -112,6 +115,7 @@ export class SunMoon {
   ): void {
     const gfx = this.shadowGfx;
     gfx.clear();
+    this.debugGfx.clear();
     if (elevation <= 0.02) return;
 
     const totalAlpha  = Math.min(0.99, elevation * 1.26 + 0.18);
@@ -161,20 +165,62 @@ export class SunMoon {
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
+          if (this.DEBUG_SHADOWS) {
+            this.debugGfx.lineStyle(2, 0xffffff, 1);
+            this.debugGfx.moveTo(p1x, p1y);
+            this.debugGfx.lineTo(p2x, p2y);
+            this.debugGfx.lineTo(p3x, p3y);
+            this.debugGfx.lineTo(p4x, p4y);
+            this.debugGfx.lineTo(p1x, p1y);
+            this.debugGfx.strokePath();
+          }
+
           const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
           const peakShadX = mid + peakLean;
           if (peakShadX < p3x && leanRate >= 0) {
             gfx.fillTriangle(p2x, p2y, peakShadX, shadBot, p3x, p3y);
+            if (this.DEBUG_SHADOWS) {
+              this.debugGfx.lineStyle(2, 0x00ff00, 1);
+              this.debugGfx.moveTo(p2x, p2y);
+              this.debugGfx.lineTo(peakShadX, shadBot);
+              this.debugGfx.lineTo(p3x, p3y);
+              this.debugGfx.lineTo(p2x, p2y);
+              this.debugGfx.strokePath();
+            }
           } else if (peakShadX > p4x && leanRate < 0) {
             gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
+            if (this.DEBUG_SHADOWS) {
+              this.debugGfx.lineStyle(2, 0x00ff00, 1);
+              this.debugGfx.moveTo(p1x, p1y);
+              this.debugGfx.lineTo(p4x, p4y);
+              this.debugGfx.lineTo(peakShadX, shadBot);
+              this.debugGfx.lineTo(p1x, p1y);
+              this.debugGfx.strokePath();
+            }
           }
 
           const chimneyLean = maxLean;
           const chimneyShadX = chx + chimneyLean;
           if (chimneyShadX > peakShadX && leanRate >= 0) {
             gfx.fillTriangle(peakShadX, shadBot, p3x, p3y, chimneyShadX, shadBot);
+            if (this.DEBUG_SHADOWS) {
+              this.debugGfx.lineStyle(2, 0xff0000, 1);
+              this.debugGfx.moveTo(peakShadX, shadBot);
+              this.debugGfx.lineTo(p3x, p3y);
+              this.debugGfx.lineTo(chimneyShadX, shadBot);
+              this.debugGfx.lineTo(peakShadX, shadBot);
+              this.debugGfx.strokePath();
+            }
           } else if (chimneyShadX < peakShadX && leanRate < 0) {
             gfx.fillTriangle(peakShadX, shadBot, p4x, p4y, chimneyShadX, shadBot);
+            if (this.DEBUG_SHADOWS) {
+              this.debugGfx.lineStyle(2, 0xff0000, 1);
+              this.debugGfx.moveTo(peakShadX, shadBot);
+              this.debugGfx.lineTo(p4x, p4y);
+              this.debugGfx.lineTo(chimneyShadX, shadBot);
+              this.debugGfx.lineTo(peakShadX, shadBot);
+              this.debugGfx.strokePath();
+            }
           }
         } else {
           const lean = leanRate * shadowExtent;
