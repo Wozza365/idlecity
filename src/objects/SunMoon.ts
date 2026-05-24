@@ -208,7 +208,7 @@ export class SunMoon {
               const t1 = (buildGY + shadowGapDistance - rayLightY) / (buildGY - rayLightY);
               const shadowStartLeftX = rayLightX + t1 * (signLeft - rayLightX);
               const shadowStartRightX = rayLightX + t1 * (signRight - rayLightX);
-              const postShadowX = rayLightX + t1 * (cx - rayLightX);
+
 
               // Post shadow
               const t2 = (buildGY + shadowGapDistance + fixedShadowLength - rayLightY) / (buildGY - rayLightY);
