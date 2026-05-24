@@ -14,6 +14,7 @@ const config: Phaser.Types.Core.GameConfig = {
     clearBeforeRender: true,
     antialias: false,
     roundPixels: true,
+    maxLights: 100,
   },
 };
 

@@ -4,6 +4,7 @@ import { YARD_H, buildingHeight } from '../constants';
 export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
+  private windowGlows: Phaser.GameObjects.Rectangle[] = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -294,12 +295,30 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Window lights ─────────────────────────────────────────────
+    // ── Window glow overlays & lights (4 per window, one per pane quadrant) ───
+    const sashH = Math.round(wh / 2) - 1;
+    const halfWw = Math.round(ww / 2);
+
     for (const wxx of [wx1, wx2]) {
-      const wcx = wxx + Math.round(ww / 2);
-      const wcy = wy + Math.round(wh / 2);
-      const light = scene.lights.addLight(wcx, wcy, 160, 0xffaa44, 0);
-      this.windowLights.push(light);
+      // Pane bounds excluding the 2px divider lines
+      const panes = [
+        { px: wxx,              py: wy,             pw: halfWw - 1,      ph: sashH },
+        { px: wxx + halfWw + 1, py: wy,             pw: ww - halfWw - 1, ph: sashH },
+        { px: wxx,              py: wy + sashH + 2, pw: halfWw - 1,      ph: wh - sashH - 2 },
+        { px: wxx + halfWw + 1, py: wy + sashH + 2, pw: ww - halfWw - 1, ph: wh - sashH - 2 },
+      ];
+
+      for (const { px, py, pw, ph } of panes) {
+        const cx = px + pw / 2;
+        const cy = py + ph / 2;
+
+        const glow = scene.add.rectangle(cx, cy, pw, ph, 0xffcc66).setAlpha(0);
+        this.add(glow);
+        this.windowGlows.push(glow);
+
+        const light = scene.lights.addLight(cx, cy, 80, 0xffaa44, 0);
+        this.windowLights.push(light);
+      }
     }
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
@@ -310,10 +329,12 @@ export class Tier1House extends Phaser.GameObjects.Container {
   }
 
   updateWindowLights(elevation: number): void {
-    // Fade in as sun approaches horizon; fully on at/below elevation 0
-    const intensity = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3)) * 0.9;
+    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
     for (const light of this.windowLights) {
-      light.intensity = intensity;
+      light.intensity = t * 0.75;
+    }
+    for (const glow of this.windowGlows) {
+      glow.setAlpha(t * 0.85);
     }
   }
 
