@@ -5,7 +5,7 @@ export class Road {
   private gfx: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.gfx = scene.add.graphics().setDepth(7);
+    this.gfx = scene.add.graphics().setDepth(7).setLighting(true);
   }
 
   render(level: number, width: number, groundY: number): void {

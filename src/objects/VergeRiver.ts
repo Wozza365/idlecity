@@ -5,7 +5,7 @@ export class VergeRiver {
   private gfx: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.gfx = scene.add.graphics().setDepth(6);
+    this.gfx = scene.add.graphics().setDepth(6).setLighting(true);
   }
 
   render(width: number, groundY: number): void {

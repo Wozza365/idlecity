@@ -15,7 +15,7 @@ export class Sky {
   }
 
   private createSkyGfx(): void {
-    this.skyGfx = this.scene.add.graphics().setDepth(0);
+    this.skyGfx = this.scene.add.graphics().setDepth(0).setLighting(true);
   }
 
   /** Destroy old skyGfx and create a fresh one — call at the top of buildLayout. */
