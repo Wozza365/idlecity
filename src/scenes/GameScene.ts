@@ -280,7 +280,20 @@ export class GameScene extends Phaser.Scene {
     if (!this.masterClock) return;
     const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
 
-    this.sunAngle = Math.PI / 2 + (elapsed / 240_000) * Math.PI * 2;
+    // Piecewise angle: sun rises at 4am (elapsed=160k), peaks at noon (0), sets at 8pm (80k).
+    // Day (160k ms) moves at half speed of night (80k ms) so day lasts 16 game-hours.
+    const SUNSET   = 80_000;   // elapsed at 8pm
+    const SUNRISE  = 160_000;  // elapsed at 4am
+    if (elapsed < SUNSET) {
+      // Noon→8pm: sunAngle π/2 → π
+      this.sunAngle = Math.PI / 2 + (elapsed / SUNSET) * (Math.PI / 2);
+    } else if (elapsed < SUNRISE) {
+      // 8pm→4am (night): sunAngle π → 2π (fast)
+      this.sunAngle = Math.PI + ((elapsed - SUNSET) / (SUNRISE - SUNSET)) * Math.PI;
+    } else {
+      // 4am→noon: sunAngle 2π → 5π/2
+      this.sunAngle = 2 * Math.PI + ((elapsed - SUNRISE) / (240_000 - SUNRISE)) * (Math.PI / 2);
+    }
 
     const elev = Math.sin(this.sunAngle);
     this.sky.updateGradient(elev, this.scale.width, this.groundY);

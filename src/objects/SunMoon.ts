@@ -119,7 +119,7 @@ export class SunMoon {
     const ab = Math.round( (ambTint        & 0xff) * amb);
     this.scene.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
 
-    this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth, sunX, sunY);
+    this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth, sunX, sunY, width);
   }
 
   private drawShadows(
@@ -131,6 +131,7 @@ export class SunMoon {
     plotWidth: number,
     sunX: number,
     sunY: number,
+    width: number,
   ): void {
     const gfx = this.shadowGfx;
     gfx.clear();
@@ -172,29 +173,45 @@ export class SunMoon {
           const fixedShadowLength = 8;
           const postShadowStartY = buildGY + 10;
 
-          // 5 raycasting positions: center (50% alpha) + 4 outer (12.5% each)
-          const rayPositions = [
-            { offsetX: 0, alpha: totalAlpha * 0.5 },
-            { offsetX: -6, alpha: totalAlpha * 0.125 },
-            { offsetX: -3, alpha: totalAlpha * 0.125 },
-            { offsetX: 3, alpha: totalAlpha * 0.125 },
-            { offsetX: 6, alpha: totalAlpha * 0.125 },
+          // 5 raycasting positions around sun + 20 across screen for penumbra
+          const rayPositions: Array<{ offsetX: number; alpha: number }> = [
+            { offsetX: 0, alpha: totalAlpha * 0.025 },
+            { offsetX: -6, alpha: totalAlpha * 0.01 },
+            { offsetX: -3, alpha: totalAlpha * 0.01 },
+            { offsetX: 3, alpha: totalAlpha * 0.01 },
+            { offsetX: 6, alpha: totalAlpha * 0.01 },
           ];
+
+          // Add 20 positions spread across screen width, strongest near sun
+          const screenWidth = width;
+          for (let i = 0; i < 20; i++) {
+            const absolutePos = (i / 19) * screenWidth;
+            const distFromSun = Math.abs(absolutePos - sunX);
+            const maxDist = screenWidth;
+            const closeness = Math.max(0, 1 - distFromSun / maxDist);
+            const softAlpha = totalAlpha * (0.01 + closeness * 0.005);
+            const offsetX = absolutePos - screenWidth / 2;
+            rayPositions.push({ offsetX, alpha: softAlpha });
+          }
 
           const lightY = sunY - 300;
           if (lightY < buildGY) {
             for (const ray of rayPositions) {
               const rayLightX = sunX + ray.offsetX;
+              const distFromCenter = Math.abs(ray.offsetX);
+              const maxDist = width / 2;
+              const edgeFactor = distFromCenter / maxDist;
+              const rayLightY = lightY + edgeFactor * 30;
               gfx.fillStyle(0x000022, ray.alpha);
 
               // Calculate where shadow starts
-              const t1 = (buildGY + shadowGapDistance - lightY) / (buildGY - lightY);
+              const t1 = (buildGY + shadowGapDistance - rayLightY) / (buildGY - rayLightY);
               const shadowStartLeftX = rayLightX + t1 * (signLeft - rayLightX);
               const shadowStartRightX = rayLightX + t1 * (signRight - rayLightX);
               const postShadowX = rayLightX + t1 * (cx - rayLightX);
 
               // Post shadow
-              const t2 = (buildGY + shadowGapDistance + fixedShadowLength - lightY) / (buildGY - lightY);
+              const t2 = (buildGY + shadowGapDistance + fixedShadowLength - rayLightY) / (buildGY - rayLightY);
               const postShadowEndX = rayLightX + t2 * (cx - rayLightX);
               gfx.fillTriangle(cx - 2, postShadowStartY, cx + 2, postShadowStartY, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength - 2);
               gfx.fillTriangle(cx - 2, postShadowStartY, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength - 2, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength - 2);
