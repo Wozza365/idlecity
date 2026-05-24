@@ -105,6 +105,30 @@ export class SunMoon {
     this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth);
   }
 
+  private getTier1HouseOutline(
+    x: number,
+    plotWidth: number,
+    groundY: number,
+    h: number,
+  ): Array<{ x: number; y: number; height: number }> {
+    const w = plotWidth;
+    const bw = Math.round(w * 0.82);
+    const bx = x + Math.round((w - bw) / 2);
+    const buildGY = groundY - YARD_H;
+    const top = groundY - h - YARD_H;
+    const roofH = Math.round(bw * 0.42);
+    const mid = bx + Math.round(bw / 2);
+    const ov = 6;
+
+    return [
+      { x: bx, y: buildGY, height: 0 },
+      { x: bx + bw, y: buildGY, height: 0 },
+      { x: bx + bw + ov, y: top, height: h + YARD_H },
+      { x: mid, y: top - roofH, height: h + YARD_H + roofH },
+      { x: bx - ov, y: top, height: h + YARD_H },
+    ];
+  }
+
   private drawShadows(
     sunAngle: number,
     elevation: number,
@@ -152,37 +176,36 @@ export class SunMoon {
         const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
 
         if (plot.level <= 15) {
-          const buildGY  = groundY - YARD_H;
-          const roofHVal = Math.round(bw * 0.42);
-          const mid      = bx + Math.round(bw / 2);
-          const chx      = bx + Math.round(bw * 0.67);
-          const chimneyH = roofHVal + 2;
+          // Tier1House: use polygon projection for accurate shadows
+          const outline = this.getTier1HouseOutline(x, plotWidth, groundY, h);
 
-          const totalH = h + roofHVal + chimneyH;
-          const maxLean = leanRate * (shadowExtent + YARD_H + totalH);
+          // Project each outline point to the ground plane
+          const shadowPolygon: Array<{ x: number; y: number }> = [];
+          for (const point of outline) {
+            const lean = leanRate * (shadowExtent + point.height);
+            shadowPolygon.push({
+              x: point.x + lean,
+              y: point.y === (groundY - YARD_H) ? point.y : shadBot, // base stays at buildGY, rest goes to shadBot
+            });
+          }
 
-          const p1x = bx,              p1y = buildGY;
-          const p2x = bx + bw,         p2y = buildGY;
-          const p3x = bx + bw + maxLean, p3y = shadBot;
-          const p4x = bx + maxLean,      p4y = shadBot;
-
-          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
-
-          // Roof shadow: triangle at bottom of main shadow pointing further down
-          // Tip uses maxLean because it's further away and needs greater lean
-          const shadowDepth = shadBot - buildGY;
-          const roofShadowTip = shadBot + Math.round(shadowDepth * roofHVal / h);
-          const peakShadX = mid + maxLean;
-          gfx.fillTriangle(p4x, shadBot, p3x, shadBot, peakShadX, roofShadowTip);
+          // Render the shadow polygon as triangles (fan triangulation from first point)
+          const firstPoint = shadowPolygon[0];
+          for (let j = 1; j < shadowPolygon.length - 1; j++) {
+            gfx.fillTriangle(
+              firstPoint.x, firstPoint.y,
+              shadowPolygon[j].x, shadowPolygon[j].y,
+              shadowPolygon[j + 1].x, shadowPolygon[j + 1].y
+            );
+          }
 
           if (this.DEBUG_SHADOWS) {
             this.debugGfx.lineStyle(2, 0xffffff, 1);
-            this.debugGfx.moveTo(p1x, p1y);
-            this.debugGfx.lineTo(p2x, p2y);
-            this.debugGfx.lineTo(p3x, p3y);
-            this.debugGfx.lineTo(p4x, p4y);
-            this.debugGfx.lineTo(p1x, p1y);
+            this.debugGfx.moveTo(shadowPolygon[0].x, shadowPolygon[0].y);
+            for (let j = 1; j < shadowPolygon.length; j++) {
+              this.debugGfx.lineTo(shadowPolygon[j].x, shadowPolygon[j].y);
+            }
+            this.debugGfx.lineTo(shadowPolygon[0].x, shadowPolygon[0].y);
             this.debugGfx.strokePath();
           }
         } else {

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
 
 export class Tier1House extends Phaser.GameObjects.Container {
+  private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
+
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
 
@@ -41,6 +43,17 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const roofH = Math.round(bw * 0.42);
     const ov    = 6;
     const mid   = bx + Math.round(bw / 2);
+
+    // ── Building outline for shadow projection ─────────────────
+    // Store the polygon points with their heights for shadow casting
+    // Points go: bottom-left, bottom-right, right-eave, peak, left-eave
+    this.outlinePoints = [
+      { x: bx, y: buildGY, height: 0 },                          // bottom-left (ground level, no height)
+      { x: bx + bw, y: buildGY, height: 0 },                     // bottom-right
+      { x: bx + bw + ov, y: top, height: h + YARD_H },           // right roof eave (at building top, height from ground)
+      { x: mid, y: top - roofH, height: h + YARD_H + roofH },    // roof peak (full height including roof)
+      { x: bx - ov, y: top, height: h + YARD_H },                // left roof eave
+    ];
 
     // ── Chimney (drawn before roof so roof occludes base) ─────
     const cw          = Math.round(bw * 0.10);
@@ -279,5 +292,9 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
 
     this.add(gfx);
+  }
+
+  getOutlinePoints() {
+    return this.outlinePoints;
   }
 }
