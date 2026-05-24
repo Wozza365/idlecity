@@ -19,8 +19,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     // ── Body ──────────────────────────────────────────────────
     const body = scene.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xfdf7ed);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (body as any).setLighting(true);
+    body.setLighting(true);
     this.add(body);
 
     const gfx = scene.add.graphics();
