@@ -36,16 +36,16 @@ export class Sky {
       const t = (elev + 0.15) / 0.13;
       zenith  = lerpColor(0x04040f, 0x160c2a, t);
       horizon = lerpColor(0x08082a, 0x3a100a, t);
-    } else if (elev <= 0.10) {
-      const t = (elev + 0.02) / 0.12;
+    } else if (elev <= 0.05) {
+      const t = (elev + 0.02) / 0.07;
       zenith  = lerpColor(0x160c2a, 0x1e3878, t);
       horizon = lerpColor(0x3a100a, 0xc85c14, t);
-    } else if (elev <= 0.30) {
-      const t = (elev - 0.10) / 0.20;
+    } else if (elev <= 0.20) {
+      const t = (elev - 0.05) / 0.15;
       zenith  = lerpColor(0x1e3878, 0x2255aa, t);
       horizon = lerpColor(0xc85c14, 0x78aac8, t);
-    } else if (elev <= 0.50) {
-      const t = (elev - 0.30) / 0.20;
+    } else if (elev <= 0.45) {
+      const t = (elev - 0.20) / 0.25;
       zenith  = lerpColor(0x2255aa, 0x2a6aa0, t);
       horizon = lerpColor(0x78aac8, 0x6aaad0, t);
     } else {
@@ -59,10 +59,10 @@ export class Sky {
 
   updateOverlay(elev: number): void {
     this.nightOverlay.setFillStyle(0x000022);
-    if (elev > 0.12) {
+    if (elev > 0.05) {
       this.nightOverlay.setAlpha(0);
     } else if (elev > 0) {
-      this.nightOverlay.setAlpha(0.22 * (1 - elev / 0.12));
+      this.nightOverlay.setAlpha(0.22 * (1 - elev / 0.05));
     } else if (elev > -0.15) {
       const t = -elev / 0.15;
       this.nightOverlay.setAlpha(0.22 + t * 0.13);

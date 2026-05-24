@@ -96,7 +96,7 @@ export class SunMoon {
     this.sunLight.x         = sunX;
     this.sunLight.y         = sunY - 300;
     this.sunLight.height = Math.max(100, 500 * Math.max(0, elevation));
-    this.sunLight.intensity = Math.max(0, elevation * 3.2);
+    this.sunLight.intensity = Math.max(0, Math.sqrt(Math.max(0, elevation)) * 3.2);
 
     const sunColor = sunColorAtElevation(elevation);
     this.sunCircle.setFillStyle(sunColor);
@@ -111,8 +111,9 @@ export class SunMoon {
     this.moonLight.y         = moonY;
     this.moonLight.intensity = Math.max(0, moonElev * 0.5);
 
-    const ambMin  = elevation >= 0 ? Math.max(0.08, 0.28 - elevation) : 0.08;
-    const amb     = Math.max(ambMin, elevation * 0.55 + 0.14);
+    const amb = elevation >= 0
+      ? Math.max(0.20, elevation * 0.55 + 0.25)
+      : Math.max(0.08, elevation * 0.80 + 0.20);
     const ambTint = lerpColor(0xff8833, 0xffffff, Math.min(1, elevation * 3));
     const ar = Math.round(((ambTint >> 16) & 0xff) * amb);
     const ag = Math.round(((ambTint >> 8)  & 0xff) * amb);
