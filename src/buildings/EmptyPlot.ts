@@ -6,6 +6,7 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
 
     const gfx     = scene.add.graphics();
+    gfx.setLighting(true);
     const gy      = groundY;
     const w       = plotWidth;
     const dirtTop = gy - YARD_H;
