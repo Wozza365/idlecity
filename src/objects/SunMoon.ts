@@ -127,6 +127,9 @@ export class SunMoon {
     const DISC_SPREAD    = 0.10;
     const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
 
+    // Capture first sample geometry for debug rendering
+    let firstSampleLeanRate = 0;
+
     for (let s = 0; s < NUM_SAMPLES; s++) {
       const t      = (s / (NUM_SAMPLES - 1)) - 0.5;
       const sAngle = sunAngle + t * DISC_SPREAD;
@@ -135,6 +138,7 @@ export class SunMoon {
       if (sElev <= 0.01) continue;
 
       const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
+      if (s === 0 || (s === 1 && sElev <= 0.01)) firstSampleLeanRate = leanRate;
       gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
 
       for (let i = 0; i < PLOT_COUNT; i++) {
@@ -231,6 +235,46 @@ export class SunMoon {
 
           gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+        }
+      }
+    }
+
+    // Render clear white outline for main building shadow (center sample only)
+    if (this.DEBUG_SHADOWS) {
+      const sAngle = sunAngle;
+      const sElev = Math.sin(sAngle);
+      const sHoriz = Math.cos(sAngle);
+      if (sElev > 0.01) {
+        const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
+        this.debugGfx.lineStyle(3, 0xffffff, 1);
+
+        for (let i = 0; i < PLOT_COUNT; i++) {
+          const plot = plots[i];
+          if (!plot.unlocked) continue;
+
+          const x = i * plotWidth;
+          const w = plotWidth;
+          const h = buildingHeight(plot.level);
+          const bw = plot.level <= 15 ? Math.round(w * 0.82) : w;
+          const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
+
+          if (plot.level <= 15) {
+            const buildGY = groundY - YARD_H;
+            const totalH = h + Math.round(bw * 0.42) + Math.round(bw * 0.42) + 2;
+            const maxLean = leanRate * (shadowExtent + YARD_H + totalH);
+
+            const p1x = bx, p1y = buildGY;
+            const p2x = bx + bw, p2y = buildGY;
+            const p3x = bx + bw + maxLean, p3y = shadBot;
+            const p4x = bx + maxLean, p4y = shadBot;
+
+            this.debugGfx.moveTo(p1x, p1y);
+            this.debugGfx.lineTo(p2x, p2y);
+            this.debugGfx.lineTo(p3x, p3y);
+            this.debugGfx.lineTo(p4x, p4y);
+            this.debugGfx.lineTo(p1x, p1y);
+            this.debugGfx.strokePath();
+          }
         }
       }
     }
