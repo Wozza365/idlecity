@@ -135,6 +135,7 @@ export class GameScene extends Phaser.Scene {
 
     this.panelChrome.draw(width, height, this.panelTop, this.colTop, this.sectionW);
 
+    this.statsBar?.destroy();
     this.statsBar = new StatsBar(this, this.panelTop, width);
 
     for (let i = 0; i < PLOT_COUNT; i++) {
@@ -151,6 +152,7 @@ export class GameScene extends Phaser.Scene {
       this.add.existing(this.plotUIs[i].container);
     }
 
+    this.roadUI?.destroy();
     this.roadUI = new RoadUI(
       this,
       this.state.road,
@@ -160,6 +162,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.add.existing(this.roadUI.container);
 
+    this.devPanel?.destroy();
     this.devPanel = new DevPanel(
       this,
       width,
