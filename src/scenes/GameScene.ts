@@ -1,23 +1,20 @@
 import Phaser from 'phaser';
-import { type GameState, type PlotState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
+import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
   PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_H, VERGE_H, RIVER_H,
   UNLOCK_COSTS,
-  upgradeCost, perBuildingIncome, fmt,
+  upgradeCost, perBuildingIncome,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
 import { Sky } from '../objects/Sky';
 import { SunMoon } from '../objects/SunMoon';
 import { Road } from '../objects/Road';
 import { VergeRiver } from '../objects/VergeRiver';
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface ActionRef {
-  btn: Phaser.GameObjects.Rectangle;
-  getCost: () => number;
-  activeColor: number;
-}
+import { StatsBar } from '../ui/StatsBar';
+import { PanelChrome } from '../ui/PanelChrome';
+import { PlotUI } from '../ui/PlotUI';
+import { RoadUI } from '../ui/RoadUI';
+import { DevPanel } from '../ui/DevPanel';
 
 // ── Scene ──────────────────────────────────────────────────────────────────────
 
@@ -25,15 +22,14 @@ export class GameScene extends Phaser.Scene {
   private state: GameState = loadGame(PLOT_COUNT);
 
   private plotContainers: Phaser.GameObjects.Container[] = [];
-  private uiContainers: Phaser.GameObjects.Container[] = [];
-  private actionRefs: (ActionRef | null)[] = new Array(PLOT_COUNT + 1).fill(null);
+  private plotUIs: PlotUI[] = [];
 
-  // Persistent graphics layer — depth-ordered, never destroyed
-  private panelChromeGfx!: Phaser.GameObjects.Graphics;
+  // UI managers
+  private panelChrome!: PanelChrome;
 
-  private roadUiContainer!: Phaser.GameObjects.Container;
-  private goldText!: Phaser.GameObjects.Text;
-  private taxRateText!: Phaser.GameObjects.Text;
+  private statsBar!: StatsBar;
+  private roadUI!: RoadUI;
+  private devPanel!: DevPanel;
   private saveNotification!: Phaser.GameObjects.Text;
 
   // World-layer managers
@@ -44,10 +40,6 @@ export class GameScene extends Phaser.Scene {
 
   // Panel background — destroyed and recreated on resize
   private panelBg!: Phaser.GameObjects.Rectangle;
-
-  // Dev panel
-  private devPanelContainer!: Phaser.GameObjects.Container;
-  private clockText?: Phaser.GameObjects.Text;
 
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
@@ -73,7 +65,7 @@ export class GameScene extends Phaser.Scene {
     this.lights.enable();
     this.lights.setAmbientColor(0x888888);
 
-    this.panelChromeGfx = this.add.graphics().setDepth(10);
+    this.panelChrome = new PanelChrome(this);
 
     // World-layer managers — each owns its own graphics/objects
     this.sky        = new Sky(this);
@@ -137,21 +129,44 @@ export class GameScene extends Phaser.Scene {
       this.plotContainers[i] = this.renderPlot(i);
     }
 
-    this.drawPanelChrome();
+    this.panelChrome.draw(width, height, this.panelTop, this.colTop, this.sectionW);
 
-    this.goldText?.destroy();
-    this.taxRateText?.destroy();
-    this.drawStatsBar();
+    this.statsBar = new StatsBar(this, this.panelTop, width);
 
     for (let i = 0; i < PLOT_COUNT; i++) {
-      this.uiContainers[i] = this.renderUISection(i);
+      this.plotUIs[i]?.destroy();
+      this.plotUIs[i] = new PlotUI(
+        this,
+        i,
+        this.state.plots[i],
+        this.sectionW,
+        this.colTop,
+        () => this.onPlotUpgrade(i),
+        () => this.onPlotUnlock(i)
+      );
+      this.add.existing(this.plotUIs[i].container);
     }
 
-    this.roadUiContainer = this.renderRoadUI();
-    this.buildDevPanel();
+    this.roadUI = new RoadUI(
+      this,
+      this.state.road,
+      this.panelTop,
+      width,
+      () => this.onRoadUpgrade()
+    );
+    this.add.existing(this.roadUI.container);
+
+    this.devPanel = new DevPanel(
+      this,
+      width,
+      () => this.onAddGold(),
+      () => this.advanceTime(),
+      () => this.resetGame()
+    );
+    this.add.existing(this.devPanel.container);
 
     this.refreshButtons();
-    this.updateStats();
+    this.statsBar.update(this.state.gold, this.taxRate);
     this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY);
     this.sunMoon.update(this.sunAngle, width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
   }
@@ -168,68 +183,78 @@ export class GameScene extends Phaser.Scene {
     this.buildLayout();
   }
 
-  // ── Dev panel ──────────────────────────────────────────────────────────────
+  // ── UI callbacks ───────────────────────────────────────────────────────────
 
-  private buildDevPanel(): void {
-    this.devPanelContainer?.destroy();
-    const { width } = this.scale;
-    const container = this.add.container(0, 0).setDepth(90);
+  private onPlotUpgrade(index: number): void {
+    const plot = this.state.plots[index];
+    const cost = upgradeCost(plot.level);
+    if (this.state.gold < cost) return;
 
-    const row1Y  = 16;
-    const row2Y  = 42;
-    container.add(this.add.rectangle(width / 2, 29, width, 58, 0x000000, 0.6));
-
-    const btnW   = 120;
-    const gap    = 8;
-    const leftX  = (width - btnW * 2 - gap) / 2 + btnW / 2;
-    const rightX = leftX + btnW + gap;
-
-    const btn1 = this.add
-      .rectangle(leftX, row1Y, btnW, 26, 0x1a4400)
-      .setInteractive({ useHandCursor: true });
-    container.add(btn1);
-    container.add(
-      this.add.text(leftX, row1Y, '+$100K', { fontSize: '13px', color: '#88ff88' }).setOrigin(0.5)
+    this.state.gold -= cost;
+    plot.level = Math.min(plot.level + 1, MAX_LEVEL);
+    this.plotContainers[index] = this.renderPlot(index);
+    this.plotUIs[index].destroy();
+    this.plotUIs[index] = new PlotUI(
+      this,
+      index,
+      plot,
+      this.sectionW,
+      this.colTop,
+      () => this.onPlotUpgrade(index),
+      () => this.onPlotUnlock(index)
     );
-    btn1.on('pointerover', () => btn1.setFillStyle(0x285e00));
-    btn1.on('pointerout',  () => btn1.setFillStyle(0x1a4400));
-    btn1.on('pointerdown', () => {
-      this.state.gold += 100_000;
-      this.updateStats();
-      this.refreshButtons();
-    });
+    this.add.existing(this.plotUIs[index].container);
+    this.statsBar.update(this.state.gold, this.taxRate);
+    this.refreshButtons();
+  }
 
-    const btn2 = this.add
-      .rectangle(rightX, row1Y, btnW, 26, 0x001444)
-      .setInteractive({ useHandCursor: true });
-    container.add(btn2);
-    container.add(
-      this.add.text(rightX, row1Y, '+1 hr', { fontSize: '13px', color: '#88aaff' }).setOrigin(0.5)
+  private onPlotUnlock(index: number): void {
+    const cost = UNLOCK_COSTS[index];
+    if (this.state.gold < cost) return;
+
+    this.state.gold -= cost;
+    this.state.plots[index].unlocked = true;
+    this.state.plots[index].level = 1;
+    this.plotContainers[index] = this.renderPlot(index);
+    this.plotUIs[index].destroy();
+    this.plotUIs[index] = new PlotUI(
+      this,
+      index,
+      this.state.plots[index],
+      this.sectionW,
+      this.colTop,
+      () => this.onPlotUpgrade(index),
+      () => this.onPlotUnlock(index)
     );
-    btn2.on('pointerover', () => btn2.setFillStyle(0x001e5e));
-    btn2.on('pointerout',  () => btn2.setFillStyle(0x001444));
-    btn2.on('pointerdown', () => this.advanceTime());
+    this.add.existing(this.plotUIs[index].container);
+    this.statsBar.update(this.state.gold, this.taxRate);
+    this.refreshButtons();
+  }
 
-    // Row 2: clock (left) + reset (right)
-    this.clockText = this.add
-      .text(width / 2 - 70, row2Y, this.gameTimeString(), {
-        fontSize: '13px', color: '#aaccff', fontFamily: 'monospace',
-      })
-      .setOrigin(0.5);
-    container.add(this.clockText);
+  private onRoadUpgrade(): void {
+    const cost = this.state.road.level === 0 ? 200 : this.state.road.level * this.state.road.level * 50;
+    if (this.state.gold < cost) return;
 
-    const resetBtn = this.add
-      .rectangle(width / 2 + 60, row2Y, 110, 22, 0x440000)
-      .setInteractive({ useHandCursor: true });
-    container.add(resetBtn);
-    container.add(
-      this.add.text(width / 2 + 60, row2Y, 'Reset All', { fontSize: '12px', color: '#ff8888' }).setOrigin(0.5)
+    this.state.gold -= cost;
+    this.state.road.level = Math.min(this.state.road.level + 1, 10);
+    this.road.render(this.state.road.level, this.scale.width, this.groundY);
+    this.roadUI.destroy();
+    this.roadUI = new RoadUI(
+      this,
+      this.state.road,
+      this.panelTop,
+      this.scale.width,
+      () => this.onRoadUpgrade()
     );
-    resetBtn.on('pointerover', () => resetBtn.setFillStyle(0x661111));
-    resetBtn.on('pointerout',  () => resetBtn.setFillStyle(0x440000));
-    resetBtn.on('pointerdown', () => this.resetGame());
+    this.add.existing(this.roadUI.container);
+    this.statsBar.update(this.state.gold, this.taxRate);
+    this.refreshButtons();
+  }
 
-    this.devPanelContainer = container;
+  private onAddGold(): void {
+    this.state.gold += 100_000;
+    this.statsBar.update(this.state.gold, this.taxRate);
+    this.refreshButtons();
   }
 
   private gameTimeString(): string {
@@ -256,7 +281,7 @@ export class GameScene extends Phaser.Scene {
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
     this.sky.updateOverlay(elev);
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
-    this.clockText?.setText(this.gameTimeString());
+    this.devPanel?.updateClock(this.gameTimeString());
   }
 
   private advanceTime(): void {
@@ -282,13 +307,8 @@ export class GameScene extends Phaser.Scene {
 
   private onTaxTick(): void {
     this.state.gold += this.taxRate / 10;
-    this.updateStats();
+    this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
-  }
-
-  private updateStats(): void {
-    this.goldText.setText(`Balance: ${fmt(this.state.gold)}`);
-    this.taxRateText.setText(`Income: ${fmt(this.taxRate)}/s`);
   }
 
   // ── Save & notification ────────────────────────────────────────────────────
@@ -313,51 +333,16 @@ export class GameScene extends Phaser.Scene {
   // ── Button affordability ───────────────────────────────────────────────────
 
   private refreshButtons(): void {
-    for (const ref of this.actionRefs) {
-      if (!ref) continue;
-      const canAfford = this.state.gold >= ref.getCost();
-      if (canAfford) {
-        ref.btn.setInteractive({ useHandCursor: true });
-        ref.btn.setFillStyle(ref.activeColor);
-      } else {
-        ref.btn.disableInteractive();
-        ref.btn.setFillStyle(0x252535);
-      }
+    for (const ui of this.plotUIs) {
+      ui?.refresh(this.state.gold);
     }
+    this.roadUI?.refresh(this.state.gold);
   }
 
   // ── Layout helpers ─────────────────────────────────────────────────────────
 
   private plotLeft(index: number): number {
     return index * this.plotWidth;
-  }
-
-  // ── Panel chrome & stats bar ───────────────────────────────────────────────
-
-  private drawPanelChrome(): void {
-    const { width, height } = this.scale;
-    const gfx = this.panelChromeGfx;
-    gfx.clear();
-    gfx.lineStyle(1, 0x3a4a5a, 1);
-    gfx.moveTo(0, this.panelTop).lineTo(width, this.panelTop).strokePath();
-    gfx.moveTo(0, this.colTop).lineTo(width, this.colTop).strokePath();
-    for (let i = 1; i < PLOT_COUNT; i++) {
-      const x = i * this.sectionW;
-      gfx.moveTo(x, this.colTop).lineTo(x, height).strokePath();
-    }
-  }
-
-  private drawStatsBar(): void {
-    const { width } = this.scale;
-    const midY = this.panelTop + STATS_BAR_H / 2;
-    this.taxRateText = this.add
-      .text(8, midY, '', { fontSize: '15px', color: '#88ccff' })
-      .setOrigin(0, 0.5)
-      .setDepth(11);
-    this.goldText = this.add
-      .text(width - 8, midY, '', { fontSize: '15px', color: '#ffd966' })
-      .setOrigin(1, 0.5)
-      .setDepth(11);
   }
 
   // ── Plot rendering ─────────────────────────────────────────────────────────
@@ -374,206 +359,5 @@ export class GameScene extends Phaser.Scene {
     building.setDepth(9);
     this.add.existing(building);
     return building;
-  }
-
-  // ── UI panel columns ───────────────────────────────────────────────────────
-
-  private renderUISection(index: number): Phaser.GameObjects.Container {
-    this.uiContainers[index]?.destroy();
-    this.actionRefs[index] = null;
-
-    const container = this.add.container(0, 0).setDepth(11);
-    const cx        = index * this.sectionW + this.sectionW / 2;
-    const plot      = this.state.plots[index];
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 16, `Bldg ${index + 1}`, { fontSize: '13px', color: '#8899aa' })
-        .setOrigin(0.5)
-    );
-
-    if (plot.unlocked) {
-      this.buildUpgradeSection(container, cx, plot, index);
-    } else {
-      this.buildUnlockSection(container, cx, index);
-    }
-
-    return container;
-  }
-
-  private buildUpgradeSection(
-    container: Phaser.GameObjects.Container,
-    cx: number,
-    plot: PlotState,
-    index: number
-  ): void {
-    const atMax = plot.level >= MAX_LEVEL;
-    const cost  = upgradeCost(plot.level);
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 40, `Lv ${plot.level}/${MAX_LEVEL}`, {
-          fontSize: '14px', color: '#ddeeff',
-        })
-        .setOrigin(0.5)
-    );
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 62, `${fmt(perBuildingIncome(plot.level))}/s`, {
-          fontSize: '12px', color: '#88ddaa',
-        })
-        .setOrigin(0.5)
-    );
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 82, atMax ? '' : `${fmt(cost)}`, {
-          fontSize: '12px', color: '#99aabb',
-        })
-        .setOrigin(0.5)
-    );
-
-    const btn = this.add
-      .rectangle(cx, this.colTop + 118, 82, 44, 0x2a2a3a)
-      .setInteractive({ useHandCursor: false });
-    container.add(btn);
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 118, atMax ? 'Max' : '▲ Upgrade', {
-          fontSize: '12px', color: atMax ? '#555566' : '#cce8ff',
-        })
-        .setOrigin(0.5)
-    );
-
-    if (!atMax) {
-      btn.on('pointerover', () => btn.setFillStyle(0x2471a3));
-      btn.on('pointerout',  () => btn.setFillStyle(0x1a5276));
-      btn.on('pointerdown', (): void => {
-        if (this.state.gold < cost) return;
-        this.state.gold -= cost;
-        this.state.plots[index].level = Math.min(plot.level + 1, MAX_LEVEL);
-        this.plotContainers[index] = this.renderPlot(index);
-        this.uiContainers[index]   = this.renderUISection(index);
-        this.updateStats();
-        this.refreshButtons();
-      });
-      this.actionRefs[index] = { btn, getCost: (): number => cost, activeColor: 0x1a5276 };
-    }
-  }
-
-  private buildUnlockSection(
-    container: Phaser.GameObjects.Container,
-    cx: number,
-    index: number
-  ): void {
-    const cost = UNLOCK_COSTS[index];
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 40, '🔒', { fontSize: '18px', color: '#555566' })
-        .setOrigin(0.5)
-    );
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 68, `${fmt(cost)}`, { fontSize: '12px', color: '#99aabb' })
-        .setOrigin(0.5)
-    );
-
-    const btn = this.add
-      .rectangle(cx, this.colTop + 110, 82, 44, 0x2a2a3a)
-      .setInteractive({ useHandCursor: false });
-    container.add(btn);
-
-    container.add(
-      this.add
-        .text(cx, this.colTop + 110, 'Unlock', { fontSize: '13px', color: '#e8ffe8' })
-        .setOrigin(0.5)
-    );
-
-    btn.on('pointerover', () => btn.setFillStyle(0x3d8a22));
-    btn.on('pointerout',  () => btn.setFillStyle(0x2d6b1a));
-    btn.on('pointerdown', (): void => {
-      if (this.state.gold < cost) return;
-      this.state.gold -= cost;
-      this.state.plots[index].unlocked = true;
-      this.state.plots[index].level    = 1;
-      this.plotContainers[index] = this.renderPlot(index);
-      this.uiContainers[index]   = this.renderUISection(index);
-      this.updateStats();
-      this.refreshButtons();
-    });
-
-    this.actionRefs[index] = { btn, getCost: (): number => cost, activeColor: 0x2d6b1a };
-  }
-
-  // ── Road UI ────────────────────────────────────────────────────────────────
-
-  private roadUpgradeCost(): number {
-    const lvl = this.state.road.level;
-    return lvl === 0 ? 200 : lvl * lvl * 50;
-  }
-
-  private roadTierName(): string {
-    const lvl = this.state.road.level;
-    if (lvl === 0)  return 'None';
-    if (lvl <= 2)   return 'Dirt Track';
-    if (lvl <= 4)   return 'Gravel';
-    if (lvl <= 6)   return 'Paved';
-    if (lvl <= 8)   return 'Two-Lane';
-    return 'Highway';
-  }
-
-  private renderRoadUI(): Phaser.GameObjects.Container {
-    this.roadUiContainer?.destroy();
-    this.actionRefs[PLOT_COUNT] = null;
-
-    const container = this.add.container(0, 0).setDepth(11);
-    const { width } = this.scale;
-    const midY      = this.panelTop + STATS_BAR_H / 2;
-    const atMax     = this.state.road.level >= 10;
-    const cost      = this.roadUpgradeCost();
-
-    container.add(
-      this.add
-        .text(width / 2, midY - 13, `Road: ${this.roadTierName()}`, {
-          fontSize: '12px', color: '#aabbcc',
-        })
-        .setOrigin(0.5, 0.5)
-    );
-
-    const btn = this.add
-      .rectangle(width / 2, midY + 12, 130, 26, 0x2a2a3a)
-      .setInteractive({ useHandCursor: false });
-    container.add(btn);
-
-    container.add(
-      this.add
-        .text(
-          width / 2, midY + 12,
-          atMax ? 'Road: Max' : `▲ Lv ${this.state.road.level + 1}  ${fmt(cost)}`,
-          { fontSize: '11px', color: atMax ? '#555566' : '#cce8ff' }
-        )
-        .setOrigin(0.5, 0.5)
-    );
-
-    if (!atMax) {
-      btn.on('pointerover', () => btn.setFillStyle(0x7a5500));
-      btn.on('pointerout',  () => btn.setFillStyle(0x5a3e00));
-      btn.on('pointerdown', (): void => {
-        if (this.state.gold < cost) return;
-        this.state.gold -= cost;
-        this.state.road.level = Math.min(this.state.road.level + 1, 10);
-        this.road.render(this.state.road.level, this.scale.width, this.groundY);
-        this.roadUiContainer = this.renderRoadUI();
-        this.updateStats();
-        this.refreshButtons();
-      });
-      this.actionRefs[PLOT_COUNT] = { btn, getCost: (): number => cost, activeColor: 0x5a3e00 };
-    }
-
-    return container;
   }
 }
