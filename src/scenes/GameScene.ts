@@ -8,6 +8,7 @@ import {
 import { createBuilding, EmptyPlot } from '../buildings';
 import { Sky } from '../objects/Sky';
 import { SunMoon } from '../objects/SunMoon';
+import { Stars } from '../objects/Stars';
 import { Road } from '../objects/Road';
 import { VergeRiver } from '../objects/VergeRiver';
 import { StatsBar } from '../ui/StatsBar';
@@ -35,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   // World-layer managers
   private sky!: Sky;
   private sunMoon!: SunMoon;
+  private stars!: Stars;
   private road!: Road;
   private vergeRiver!: VergeRiver;
 
@@ -72,6 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.road       = new Road(this);
     this.vergeRiver = new VergeRiver(this);
     this.sunMoon    = new SunMoon(this, this.groundY);
+    this.stars      = new Stars(this, this.groundY);
 
     // Build all layout-dependent visuals
     this.buildLayout();
@@ -178,6 +181,7 @@ export class GameScene extends Phaser.Scene {
 
     this.sky.resize(width, height);
     this.sunMoon.resize(width);
+    this.stars.resize(width, this.groundY);
     this.saveNotification?.setPosition(width - 12, 12);
 
     this.buildLayout();
@@ -281,6 +285,7 @@ export class GameScene extends Phaser.Scene {
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
     this.sky.updateOverlay(elev);
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
+    this.stars.update(elev, this.sunAngle, this.scale.width, this.groundY);
     this.devPanel?.updateClock(this.gameTimeString());
   }
 
