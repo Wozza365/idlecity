@@ -181,6 +181,12 @@ export class SunMoon {
 
           const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
           const peakShadX = mid + peakLean;
+
+          if (this.DEBUG_SHADOWS && s === 5) {
+            console.log(`Building ${i}: peakShadX=${peakShadX.toFixed(0)}, p3x=${p3x.toFixed(0)}, p4x=${p4x.toFixed(0)}, leanRate=${leanRate.toFixed(3)}`);
+            console.log(`  Roof condition (peakShadX < p3x && leanRate >= 0): ${peakShadX < p3x && leanRate >= 0}`);
+          }
+
           if (peakShadX < p3x && leanRate >= 0) {
             gfx.fillTriangle(p2x, p2y, peakShadX, shadBot, p3x, p3y);
             if (this.DEBUG_SHADOWS) {
