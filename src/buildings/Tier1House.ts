@@ -292,6 +292,23 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
 
     this.add(gfx);
+
+    // ── Window glow (ADD blend — subtle at day, warm at night) ───
+    const glowGfx = scene.add.graphics()
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setLighting(false);
+    const gc = 0xffcc66;
+    for (const wxx of [wx1, wx2]) {
+      const wcx = wxx + Math.round(ww / 2);
+      const wcy = wy + Math.round(wh / 2);
+      glowGfx.fillStyle(gc, 0.06);
+      glowGfx.fillEllipse(wcx, wcy, ww * 5, wh * 4);
+      glowGfx.fillStyle(gc, 0.12);
+      glowGfx.fillEllipse(wcx, wcy, ww * 3, wh * 2.5);
+      glowGfx.fillStyle(gc, 0.22);
+      glowGfx.fillEllipse(wcx, wcy, ww * 1.5, wh * 1.5);
+    }
+    this.add(glowGfx);
   }
 
   getOutlinePoints() {
