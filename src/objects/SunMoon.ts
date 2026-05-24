@@ -179,24 +179,8 @@ export class SunMoon {
             this.debugGfx.strokePath();
           }
 
-          const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
-          const peakShadX = mid + peakLean;
-
-          if (peakShadX > p4x && peakShadX < p3x) {
-            if (leanRate >= 0) {
-              gfx.fillTriangle(p2x, p2y, peakShadX, shadBot, p3x, p3y);
-            } else {
-              gfx.fillTriangle(p1x, p1y, p4x, p4y, peakShadX, shadBot);
-            }
-          }
-
-          const chimneyLean = maxLean;
-          const chimneyShadX = chx + chimneyLean;
-          if (chimneyShadX > peakShadX) {
-            gfx.fillTriangle(peakShadX, shadBot, p3x, p3y, chimneyShadX, shadBot);
-          } else if (chimneyShadX < peakShadX) {
-            gfx.fillTriangle(peakShadX, shadBot, p4x, p4y, chimneyShadX, shadBot);
-          }
+          // Roof and chimney shadows are already accounted for in maxLean (main trapezoid shadow)
+          // Don't render separate roof/chimney shadows as they create artifacts inside the building
         } else {
           const lean = leanRate * shadowExtent;
           const p1x = bx,             p1y = groundY;
@@ -252,43 +236,6 @@ export class SunMoon {
             this.debugGfx.lineTo(p1x, p1y);
             this.debugGfx.strokePath();
 
-            // Roof shadow green outline
-            const peakShadX = mid + peakLean;
-            this.debugGfx.lineStyle(2, 0x00ff00, 1);
-            if (peakShadX > p4x && peakShadX < p3x) {
-              // Peak shadow falls between the main shadow edges
-              if (leanRate >= 0) {
-                this.debugGfx.moveTo(p2x, p2y);
-                this.debugGfx.lineTo(peakShadX, shadBot);
-                this.debugGfx.lineTo(p3x, p3y);
-                this.debugGfx.lineTo(p2x, p2y);
-                this.debugGfx.strokePath();
-              } else {
-                this.debugGfx.moveTo(p1x, p1y);
-                this.debugGfx.lineTo(p4x, p4y);
-                this.debugGfx.lineTo(peakShadX, shadBot);
-                this.debugGfx.lineTo(p1x, p1y);
-                this.debugGfx.strokePath();
-              }
-            }
-
-            // Chimney shadow red outline
-            const chimneyLean = maxLean;
-            const chimneyShadX = chx + chimneyLean;
-            this.debugGfx.lineStyle(2, 0xff0000, 1);
-            if (chimneyShadX > peakShadX) {
-              this.debugGfx.moveTo(peakShadX, shadBot);
-              this.debugGfx.lineTo(p3x, p3y);
-              this.debugGfx.lineTo(chimneyShadX, shadBot);
-              this.debugGfx.lineTo(peakShadX, shadBot);
-              this.debugGfx.strokePath();
-            } else if (chimneyShadX < peakShadX) {
-              this.debugGfx.moveTo(peakShadX, shadBot);
-              this.debugGfx.lineTo(p4x, p4y);
-              this.debugGfx.lineTo(chimneyShadX, shadBot);
-              this.debugGfx.lineTo(peakShadX, shadBot);
-              this.debugGfx.strokePath();
-            }
           }
         }
       }
