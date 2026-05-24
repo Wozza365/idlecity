@@ -162,7 +162,7 @@ export class SunMoon {
         const w  = plotWidth;
         const buildGY = groundY - YARD_H;
 
-        // Shadow for empty plot sign using raycasting
+        // Shadow for empty plot sign using raycasting with penumbra
         if (!plot.unlocked) {
           const cx = x + Math.round(w * 0.5);
           const signWidth = 48;
@@ -170,30 +170,41 @@ export class SunMoon {
           const signRight = signLeft + signWidth;
           const shadowGapDistance = 22;
           const fixedShadowLength = 8;
+          const postShadowStartY = buildGY + 10;
 
-          // Raycast from light position through sign to ground plane
-          // Light is at (sunX, sunY - 300), sign base at buildGY
+          // 5 raycasting positions: center (50% alpha) + 4 outer (12.5% each)
+          const rayPositions = [
+            { offsetX: 0, alpha: totalAlpha * 0.5 },
+            { offsetX: -6, alpha: totalAlpha * 0.125 },
+            { offsetX: -3, alpha: totalAlpha * 0.125 },
+            { offsetX: 3, alpha: totalAlpha * 0.125 },
+            { offsetX: 6, alpha: totalAlpha * 0.125 },
+          ];
+
           const lightY = sunY - 300;
           if (lightY < buildGY) {
-            // Calculate where shadow starts (gap ahead of sign)
-            const t1 = (buildGY + shadowGapDistance - lightY) / (buildGY - lightY);
-            const shadowStartLeftX = sunX + t1 * (signLeft - sunX);
-            const shadowStartRightX = sunX + t1 * (signRight - sunX);
-            const postShadowX = sunX + t1 * (cx - sunX);
+            for (const ray of rayPositions) {
+              const rayLightX = sunX + ray.offsetX;
+              gfx.fillStyle(0x000022, ray.alpha);
 
-            // Shadow for the wooden post (thicker, starts where sign shadow begins)
-            const t2 = (buildGY + shadowGapDistance + fixedShadowLength - lightY) / (buildGY - lightY);
-            const postShadowEndX = sunX + t2 * (cx - sunX);
+              // Calculate where shadow starts
+              const t1 = (buildGY + shadowGapDistance - lightY) / (buildGY - lightY);
+              const shadowStartLeftX = rayLightX + t1 * (signLeft - rayLightX);
+              const shadowStartRightX = rayLightX + t1 * (signRight - rayLightX);
+              const postShadowX = rayLightX + t1 * (cx - rayLightX);
 
-            gfx.fillTriangle(postShadowX - 2, buildGY + shadowGapDistance, postShadowX + 2, buildGY + shadowGapDistance, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength);
-            gfx.fillTriangle(postShadowX - 2, buildGY + shadowGapDistance, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength);
+              // Post shadow
+              const t2 = (buildGY + shadowGapDistance + fixedShadowLength - lightY) / (buildGY - lightY);
+              const postShadowEndX = rayLightX + t2 * (cx - rayLightX);
+              gfx.fillTriangle(cx - 2, postShadowStartY, cx + 2, postShadowStartY, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength - 2);
+              gfx.fillTriangle(cx - 2, postShadowStartY, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength - 2, postShadowEndX, buildGY + shadowGapDistance + fixedShadowLength - 2);
 
-            // Calculate where sign shadow extends to
-            const shadowEndLeftX = sunX + t2 * (signLeft - sunX);
-            const shadowEndRightX = sunX + t2 * (signRight - sunX);
-
-            gfx.fillTriangle(shadowStartLeftX, buildGY + shadowGapDistance, shadowStartRightX, buildGY + shadowGapDistance, shadowEndRightX, buildGY + shadowGapDistance + fixedShadowLength);
-            gfx.fillTriangle(shadowStartLeftX, buildGY + shadowGapDistance, shadowEndRightX, buildGY + shadowGapDistance + fixedShadowLength, shadowEndLeftX, buildGY + shadowGapDistance + fixedShadowLength);
+              // Sign shadow
+              const shadowEndLeftX = rayLightX + t2 * (signLeft - rayLightX);
+              const shadowEndRightX = rayLightX + t2 * (signRight - rayLightX);
+              gfx.fillTriangle(shadowStartLeftX, buildGY + shadowGapDistance, shadowStartRightX, buildGY + shadowGapDistance, shadowEndRightX, buildGY + shadowGapDistance + fixedShadowLength);
+              gfx.fillTriangle(shadowStartLeftX, buildGY + shadowGapDistance, shadowEndRightX, buildGY + shadowGapDistance + fixedShadowLength, shadowEndLeftX, buildGY + shadowGapDistance + fixedShadowLength);
+            }
           }
           continue;
         }
