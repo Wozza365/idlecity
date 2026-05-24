@@ -41,6 +41,9 @@ export class GameScene extends Phaser.Scene {
   // Panel background — destroyed and recreated on resize
   private panelBg!: Phaser.GameObjects.Rectangle;
 
+  // Directional shadow filter for buildings
+  private shadowFilter!: Phaser.Filters.Shadow;
+
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
   private timeOffsetMs: number = 0;
@@ -64,6 +67,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.lights.enable();
     this.lights.setAmbientColor(0x888888);
+
+    this.shadowFilter = this.cameras.main.filters.internal.addShadow(0, 0, 0.15, 1, 0x000022, 8, 0.6);
 
     this.panelChrome = new PanelChrome(this);
 
@@ -168,7 +173,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshButtons();
     this.statsBar.update(this.state.gold, this.taxRate);
     this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY);
-    this.sunMoon.update(this.sunAngle, width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
+    this.sunMoon.update(this.sunAngle, width, this.groundY);
   }
 
   // ── Resize handler ─────────────────────────────────────────────────────────
@@ -280,12 +285,28 @@ export class GameScene extends Phaser.Scene {
     const elev = Math.sin(this.sunAngle);
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
     this.sky.updateOverlay(elev);
-    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
+    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY);
+
+    this.updateShadowFilter(this.sunAngle, elev);
     this.devPanel?.updateClock(this.gameTimeString());
   }
 
   private advanceTime(): void {
     this.timeOffsetMs = (this.timeOffsetMs + 240_000 / 24) % 240_000;
+  }
+
+  private updateShadowFilter(sunAngle: number, elevation: number): void {
+    if (elevation <= 0.02) {
+      this.shadowFilter.intensity = 0;
+      return;
+    }
+
+    const leanDist = Math.max(10, (1 - elevation) * 100);
+    const angle = sunAngle + Math.PI / 2;
+    this.shadowFilter.x = Math.cos(angle) * leanDist / this.scale.width;
+    this.shadowFilter.y = Math.sin(angle) * leanDist / this.scale.height;
+    this.shadowFilter.decay = 0.12 + elevation * 0.03;
+    this.shadowFilter.intensity = Math.min(0.8, elevation * 1.2);
   }
 
   // ── Tax system ─────────────────────────────────────────────────────────────
