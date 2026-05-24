@@ -170,10 +170,10 @@ export class SunMoon {
           gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
           // Roof shadow: triangle at bottom of main shadow pointing further down
-          const peakLean = leanRate * (shadowExtent + YARD_H + h + roofHVal);
-          const peakShadX = mid + peakLean;
+          // Tip uses maxLean because it's further away and needs greater lean
           const shadowDepth = shadBot - buildGY;
           const roofShadowTip = shadBot + Math.round(shadowDepth * roofHVal / h);
+          const peakShadX = mid + maxLean;
           gfx.fillTriangle(p4x, shadBot, p3x, shadBot, peakShadX, roofShadowTip);
 
           if (this.DEBUG_SHADOWS) {
