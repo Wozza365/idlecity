@@ -166,8 +166,8 @@ export class SunMoon {
           const p3x = bx + bw + maxLean, p3y = shadBot;
           const p4x = bx + maxLean,      p4y = shadBot;
 
-          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+          // TEMP DISABLED for debugging: gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+          // TEMP DISABLED for debugging: gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
 
           if (this.DEBUG_SHADOWS) {
             this.debugGfx.lineStyle(2, 0xffffff, 1);
