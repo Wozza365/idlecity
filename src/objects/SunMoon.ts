@@ -168,19 +168,25 @@ export class SunMoon {
           const signWidth = 48;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
+          const shadowGapDistance = 8;
           const fixedShadowLength = 30;
 
-          // Raycast from light position through sign to ground
+          // Raycast from light position through sign to ground plane
           // Light is at (sunX, sunY - 300), sign base at buildGY
           const lightY = sunY - 300;
           if (lightY < buildGY) {
-            // Light is above sign, can cast shadow
-            const t = (buildGY + fixedShadowLength - lightY) / (buildGY - lightY);
-            const shadowLeftX = sunX + t * (signLeft - sunX);
-            const shadowRightX = sunX + t * (signRight - sunX);
+            // Calculate where shadow starts (gap ahead of sign)
+            const t1 = (buildGY + shadowGapDistance - lightY) / (buildGY - lightY);
+            const shadowStartLeftX = sunX + t1 * (signLeft - sunX);
+            const shadowStartRightX = sunX + t1 * (signRight - sunX);
 
-            gfx.fillTriangle(signLeft, buildGY, signRight, buildGY, shadowRightX, buildGY + fixedShadowLength);
-            gfx.fillTriangle(signLeft, buildGY, shadowRightX, buildGY + fixedShadowLength, shadowLeftX, buildGY + fixedShadowLength);
+            // Calculate where shadow extends to
+            const t2 = (buildGY + shadowGapDistance + fixedShadowLength - lightY) / (buildGY - lightY);
+            const shadowEndLeftX = sunX + t2 * (signLeft - sunX);
+            const shadowEndRightX = sunX + t2 * (signRight - sunX);
+
+            gfx.fillTriangle(shadowStartLeftX, buildGY + shadowGapDistance, shadowStartRightX, buildGY + shadowGapDistance, shadowEndRightX, buildGY + shadowGapDistance + fixedShadowLength);
+            gfx.fillTriangle(shadowStartLeftX, buildGY + shadowGapDistance, shadowEndRightX, buildGY + shadowGapDistance + fixedShadowLength, shadowEndLeftX, buildGY + shadowGapDistance + fixedShadowLength);
           }
           continue;
         }
