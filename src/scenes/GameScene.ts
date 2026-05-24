@@ -67,7 +67,7 @@ export class GameScene extends Phaser.Scene {
   private sunAngle: number = Math.PI / 2;
   private sunCircle!: Phaser.GameObjects.Arc;
   private moonCircle!: Phaser.GameObjects.Arc;
-  private sunRaysGfx!: Phaser.GameObjects.Graphics;
+  private sunGlowSprite!: Phaser.GameObjects.Image;
   private sunGroundGlow!: Phaser.GameObjects.Ellipse;
   private sunLight!: Phaser.GameObjects.Light;
 
@@ -875,9 +875,31 @@ export class GameScene extends Phaser.Scene {
     const cx = width / 2;
     const gy = this.groundY;
 
-    this.moonCircle   = this.add.arc(cx, gy, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
-    this.sunRaysGfx   = this.add.graphics().setDepth(3);
-    this.sunCircle    = this.add.arc(cx, 80, 20, 0, 360, false, 0xfff8aa, 1).setDepth(5);
+    // Build a smooth radial gradient texture once using the Canvas 2D API,
+    // then render it as an additive-blended sprite so there are no hard rings.
+    const texSize = 256;
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width  = texSize;
+    glowCanvas.height = texSize;
+    const ctx2d = glowCanvas.getContext('2d')!;
+    const half = texSize / 2;
+    const grad = ctx2d.createRadialGradient(half, half, 0, half, half, half);
+    grad.addColorStop(0.00, 'rgba(255,255,255,1.00)');
+    grad.addColorStop(0.12, 'rgba(255,255,255,0.80)');
+    grad.addColorStop(0.28, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(0.50, 'rgba(255,255,255,0.10)');
+    grad.addColorStop(0.75, 'rgba(255,255,255,0.02)');
+    grad.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+    ctx2d.fillStyle = grad;
+    ctx2d.fillRect(0, 0, texSize, texSize);
+    this.textures.addCanvas('sun-glow', glowCanvas);
+
+    this.moonCircle    = this.add.arc(cx, gy, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(2);
+    this.sunGlowSprite = this.add.image(cx, 80, 'sun-glow')
+      .setDisplaySize(220, 220)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(3);
+    this.sunCircle     = this.add.arc(cx, 80, 20, 0, 360, false, 0xfff8aa, 1).setDepth(5);
     this.sunGroundGlow = this.add
       .ellipse(cx, gy + 6, Math.round(width * 0.5), 22, 0xfffae0, 0)
       .setDepth(6);
@@ -903,7 +925,7 @@ export class GameScene extends Phaser.Scene {
 
     this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
     this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
-    this.drawSunGlow(sunX, sunY, sunAbove, sunColorAtElevation(elevation), Math.min(1, elevation * 2.5 + 0.4));
+    this.sunGlowSprite.setPosition(sunX, sunY).setVisible(sunAbove);
 
     this.sunGroundGlow
       .setPosition(sunX, this.groundY + 6)
@@ -917,6 +939,7 @@ export class GameScene extends Phaser.Scene {
     // Dynamic sun color: deep orange-red at horizon → golden yellow → warm white at noon
     const sunColor = sunColorAtElevation(elevation);
     this.sunCircle.setFillStyle(sunColor);
+    this.sunGlowSprite.setTint(sunColor);
     this.sunLight.setColor(sunColor);
 
     // At low elevation keep ambient bright enough to show warm tint on buildings
@@ -1024,25 +1047,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private drawSunGlow(cx: number, cy: number, visible: boolean, color: number, intensity: number): void {
-    const gfx = this.sunRaysGfx;
-    gfx.clear();
-    if (!visible || intensity <= 0) return;
-
-    // Radial glow: largest (faintest) first so inner circles composite on top.
-    const layers: { r: number; a: number }[] = [
-      { r: 110, a: 0.012 },
-      { r: 85,  a: 0.025 },
-      { r: 65,  a: 0.050 },
-      { r: 48,  a: 0.090 },
-      { r: 34,  a: 0.150 },
-      { r: 24,  a: 0.220 },
-    ];
-    for (const { r, a } of layers) {
-      gfx.fillStyle(color, Math.min(1, a * intensity));
-      gfx.fillCircle(cx, cy, r);
-    }
-  }
 
   // ── UI panel columns ───────────────────────────────────────────────────────
 
