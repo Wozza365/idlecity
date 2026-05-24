@@ -282,7 +282,7 @@ export class GameScene extends Phaser.Scene {
 
     // Piecewise angle: sun rises at 4am (elapsed=160k), peaks at noon (0), sets at 8pm (80k).
     // Day (160k ms) moves at half speed of night (80k ms) so day lasts 16 game-hours.
-    const SUNSET   = 80_000;   // elapsed at 8pm
+    const SUNSET   = 100_000;  // elapsed at 10pm
     const SUNRISE  = 160_000;  // elapsed at 4am
     if (elapsed < SUNSET) {
       // Noon→8pm: sunAngle π/2 → π
