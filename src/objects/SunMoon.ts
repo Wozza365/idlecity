@@ -156,10 +156,24 @@ export class SunMoon {
 
       for (let i = 0; i < PLOT_COUNT; i++) {
         const plot = plots[i];
-        if (!plot.unlocked) continue;
-
         const x  = i * plotWidth;
         const w  = plotWidth;
+        const buildGY = groundY - YARD_H;
+
+        // Shadow for empty plot sign (elevated, so casts longer shadow)
+        if (!plot.unlocked) {
+          const cx = x + Math.round(w * 0.5);
+          const signWidth = 48;
+          const signHeight = 46;
+          const signLeft = cx - Math.round(signWidth / 2);
+          const signRight = signLeft + signWidth;
+          const signLean = leanRate * (shadowExtent + signHeight);
+
+          gfx.fillTriangle(signLeft, buildGY, signRight, buildGY, signRight + signLean, shadBot);
+          gfx.fillTriangle(signLeft, buildGY, signRight + signLean, shadBot, signLeft + signLean, shadBot);
+          continue;
+        }
+
         const h  = buildingHeight(plot.level);
         const bw = plot.level <= 15 ? Math.round(w * 0.82) : w;
         const bx = plot.level <= 15 ? x + Math.round((w - bw) / 2) : x;
