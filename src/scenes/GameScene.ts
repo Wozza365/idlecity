@@ -12,6 +12,7 @@ const STATS_BAR_H = 54;   // top strip of UI panel (road + income + balance)
 const ROAD_H = 48;        // road strip between sky and UI panel
 const VERGE_H = 24;       // grass verge below road (half road height)
 const RIVER_H = 48;       // river below verge (same as road height)
+const YARD_H = 20;        // front-yard lawn strip height (also dirt depth for empty plots)
 
 /** Gold required to unlock each building slot (index = building id). */
 const UNLOCK_COSTS: readonly number[] = [0, 500, 2_500, 15_000, 100_000];
@@ -439,7 +440,6 @@ export class GameScene extends Phaser.Scene {
     const bx      = x + Math.round((w - bw) / 2);
     const gy      = this.groundY;
     const foundH  = 6;
-    const YARD_H  = 20;
     const buildGY = gy - YARD_H;   // building sits above the lawn strip
     top -= YARD_H;                  // shift entire building up
     const bodyH  = h - foundH;
@@ -809,11 +809,63 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildEmptyPlot(container: Phaser.GameObjects.Container, x: number): void {
-    const gfx = this.add.graphics();
-    gfx.fillStyle(0x1a1b2e, 0.7);
-    gfx.fillRect(x, this.groundY - PLOT_BASE_HEIGHT, this.plotWidth, PLOT_BASE_HEIGHT);
-    gfx.lineStyle(2, 0x3a3d5c, 1);
-    gfx.strokeRect(x, this.groundY - PLOT_BASE_HEIGHT, this.plotWidth, PLOT_BASE_HEIGHT);
+    const gfx     = this.add.graphics();
+    const gy      = this.groundY;
+    const w       = this.plotWidth;
+    const dirtTop = gy - YARD_H;
+
+    // ── Dirt plot (same depth as tier-1 front yard) ───────────────
+    gfx.fillStyle(0x7a5228, 1);
+    gfx.fillRect(x, dirtTop, w, YARD_H);
+    gfx.fillStyle(0x5c3c18, 1);
+    gfx.fillRect(x, dirtTop, w, 2);          // topsoil edge
+    // Scattered soil clumps for texture
+    gfx.fillStyle(0x5c3c18, 1);
+    for (let i = 0; i < 5; i++) {
+      const px = x + Math.round(((i + 0.5) / 5) * w);
+      gfx.fillRect(px - 2, dirtTop + 5, 5, 2);
+      gfx.fillRect(px + 4, dirtTop + 13, 4, 2);
+    }
+
+    // ── Wooden post ───────────────────────────────────────────────
+    const cx    = x + Math.round(w * 0.5);
+    const postTop = dirtTop - 24;
+    gfx.fillStyle(0xb08040, 1);
+    gfx.fillRect(cx - 1, postTop, 3, 24 + 10);   // 10 px buried in dirt
+    gfx.fillStyle(0x806028, 1);
+    gfx.fillRect(cx + 1, postTop, 1, 24 + 10);   // right-edge shadow
+
+    // ── Sign board ────────────────────────────────────────────────
+    const bW = 48, bH = 26;
+    const bX = cx - Math.round(bW / 2);
+    const bY = postTop - bH + 4;              // overlaps post top slightly
+
+    gfx.fillStyle(0x909090, 1);               // grey border / frame
+    gfx.fillRect(bX - 1, bY - 1, bW + 2, bH + 2);
+
+    gfx.fillStyle(0xcc2020, 1);               // red header band
+    gfx.fillRect(bX, bY, bW, 9);
+
+    gfx.fillStyle(0xf8f4ee, 1);               // cream sign body
+    gfx.fillRect(bX, bY + 9, bW, bH - 9);
+
+    // White pixel blocks in red header — suggest "FOR SALE"
+    gfx.fillStyle(0xffcccc, 1);
+    for (const ox of [3, 11, 20, 30, 39]) {
+      gfx.fillRect(bX + ox, bY + 3, 5, 3);
+    }
+
+    // Red pixel rows in cream body — two lines of illegible estate-agent text
+    gfx.fillStyle(0xcc2020, 1);
+    gfx.fillRect(bX + 3,  bY + 13, 8, 2);
+    gfx.fillRect(bX + 14, bY + 13, 6, 2);
+    gfx.fillRect(bX + 23, bY + 13, 8, 2);
+    gfx.fillRect(bX + 34, bY + 13, 8, 2);
+    gfx.fillStyle(0xaaaaaa, 1);              // grey sub-line (phone number / URL)
+    gfx.fillRect(bX + 3,  bY + 19, 11, 1);
+    gfx.fillRect(bX + 17, bY + 19, 9,  1);
+    gfx.fillRect(bX + 29, bY + 19, 12, 1);
+
     container.add(gfx);
   }
 
@@ -1011,7 +1063,6 @@ export class GameScene extends Phaser.Scene {
           // Tier 1 house: sits on buildGY (YARD_H above road), triangular roof.
           // Shadow is a parallelogram with the same width as the building (bw),
           // leaned horizontally by leanRate × full depth from buildGY to shadBot.
-          const YARD_H   = 20;
           const buildGY  = this.groundY - YARD_H;
           const roofHVal = Math.round(bw * 0.42);
           const mid      = bx + Math.round(bw / 2);
