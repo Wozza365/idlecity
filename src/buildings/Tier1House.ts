@@ -201,6 +201,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     gfx.fillRect(dx - 6, buildGY - 3, dw + 12, 3);
 
     // Lv 9+: porch lantern above door
+    let porchLightPos: { cx: number; cy: number } | null = null;
     if (level >= 9) {
       const lx = dx + Math.round(dw / 2);
       gfx.fillStyle(0x404038, 1);
@@ -209,6 +210,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
       gfx.fillRect(lx - 2, dy - 9, 4, 6);
       gfx.fillStyle(0x606058, 1);
       gfx.fillRect(lx - 1, dy - 2, 2, 3);
+      porchLightPos = { cx: lx, cy: dy - 6 };
     }
 
     // ── Corner trim boards ────────────────────────────────────
@@ -346,6 +348,11 @@ export class Tier1House extends Phaser.GameObjects.Container {
       lampConeGfx.fillStyle(0xfff4cc, 1);
       lampConeGfx.fillCircle(cx, cy, 2);
     }
+    // Porch lantern lens (level 9+)
+    if (porchLightPos) {
+      lampConeGfx.fillStyle(0xffdd88, 1);
+      lampConeGfx.fillCircle(porchLightPos.cx, porchLightPos.cy, 2);
+    }
     lampConeGfx.setAlpha(0);
     lampConeGfx.setBlendMode(Phaser.BlendModes.ADD);
     this.add(lampConeGfx);
@@ -357,6 +364,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
     // Fence post point lights (level 8+)
     for (const { cx, cy } of fencePosts) {
       this.windowLights.push(scene.lights.addLight(cx, cy, 35, 0xffee88, 0));
+    }
+    // Porch lantern point light (level 9+)
+    if (porchLightPos) {
+      this.windowLights.push(scene.lights.addLight(porchLightPos.cx, porchLightPos.cy, 45, 0xffcc44, 0));
     }
 
     // ── Window glass overlay & lights ─────────────────────────────────────────
