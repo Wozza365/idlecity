@@ -334,20 +334,30 @@ export class Tier1House extends Phaser.GameObjects.Container {
     this.add(gfx);
 
     // ── Street lamp cone & point light ────────────────────────────────────────
+    // All drawn into one ADD-blend Graphics; setAlpha(t) drives day→night.
+    // Layered from outermost to brightest so each inner ring punches through.
     const lampConeGfx = scene.add.graphics();
-    // Lamp lens glow — small bright circle at the head so the lamp visually
-    // appears "on" at night even when the head housing is dark from low ambient.
-    lampConeGfx.fillStyle(0xfff4cc, 1);
-    lampConeGfx.fillCircle(lampCx, lampCy + 1, 3);
+    // Outer soft halo
+    lampConeGfx.fillStyle(0xffee88, 0.12);
+    lampConeGfx.fillCircle(lampCx, lampCy, 22);
+    // Mid halo
+    lampConeGfx.fillStyle(0xffee88, 0.22);
+    lampConeGfx.fillCircle(lampCx, lampCy, 12);
+    // Inner halo
+    lampConeGfx.fillStyle(0xfff4cc, 0.45);
+    lampConeGfx.fillCircle(lampCx, lampCy, 6);
+    // Lens bright spot
+    lampConeGfx.fillStyle(0xffffff, 0.90);
+    lampConeGfx.fillCircle(lampCx, lampCy, 3);
     // Downward cone
-    lampConeGfx.fillStyle(0xffee88, 1);
-    lampConeGfx.fillTriangle(lampCx, lampCy + 3, lampCx - coneSpread, gy - 2, lampCx + coneSpread, gy - 2);
+    lampConeGfx.fillStyle(0xffee88, 0.55);
+    lampConeGfx.fillTriangle(lampCx, lampCy + 2, lampCx - coneSpread, gy - 2, lampCx + coneSpread, gy - 2);
     lampConeGfx.setAlpha(0);
     lampConeGfx.setBlendMode(Phaser.BlendModes.ADD);
     this.add(lampConeGfx);
     this.lampConeGfx = lampConeGfx;
 
-    const streetLampLight = scene.lights.addLight(lampCx, lampCy, 100, 0xffee88, 0);
+    const streetLampLight = scene.lights.addLight(lampCx, lampCy, 110, 0xffee88, 0);
     this.streetLampLight = streetLampLight;
 
     // ── Window glass overlay & lights ─────────────────────────────────────────
@@ -397,7 +407,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
       this.streetLampLight.intensity = t * 1.2;
     }
     if (this.lampConeGfx) {
-      this.lampConeGfx.setAlpha(t * 0.45);
+      this.lampConeGfx.setAlpha(t);
     }
   }
 
