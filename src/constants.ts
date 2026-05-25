@@ -45,6 +45,9 @@ export function sunColorAtElevation(elev: number): number {
 
 export const UI_FONT = 'Inter, sans-serif';
 
+// 240_000 ms real = 24 game hours → 1 game hour = 10 real seconds = 10× the per-second rate
+export const GAME_HOUR_FACTOR = 10;
+
 export function fmt(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`;

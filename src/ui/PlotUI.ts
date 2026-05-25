@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { type PlotState } from '../game/GameState';
-import { MAX_LEVEL, UNLOCK_COSTS, upgradeCost, perBuildingIncome, fmt, UI_FONT } from '../constants';
+import { MAX_LEVEL, UNLOCK_COSTS, upgradeCost, perBuildingIncome, fmtBalance, UI_FONT, GAME_HOUR_FACTOR } from '../constants';
 
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
   getCost: () => number;
-  activeColor: number;
+  drawNormal: () => void;
+  drawDisabled: () => void;
 }
 
 export class PlotUI {
@@ -25,16 +26,19 @@ export class PlotUI {
     const container = scene.add.container(0, 0).setDepth(11);
     const cx = index * sectionW + sectionW / 2;
 
+    // Plot header
     container.add(
       scene.add
-        .text(cx, colTop + 16, `Bldg ${index + 1}`, { fontSize: '13px', color: '#8899aa', fontFamily: UI_FONT })
+        .text(cx, colTop + 13, `PLOT ${index + 1}`, {
+          fontSize: '10px', color: '#4a5a6a', fontFamily: UI_FONT,
+        })
         .setOrigin(0.5)
     );
 
     if (plot.unlocked) {
-      this.buildUpgradeSection(scene, container, cx, colTop, plot, onUpgrade);
+      this.buildUpgradeSection(scene, container, cx, colTop, sectionW, plot, onUpgrade);
     } else {
-      this.buildUnlockSection(scene, container, cx, colTop, index, onUnlock, isNextUnlockable);
+      this.buildUnlockSection(scene, container, cx, colTop, sectionW, index, onUnlock, isNextUnlockable);
     }
 
     this.container = container;
@@ -45,55 +49,107 @@ export class PlotUI {
     container: Phaser.GameObjects.Container,
     cx: number,
     colTop: number,
+    sectionW: number,
     plot: PlotState,
-    onUpgrade: () => void
+    onUpgrade: () => void,
   ): void {
     const atMax = plot.level >= MAX_LEVEL;
     const cost  = upgradeCost(plot.level);
+    const btnW  = sectionW - 12;
+    const btnH  = 50;
+    const btnY  = colTop + 78;
+
+    // ── Level badge ───────────────────────────────────────────────────────────
+    const badgeW = 54, badgeH = 20, badgeY = colTop + 26;
+    const badgeGfx = scene.add.graphics();
+    badgeGfx.fillStyle(0x0a1828, 1);
+    badgeGfx.fillRoundedRect(cx - badgeW / 2, badgeY, badgeW, badgeH, 4);
+    badgeGfx.fillStyle(0x2a60b0, 1);
+    badgeGfx.fillRoundedRect(cx - badgeW / 2, badgeY, 2, badgeH, { tl: 4, bl: 4, tr: 0, br: 0 });
+    container.add(badgeGfx);
 
     container.add(
       scene.add
-        .text(cx, colTop + 40, `Lv ${plot.level}/${MAX_LEVEL}`, {
-          fontSize: '14px', color: '#ddeeff', fontFamily: UI_FONT,
+        .text(cx + 2, badgeY + badgeH / 2, `LV ${plot.level}`, {
+          fontSize: '11px', color: '#6ab4e8', fontFamily: UI_FONT, fontStyle: 'bold',
         })
         .setOrigin(0.5)
     );
 
+    // ── Income ────────────────────────────────────────────────────────────────
     container.add(
       scene.add
-        .text(cx, colTop + 62, `${fmt(perBuildingIncome(plot.level) * 3600)}/hr`, {
-          fontSize: '12px', color: '#88ddaa', fontFamily: UI_FONT,
+        .text(cx, colTop + 58, `↑  ${fmtBalance(perBuildingIncome(plot.level) * GAME_HOUR_FACTOR)} / hr`, {
+          fontSize: '11px', color: '#44bb88', fontFamily: UI_FONT,
         })
         .setOrigin(0.5)
     );
 
-    container.add(
-      scene.add
-        .text(cx, colTop + 82, atMax ? '' : `${fmt(cost)}`, {
-          fontSize: '12px', color: '#99aabb', fontFamily: UI_FONT,
-        })
-        .setOrigin(0.5)
-    );
+    // ── Button ────────────────────────────────────────────────────────────────
+    const btnGfx = scene.add.graphics();
+
+    if (atMax) {
+      btnGfx.fillStyle(0x111820, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+      container.add(btnGfx);
+      container.add(
+        scene.add
+          .text(cx, btnY + btnH / 2, 'MAX LEVEL', {
+            fontSize: '10px', color: '#334455', fontFamily: UI_FONT,
+          })
+          .setOrigin(0.5)
+      );
+      return;
+    }
+
+    const drawNormal = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0d1f3a, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+      btnGfx.fillStyle(0x2a65aa, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+    };
+    const drawHover = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x183860, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+      btnGfx.fillStyle(0x3a88cc, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+    };
+    const drawDisabled = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0e1420, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+    };
+
+    drawNormal();
+    container.add(btnGfx);
 
     const btn = scene.add
-      .rectangle(cx, colTop + 118, 82, 44, 0x2a2a3a)
+      .rectangle(cx, btnY + btnH / 2, btnW, btnH, 0x000000, 0)
       .setInteractive({ useHandCursor: false });
     container.add(btn);
 
     container.add(
       scene.add
-        .text(cx, colTop + 118, atMax ? 'Max' : '▲ Upgrade', {
-          fontSize: '12px', color: atMax ? '#555566' : '#cce8ff', fontFamily: UI_FONT,
+        .text(cx, btnY + 15, '▲  UPGRADE', {
+          fontSize: '10px', color: '#6ab4f0', fontFamily: UI_FONT,
+        })
+        .setOrigin(0.5)
+    );
+    container.add(
+      scene.add
+        .text(cx, btnY + 33, fmtBalance(cost), {
+          fontSize: '13px', color: '#ddeeff', fontFamily: UI_FONT, fontStyle: 'bold',
         })
         .setOrigin(0.5)
     );
 
-    if (!atMax) {
-      btn.on('pointerover', () => btn.setFillStyle(0x2471a3));
-      btn.on('pointerout',  () => btn.setFillStyle(0x1a5276));
-      btn.on('pointerdown', onUpgrade);
-      this.actionRef = { btn, getCost: (): number => cost, activeColor: 0x1a5276 };
-    }
+    btn.on('pointerover', drawHover);
+    btn.on('pointerout', drawNormal);
+    btn.on('pointerdown', onUpgrade);
+
+    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled };
   }
 
   private buildUnlockSection(
@@ -101,42 +157,77 @@ export class PlotUI {
     container: Phaser.GameObjects.Container,
     cx: number,
     colTop: number,
+    sectionW: number,
     index: number,
     onUnlock: () => void,
     isNextUnlockable: boolean,
   ): void {
     const cost = UNLOCK_COSTS[index];
+    const btnW = sectionW - 12;
+    const btnH = 50;
+    const btnY = colTop + 78;
 
     container.add(
       scene.add
-        .text(cx, colTop + 40, '🔒', { fontSize: '18px', color: isNextUnlockable ? '#888899' : '#44444f' })
+        .text(cx, colTop + 40, '🔒', {
+          fontSize: isNextUnlockable ? '20px' : '16px',
+          color: isNextUnlockable ? '#6a7a8a' : '#2e3540',
+        })
         .setOrigin(0.5)
     );
 
-    if (isNextUnlockable) {
-      container.add(
-        scene.add
-          .text(cx, colTop + 68, `${fmt(cost)}`, { fontSize: '12px', color: '#99aabb', fontFamily: UI_FONT })
-          .setOrigin(0.5)
-      );
+    if (!isNextUnlockable) return;
 
-      const btn = scene.add
-        .rectangle(cx, colTop + 110, 82, 44, 0x2a2a3a)
-        .setInteractive({ useHandCursor: false });
-      container.add(btn);
+    const btnGfx = scene.add.graphics();
 
-      container.add(
-        scene.add
-          .text(cx, colTop + 110, 'Unlock', { fontSize: '13px', color: '#e8ffe8', fontFamily: UI_FONT })
-          .setOrigin(0.5)
-      );
+    const drawNormal = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0d2818, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+      btnGfx.fillStyle(0x2a9a50, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+    };
+    const drawHover = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x184830, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+      btnGfx.fillStyle(0x3aba68, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+    };
+    const drawDisabled = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0e1812, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
+    };
 
-      btn.on('pointerover', () => btn.setFillStyle(0x3d8a22));
-      btn.on('pointerout',  () => btn.setFillStyle(0x2d6b1a));
-      btn.on('pointerdown', onUnlock);
+    drawNormal();
+    container.add(btnGfx);
 
-      this.actionRef = { btn, getCost: (): number => cost, activeColor: 0x2d6b1a };
-    }
+    const btn = scene.add
+      .rectangle(cx, btnY + btnH / 2, btnW, btnH, 0x000000, 0)
+      .setInteractive({ useHandCursor: false });
+    container.add(btn);
+
+    container.add(
+      scene.add
+        .text(cx, btnY + 15, 'UNLOCK', {
+          fontSize: '10px', color: '#5ad494', fontFamily: UI_FONT,
+        })
+        .setOrigin(0.5)
+    );
+    container.add(
+      scene.add
+        .text(cx, btnY + 33, fmtBalance(cost), {
+          fontSize: '13px', color: '#ccffdd', fontFamily: UI_FONT, fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+    );
+
+    btn.on('pointerover', drawHover);
+    btn.on('pointerout', drawNormal);
+    btn.on('pointerdown', onUnlock);
+
+    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled };
   }
 
   refresh(gold: number): void {
@@ -144,10 +235,10 @@ export class PlotUI {
     const canAfford = gold >= this.actionRef.getCost();
     if (canAfford) {
       this.actionRef.btn.setInteractive({ useHandCursor: true });
-      this.actionRef.btn.setFillStyle(this.actionRef.activeColor);
+      this.actionRef.drawNormal();
     } else {
       this.actionRef.btn.disableInteractive();
-      this.actionRef.btn.setFillStyle(0x252535);
+      this.actionRef.drawDisabled();
     }
   }
 
