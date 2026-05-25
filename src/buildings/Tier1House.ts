@@ -277,6 +277,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
 
     // Lv 8+: picket fence at road edge of yard
+    const fencePosts: Array<{ cx: number; cy: number }> = [];
     if (level >= 8) {
       const fenceBot = gy - 2;
       gfx.fillStyle(0xe8e4d8, 1);
@@ -285,6 +286,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
       for (let fx = x + 2; fx < x + w - 1; fx += spacing) {
         gfx.fillRect(fx, fenceBot - 10, 3, 10);
         gfx.fillTriangle(fx, fenceBot - 10, fx + 3, fenceBot - 10, fx + 1, fenceBot - 13);
+        fencePosts.push({ cx: fx + 1, cy: fenceBot - 6 });
       }
     }
 
@@ -332,10 +334,16 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Street lamp lens glow & point light ───────────────────────────────────
+    // ── Street lamp & fence lens glows + point lights ─────────────────────────
     const lampConeGfx = scene.add.graphics();
+    // Street lamp lens
     lampConeGfx.fillStyle(0xfff4cc, 1);
     lampConeGfx.fillCircle(lampCx, lampCy + 1, 3);
+    // Fence post lenses (level 8+)
+    for (const { cx, cy } of fencePosts) {
+      lampConeGfx.fillStyle(0xfff4cc, 1);
+      lampConeGfx.fillCircle(cx, cy, 2);
+    }
     lampConeGfx.setAlpha(0);
     lampConeGfx.setBlendMode(Phaser.BlendModes.ADD);
     this.add(lampConeGfx);
@@ -343,6 +351,11 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     const streetLampLight = scene.lights.addLight(lampCx, lampCy, 100, 0xffee88, 0);
     this.streetLampLight = streetLampLight;
+
+    // Fence post point lights (level 8+)
+    for (const { cx, cy } of fencePosts) {
+      this.windowLights.push(scene.lights.addLight(cx, cy, 35, 0xffee88, 0));
+    }
 
     // ── Window glass overlay & lights ─────────────────────────────────────────
     // Non-lit Graphics drawn last in the container so it's always above the
