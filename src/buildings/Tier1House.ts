@@ -1,10 +1,19 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
 
+function lerpColor(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+  return ((Math.round(ar + (br - ar) * t) << 16) |
+          (Math.round(ag + (bg - ag) * t) << 8)  |
+           Math.round(ab + (bb - ab) * t));
+}
+
 export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
-  private glowGfx: Phaser.GameObjects.Graphics | null = null;
+  private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
+  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number }> = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -295,34 +304,31 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Window glow overlays & lights (4 per window, one per pane quadrant) ───
+    // ── Window glass overlay & lights ─────────────────────────────────────────
+    // Non-lit Graphics drawn last in the container so it's always above the
+    // lit building gfx. Cleared and redrawn each frame to smoothly blend the
+    // glass colour from day-blue → warm-yellow at night. Redrawing dividers
+    // here ensures they stay visible on top of the animated glass fill.
     const sashH = Math.round(wh / 2) - 1;
     const halfWw = Math.round(ww / 2);
 
-    // Separate Graphics drawn last so it's always on top; no setLighting so it
-    // renders through the default pipeline and isn't darkened by night ambient.
-    const glowGfx = scene.add.graphics();
-    glowGfx.setAlpha(0);
-
     for (const wxx of [wx1, wx2]) {
+      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw });
       const panes = [
         { px: wxx,              py: wy,             pw: halfWw - 1,      ph: sashH },
         { px: wxx + halfWw + 1, py: wy,             pw: ww - halfWw - 1, ph: sashH },
         { px: wxx,              py: wy + sashH + 2, pw: halfWw - 1,      ph: wh - sashH - 2 },
         { px: wxx + halfWw + 1, py: wy + sashH + 2, pw: ww - halfWw - 1, ph: wh - sashH - 2 },
       ];
-
       for (const { px, py, pw, ph } of panes) {
-        glowGfx.fillStyle(0xffcc66, 1);
-        glowGfx.fillRect(px, py, pw, ph);
-
-        const light = scene.lights.addLight(px + pw / 2, py + ph / 2, 80, 0xffaa44, 0);
-        this.windowLights.push(light);
+        this.windowLights.push(scene.lights.addLight(px + pw / 2, py + ph / 2, 80, 0xffaa44, 0));
       }
     }
 
-    this.add(glowGfx);
-    this.glowGfx = glowGfx;
+    const windowGlassGfx = scene.add.graphics();
+    this.drawWindowGlass(windowGlassGfx, 0);
+    this.add(windowGlassGfx);
+    this.windowGlassGfx = windowGlassGfx;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) {
@@ -336,8 +342,21 @@ export class Tier1House extends Phaser.GameObjects.Container {
     for (const light of this.windowLights) {
       light.intensity = t * 0.375;
     }
-    if (this.glowGfx) {
-      this.glowGfx.setAlpha(t * 0.425);
+    if (this.windowGlassGfx) {
+      this.drawWindowGlass(this.windowGlassGfx, t);
+    }
+  }
+
+  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
+    gfx.clear();
+    for (const { wx, wy: winY, ww, wh, sashH, halfWw } of this.windowRects) {
+      gfx.fillStyle(lerpColor(0x8ab4cc, 0xffcc66, t), 1);
+      gfx.fillRect(wx, winY, ww, sashH);
+      gfx.fillStyle(lerpColor(0x9ec2d8, 0xffcc66, t), 1);
+      gfx.fillRect(wx, winY + sashH + 2, ww, wh - sashH - 2);
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillRect(wx, winY + sashH, ww, 2);
+      gfx.fillRect(wx + halfWw - 1, winY, 2, wh);
     }
   }
 
