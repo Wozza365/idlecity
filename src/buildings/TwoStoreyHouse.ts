@@ -161,7 +161,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
       // Lv 17+: shutters
       if (level >= 17) {
-        gfx.fillStyle(0x265c22, 1);
+        gfx.fillStyle(0x8c2418, 1);
         gfx.fillRect(wxx - sw - 1, wy, sw, wh);
         gfx.fillRect(wxx + ww + 1, wy, sw, wh);
       }
@@ -245,7 +245,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
     // ── Lv 19+: left bush ─────────────────────────────────────
     if (level >= 19) {
-      const bshX = bx + 10;
+      const bshX = bx + 7;
       const bshY = buildGY - foundH;
       gfx.fillStyle(0x4a2808, 1);
       gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
@@ -257,7 +257,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
     // ── Lv 20+: right bush ────────────────────────────────────
     if (level >= 20) {
-      const bshX = bx + bw - 10;
+      const bshX = bx + bw - 7;
       const bshY = buildGY - foundH;
       gfx.fillStyle(0x4a2808, 1);
       gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
