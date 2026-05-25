@@ -79,11 +79,9 @@ export function fmt(n: number): string {
 }
 
 export function fmtRate(n: number): string {
-  const v = Math.round(n * 100) / 100;
-  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(2)}B`;
-  if (v >= 1_000_000)     return `$${(v / 1_000_000).toFixed(2)}M`;
-  if (v >= 1_000)         return `$${(v / 1_000).toFixed(2)}K`;
-  return `$${v.toFixed(2)}`;
+  const v = Math.round(n);
+  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
+  return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 export function fmtBalance(n: number): string {
