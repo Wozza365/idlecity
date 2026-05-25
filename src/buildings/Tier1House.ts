@@ -13,6 +13,8 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
+  private lampConeGfx: Phaser.GameObjects.Graphics | null = null;
+  private streetLampLight: Phaser.GameObjects.Light | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number; upperDay: number; lowerDay: number }> = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
@@ -316,7 +318,32 @@ export class Tier1House extends Phaser.GameObjects.Container {
       }
     }
 
+    // ── Street lamp ───────────────────────────────────────────────────────────
+    const margin     = bx - x;
+    const lampPX     = x + Math.round(margin / 2);
+    const lampTopY   = gy - 28;
+    const lampCx     = lampPX + 1;
+    const lampCy     = lampTopY + 2;
+    const coneSpread = Math.round(w * 0.10);
+
+    gfx.fillStyle(0x555550, 1);
+    gfx.fillRect(lampPX, lampTopY + 5, 2, gy - lampTopY - 5);  // pole shaft
+    gfx.fillStyle(0x888870, 1);
+    gfx.fillRect(lampPX - 2, lampTopY, 6, 5);                   // lamp head
+
     this.add(gfx);
+
+    // ── Street lamp cone & point light ────────────────────────────────────────
+    const lampConeGfx = scene.add.graphics();
+    lampConeGfx.fillStyle(0xffee88, 1);
+    lampConeGfx.fillTriangle(lampCx, lampCy + 3, lampCx - coneSpread, gy - 2, lampCx + coneSpread, gy - 2);
+    lampConeGfx.setAlpha(0);
+    lampConeGfx.setBlendMode(Phaser.BlendModes.ADD);
+    this.add(lampConeGfx);
+    this.lampConeGfx = lampConeGfx;
+
+    const streetLampLight = scene.lights.addLight(lampCx, lampCy, 80, 0xffee88, 0);
+    this.streetLampLight = streetLampLight;
 
     // ── Window glass overlay & lights ─────────────────────────────────────────
     // Non-lit Graphics drawn last in the container so it's always above the
@@ -349,6 +376,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
       for (const light of this.windowLights) {
         scene.lights.removeLight(light);
       }
+      if (this.streetLampLight) scene.lights.removeLight(this.streetLampLight);
     });
   }
 
@@ -359,6 +387,12 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
     if (this.windowGlassGfx) {
       this.drawWindowGlass(this.windowGlassGfx, t);
+    }
+    if (this.streetLampLight) {
+      this.streetLampLight.intensity = t * 1.2;
+    }
+    if (this.lampConeGfx) {
+      this.lampConeGfx.setAlpha(t * 0.20);
     }
   }
 
