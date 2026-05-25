@@ -335,6 +335,11 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     // ── Street lamp cone & point light ────────────────────────────────────────
     const lampConeGfx = scene.add.graphics();
+    // Lamp lens glow — small bright circle at the head so the lamp visually
+    // appears "on" at night even when the head housing is dark from low ambient.
+    lampConeGfx.fillStyle(0xfff4cc, 1);
+    lampConeGfx.fillCircle(lampCx, lampCy + 1, 3);
+    // Downward cone
     lampConeGfx.fillStyle(0xffee88, 1);
     lampConeGfx.fillTriangle(lampCx, lampCy + 3, lampCx - coneSpread, gy - 2, lampCx + coneSpread, gy - 2);
     lampConeGfx.setAlpha(0);
@@ -342,7 +347,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     this.add(lampConeGfx);
     this.lampConeGfx = lampConeGfx;
 
-    const streetLampLight = scene.lights.addLight(lampCx, lampCy, 80, 0xffee88, 0);
+    const streetLampLight = scene.lights.addLight(lampCx, lampCy, 100, 0xffee88, 0);
     this.streetLampLight = streetLampLight;
 
     // ── Window glass overlay & lights ─────────────────────────────────────────
@@ -392,7 +397,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
       this.streetLampLight.intensity = t * 1.2;
     }
     if (this.lampConeGfx) {
-      this.lampConeGfx.setAlpha(t * 0.20);
+      this.lampConeGfx.setAlpha(t * 0.45);
     }
   }
 
