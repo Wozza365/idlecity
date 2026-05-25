@@ -44,6 +44,7 @@ export function sunColorAtElevation(elev: number): number {
 }
 
 export const UI_FONT = 'Inter, sans-serif';
+export const MONO_FONT = "'Roboto Mono', monospace";
 
 // 240_000 ms real = 24 game hours → 1 game hour = 10 real seconds = 10× the per-second rate
 export const GAME_HOUR_FACTOR = 10;

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { STATS_BAR_H, fmtBalance, UI_FONT, GAME_HOUR_FACTOR } from '../constants';
+import { STATS_BAR_H, fmtBalance, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR } from '../constants';
 
 export class StatsBar {
   private gfx: Phaser.GameObjects.Graphics;
@@ -39,7 +39,7 @@ export class StatsBar {
       .text(20, labelY, 'INCOME', { fontSize: '11px', color: '#4a8a68', fontFamily: UI_FONT })
       .setOrigin(0, 0.5).setDepth(11);
     this.incomeValue = scene.add
-      .text(20, valueY, '', { fontSize: '16px', color: '#88ddaa', fontFamily: UI_FONT, fontStyle: 'bold' })
+      .text(20, valueY, '', { fontSize: '16px', color: '#88ddaa', fontFamily: MONO_FONT, fontStyle: 'bold' })
       .setOrigin(0, 0.5).setDepth(11);
 
     // ↑ icon — 16 px from the right edge of the income pill
@@ -52,7 +52,7 @@ export class StatsBar {
       .text(width - 20, labelY, 'BALANCE', { fontSize: '11px', color: '#8a7030', fontFamily: UI_FONT })
       .setOrigin(1, 0.5).setDepth(11);
     this.balanceValue = scene.add
-      .text(width - 20, valueY, '', { fontSize: '16px', color: '#ffd966', fontFamily: UI_FONT, fontStyle: 'bold' })
+      .text(width - 20, valueY, '', { fontSize: '16px', color: '#ffd966', fontFamily: MONO_FONT, fontStyle: 'bold' })
       .setOrigin(1, 0.5).setDepth(11);
 
     // ◆ icon — 16 px from the left edge of the balance pill, colored gold

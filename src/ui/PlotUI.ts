@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type PlotState } from '../game/GameState';
-import { MAX_LEVEL, UNLOCK_COSTS, upgradeCost, perBuildingIncome, fmtBalance, UI_FONT, GAME_HOUR_FACTOR } from '../constants';
+import { MAX_LEVEL, UNLOCK_COSTS, upgradeCost, perBuildingIncome, fmtBalance, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR } from '../constants';
 
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
@@ -81,7 +81,7 @@ export class PlotUI {
     container.add(
       scene.add
         .text(cx, colTop + 58, `↑  ${fmtBalance(perBuildingIncome(plot.level) * GAME_HOUR_FACTOR)} / hr`, {
-          fontSize: '11px', color: '#44bb88', fontFamily: UI_FONT,
+          fontSize: '11px', color: '#44bb88', fontFamily: MONO_FONT,
         })
         .setOrigin(0.5)
     );
@@ -141,7 +141,7 @@ export class PlotUI {
     container.add(
       scene.add
         .text(cx, btnY + 33, fmtBalance(cost), {
-          fontSize: '13px', color: '#ddeeff', fontFamily: UI_FONT, fontStyle: 'bold',
+          fontSize: '13px', color: '#ddeeff', fontFamily: MONO_FONT, fontStyle: 'bold',
         })
         .setOrigin(0.5)
     );
@@ -220,7 +220,7 @@ export class PlotUI {
     container.add(
       scene.add
         .text(cx, btnY + 33, fmtBalance(cost), {
-          fontSize: '13px', color: '#ccffdd', fontFamily: UI_FONT, fontStyle: 'bold',
+          fontSize: '13px', color: '#ccffdd', fontFamily: MONO_FONT, fontStyle: 'bold',
         })
         .setOrigin(0.5)
     );
