@@ -9,10 +9,10 @@ export class StatsBar {
   private balanceValue: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, panelTop: number, width: number) {
-    const labelY = panelTop + 16;
-    const valueY = panelTop + 37;
-    const pillY  = panelTop + 7;
-    const pillH  = STATS_BAR_H - 14;
+    const labelY = panelTop + 22;
+    const valueY = panelTop + 43;
+    const pillY  = panelTop + 8;
+    const pillH  = STATS_BAR_H - 16;
     const pillW  = 190;
     const r      = 6;
 
