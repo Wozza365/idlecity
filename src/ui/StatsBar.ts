@@ -10,7 +10,7 @@ export class StatsBar {
 
   constructor(scene: Phaser.Scene, panelTop: number, width: number) {
     const labelY = panelTop + 22;
-    const valueY = panelTop + 43;
+    const valueY = panelTop + 39;
     const pillY  = panelTop + 8;
     const pillH  = STATS_BAR_H - 16;
     const pillW  = 190;
@@ -33,7 +33,7 @@ export class StatsBar {
 
     // Income texts
     this.incomeLabel = scene.add
-      .text(20, labelY, 'INCOME', { fontSize: '9px', color: '#4a8a68', fontFamily: UI_FONT })
+      .text(20, labelY, 'INCOME', { fontSize: '11px', color: '#4a8a68', fontFamily: UI_FONT })
       .setOrigin(0, 0.5)
       .setDepth(11);
     this.incomeValue = scene.add
@@ -43,7 +43,7 @@ export class StatsBar {
 
     // Balance texts
     this.balanceLabel = scene.add
-      .text(width - 20, labelY, 'BALANCE', { fontSize: '9px', color: '#8a7030', fontFamily: UI_FONT })
+      .text(width - 20, labelY, 'BALANCE', { fontSize: '11px', color: '#8a7030', fontFamily: UI_FONT })
       .setOrigin(1, 0.5)
       .setDepth(11);
     this.balanceValue = scene.add
@@ -54,7 +54,7 @@ export class StatsBar {
 
   update(gold: number, taxRate: number): void {
     this.incomeValue.setText(`↑  ${fmt(taxRate * 3600)} / hr`);
-    this.balanceValue.setText(fmtBalance(gold));
+    this.balanceValue.setText(`🪙  ${fmtBalance(gold)}`);
   }
 
   destroy(): void {
