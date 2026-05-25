@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type RoadState } from '../game/GameState';
-import { STATS_BAR_H, fmt } from '../constants';
+import { STATS_BAR_H, fmt, UI_FONT } from '../constants';
 
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
@@ -27,7 +27,7 @@ export class RoadUI {
     container.add(
       scene.add
         .text(width / 2, midY - 13, `Road: ${this.roadTierName(road.level)}`, {
-          fontSize: '12px', color: '#aabbcc',
+          fontSize: '12px', color: '#aabbcc', fontFamily: UI_FONT,
         })
         .setOrigin(0.5, 0.5)
     );
@@ -42,7 +42,7 @@ export class RoadUI {
         .text(
           width / 2, midY + 12,
           atMax ? 'Road: Max' : `▲ Lv ${road.level + 1}  ${fmt(cost)}`,
-          { fontSize: '11px', color: atMax ? '#555566' : '#cce8ff' }
+          { fontSize: '11px', color: atMax ? '#555566' : '#cce8ff', fontFamily: UI_FONT }
         )
         .setOrigin(0.5, 0.5)
     );

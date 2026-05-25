@@ -43,8 +43,16 @@ export function sunColorAtElevation(elev: number): number {
   return lerpColor(0xffe066, 0xfff8e0, (t - 0.50) / 0.50);
 }
 
+export const UI_FONT = 'Inter, sans-serif';
+
 export function fmt(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
+  return `$${n.toFixed(0)}`;
+}
+
+export function fmtBalance(n: number): string {
+  const v = Math.floor(n);
+  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
+  return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }

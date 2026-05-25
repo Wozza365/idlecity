@@ -142,6 +142,7 @@ export class GameScene extends Phaser.Scene {
     this.statsBar?.destroy();
     this.statsBar = new StatsBar(this, this.panelTop, width);
 
+    const nextUnlock = this.state.plots.findIndex(p => !p.unlocked);
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotUIs[i]?.destroy();
       this.plotUIs[i] = new PlotUI(
@@ -151,7 +152,8 @@ export class GameScene extends Phaser.Scene {
         this.sectionW,
         this.colTop,
         () => this.onPlotUpgrade(i),
-        () => this.onPlotUnlock(i)
+        () => this.onPlotUnlock(i),
+        i === nextUnlock,
       );
       this.add.existing(this.plotUIs[i].container);
     }
@@ -213,7 +215,8 @@ export class GameScene extends Phaser.Scene {
       this.sectionW,
       this.colTop,
       () => this.onPlotUpgrade(index),
-      () => this.onPlotUnlock(index)
+      () => this.onPlotUnlock(index),
+      false,
     );
     this.add.existing(this.plotUIs[index].container);
     this.statsBar.update(this.state.gold, this.taxRate);
@@ -228,17 +231,21 @@ export class GameScene extends Phaser.Scene {
     this.state.plots[index].unlocked = true;
     this.state.plots[index].level = 1;
     this.plotContainers[index] = this.renderPlot(index);
-    this.plotUIs[index].destroy();
-    this.plotUIs[index] = new PlotUI(
-      this,
-      index,
-      this.state.plots[index],
-      this.sectionW,
-      this.colTop,
-      () => this.onPlotUpgrade(index),
-      () => this.onPlotUnlock(index)
-    );
-    this.add.existing(this.plotUIs[index].container);
+    const nextUnlock = this.state.plots.findIndex(p => !p.unlocked);
+    for (let i = 0; i < PLOT_COUNT; i++) {
+      this.plotUIs[i].destroy();
+      this.plotUIs[i] = new PlotUI(
+        this,
+        i,
+        this.state.plots[i],
+        this.sectionW,
+        this.colTop,
+        () => this.onPlotUpgrade(i),
+        () => this.onPlotUnlock(i),
+        i === nextUnlock,
+      );
+      this.add.existing(this.plotUIs[i].container);
+    }
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
   }
