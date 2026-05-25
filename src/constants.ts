@@ -12,12 +12,25 @@ export const VERGE_H = 24;
 export const RIVER_H = 48;
 export const YARD_H = 20;
 
-export const UNLOCK_COSTS: readonly number[] = [0, 500, 2_500, 15_000, 100_000];
+export const UNLOCK_COSTS: readonly number[] = [0, 50_000, 250_000, 1_500_000, 10_000_000];
 
 // ── Pure helper functions ─────────────────────────────────────────────────────
 
+// Deterministic XorShift RNG — produces consistent costs across runs
+const _upgradeCosts: number[] = (() => {
+  let s = 0xdeadbeef >>> 0;
+  const rng = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s = s >>> 0; return s / 0x100000000; };
+  const costs: number[] = [];
+  let cost = 500;
+  for (let i = 0; i < 99; i++) {
+    costs.push(Math.round(cost));
+    cost *= 1 + 0.20 + rng() * 0.10;
+  }
+  return costs;
+})();
+
 export function upgradeCost(level: number): number {
-  return level * level * 10;
+  return _upgradeCosts[Math.min(level - 1, 98)];
 }
 
 export function buildingHeight(level: number): number {
@@ -26,8 +39,17 @@ export function buildingHeight(level: number): number {
   return PLOT_BASE_HEIGHT + (clamped - 1) * HEIGHT_PER_LEVEL;
 }
 
+// Tiered income: each tier has a fixed increment per level, with the rate and base compounding.
+// All values in internal units (displayed $/hr = value × GAME_HOUR_FACTOR).
+const _t1Base = 50, _t2Base = _t1Base + 0.115 * 15, _t3Base = _t2Base + 0.135 * 20, _t4Base = _t3Base + 0.155 * 30;
+const _t1Inc = _t1Base * 0.115 / 10, _t2Inc = _t2Base * 0.135 / 10, _t3Inc = _t3Base * 0.155 / 10, _t4Inc = _t4Base * 0.175 / 10;
+const _at15 = 5 + 14 * _t1Inc, _at35 = _at15 + 20 * _t2Inc, _at65 = _at35 + 30 * _t3Inc;
+
 export function perBuildingIncome(level: number): number {
-  return Math.floor(Math.pow(level, 0.75) * 10);
+  if (level <= 15) return 5 + (level - 1) * _t1Inc;
+  if (level <= 35) return _at15 + (level - 15) * _t2Inc;
+  if (level <= 65) return _at35 + (level - 35) * _t3Inc;
+  return _at65 + (level - 65) * _t4Inc;
 }
 
 export function lerpColor(a: number, b: number, t: number): number {
