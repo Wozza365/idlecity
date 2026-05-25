@@ -4,6 +4,7 @@ import { YARD_H } from '../constants';
 export class EmptyPlot extends Phaser.GameObjects.Container {
   private signBulbGfx: Phaser.GameObjects.Graphics | null = null;
   private signBulbLights: Phaser.GameObjects.Light[] = [];
+  private signRedLight: Phaser.GameObjects.Light | null = null;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number) {
     super(scene, 0, 0);
@@ -90,10 +91,13 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
       this.signBulbLights.push(scene.lights.addLight(px, py, 16, 0xfff8f0, 0));
     }
 
+    this.signRedLight = scene.lights.addLight(bX + bW / 2, bY + 4, 40, 0xff2020, 0);
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.signBulbLights) {
         scene.lights.removeLight(light);
       }
+      if (this.signRedLight) scene.lights.removeLight(this.signRedLight);
     });
   }
 
@@ -103,5 +107,6 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
     for (const light of this.signBulbLights) {
       light.intensity = t * 0.25;
     }
+    if (this.signRedLight) this.signRedLight.intensity = t * 0.15;
   }
 }
