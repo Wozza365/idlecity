@@ -7,6 +7,7 @@ interface ActionRef {
   getCost: () => number;
   drawNormal: () => void;
   drawDisabled: () => void;
+  isHovered: () => boolean;
 }
 
 export class PlotUI {
@@ -145,11 +146,12 @@ export class PlotUI {
         .setOrigin(0.5)
     );
 
-    btn.on('pointerover', drawHover);
-    btn.on('pointerout', drawNormal);
+    let hovered = false;
+    btn.on('pointerover', () => { hovered = true;  drawHover(); });
+    btn.on('pointerout',  () => { hovered = false; drawNormal(); });
     btn.on('pointerdown', onUpgrade);
 
-    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled };
+    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
   }
 
   private buildUnlockSection(
@@ -223,11 +225,12 @@ export class PlotUI {
         .setOrigin(0.5)
     );
 
-    btn.on('pointerover', drawHover);
-    btn.on('pointerout', drawNormal);
+    let hovered = false;
+    btn.on('pointerover', () => { hovered = true;  drawHover(); });
+    btn.on('pointerout',  () => { hovered = false; drawNormal(); });
     btn.on('pointerdown', onUnlock);
 
-    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled };
+    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
   }
 
   refresh(gold: number): void {
@@ -235,7 +238,7 @@ export class PlotUI {
     const canAfford = gold >= this.actionRef.getCost();
     if (canAfford) {
       this.actionRef.btn.setInteractive({ useHandCursor: true });
-      this.actionRef.drawNormal();
+      if (!this.actionRef.isHovered()) this.actionRef.drawNormal();
     } else {
       this.actionRef.btn.disableInteractive();
       this.actionRef.drawDisabled();
