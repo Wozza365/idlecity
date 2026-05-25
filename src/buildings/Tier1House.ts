@@ -107,17 +107,18 @@ export class Tier1House extends Phaser.GameObjects.Container {
       }
     }
 
-    // Lv 14+: satellite dish on left roof slope
+    // Lv 14+: birdbath in right side of yard
     if (level >= 14) {
-      const dishX   = bx + Math.round(bw * 0.28);
-      const dSlopeT = Math.max(0, (mid - dishX) / (bw / 2 + ov));
-      const dishY   = Math.round(top - roofH + dSlopeT * roofH);
-      gfx.fillStyle(0x888880, 1);
-      gfx.fillRect(dishX - 1, dishY - 6, 2, 6);
-      gfx.fillStyle(0xd0d0c0, 1);
-      gfx.fillCircle(dishX, dishY - 8, 4);
-      gfx.fillStyle(0x909088, 1);
-      gfx.fillCircle(dishX + 1, dishY - 9, 2);
+      const bbX     = x + Math.round(w * 0.80);
+      const bbBaseY = buildGY - 2;
+      gfx.fillStyle(0xb8b0a0, 1);
+      gfx.fillRect(bbX, bbBaseY - 12, 2, 10);          // pedestal pole
+      gfx.fillStyle(0xc8c0b0, 1);
+      gfx.fillRect(bbX - 3, bbBaseY - 4, 8, 3);         // base disc
+      gfx.fillStyle(0xd0c8b8, 1);
+      gfx.fillRect(bbX - 6, bbBaseY - 15, 14, 4);       // basin
+      gfx.fillStyle(0x7090a8, 1);
+      gfx.fillRect(bbX - 5, bbBaseY - 14, 12, 2);       // water
     }
 
     // Rake trim + eave soffit

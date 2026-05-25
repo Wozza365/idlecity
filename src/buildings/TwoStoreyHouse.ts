@@ -97,19 +97,6 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       gableRect = { gpx: gx2 + 2, gpy: gy2 + 2, gpw: gw2 - 4, gph: gh2 - 4 };
     }
 
-    // Lv 25+: satellite dish on left slope
-    if (level >= 25) {
-      const dishX   = bx + Math.round(bw * 0.28);
-      const dSlopeT = Math.max(0, (mid - dishX) / (bw / 2 + ov));
-      const dishY   = Math.round(top - roofH + dSlopeT * roofH);
-      gfx.fillStyle(0x888880, 1);
-      gfx.fillRect(dishX - 1, dishY - 6, 2, 6);
-      gfx.fillStyle(0xd0d0c0, 1);
-      gfx.fillCircle(dishX, dishY - 8, 4);
-      gfx.fillStyle(0x909088, 1);
-      gfx.fillCircle(dishX + 1, dishY - 9, 2);
-    }
-
     // Rake trim + eave soffit
     gfx.lineStyle(2, 0xf0e4cc, 1);
     gfx.moveTo(bx - ov, top).lineTo(mid, top - roofH).strokePath();
