@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { YARD_H } from '../constants';
 
 export class EmptyPlot extends Phaser.GameObjects.Container {
+  private signBulbGfx: Phaser.GameObjects.Graphics | null = null;
+  private signBulbLights: Phaser.GameObjects.Light[] = [];
+
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number) {
     super(scene, 0, 0);
 
@@ -59,5 +62,48 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
     gfx.fillRect(bX + 29, bY + 19, 12, 1);
 
     this.add(gfx);
+
+    // ── Sign bulb lights ──────────────────────────────────────────────────────
+    const bulbs: Array<{ px: number; py: number }> = [];
+    // Top and bottom edges (every 8px, corners included)
+    for (let i = 0; i <= 6; i++) {
+      const bx = bX + Math.round((i / 6) * bW);
+      bulbs.push({ px: bx, py: bY - 1 });
+      bulbs.push({ px: bx, py: bY + bH + 1 });
+    }
+    // Left and right edges (2 inner positions, corners excluded)
+    for (let j = 1; j <= 2; j++) {
+      const by = bY + Math.round((j / 3) * bH);
+      bulbs.push({ px: bX - 1,      py: by });
+      bulbs.push({ px: bX + bW + 1, py: by });
+    }
+
+    const bulbGfx = scene.add.graphics();
+    for (const { px, py } of bulbs) {
+      bulbGfx.fillStyle(0xfff8f0, 1);
+      bulbGfx.fillCircle(px, py, 1.5);
+    }
+    bulbGfx.setAlpha(0);
+    bulbGfx.setBlendMode(Phaser.BlendModes.ADD);
+    this.add(bulbGfx);
+    this.signBulbGfx = bulbGfx;
+
+    for (const { px, py } of bulbs) {
+      this.signBulbLights.push(scene.lights.addLight(px, py, 16, 0xfff8f0, 0));
+    }
+
+    this.on(Phaser.GameObjects.Events.DESTROY, () => {
+      for (const light of this.signBulbLights) {
+        scene.lights.removeLight(light);
+      }
+    });
+  }
+
+  updateWindowLights(elevation: number): void {
+    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    if (this.signBulbGfx) this.signBulbGfx.setAlpha(t * 0.7);
+    for (const light of this.signBulbLights) {
+      light.intensity = t * 0.25;
+    }
   }
 }
