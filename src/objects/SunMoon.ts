@@ -274,6 +274,33 @@ export class SunMoon {
             this.debugGfx.lineTo(shadowPoints[0].x, shadowPoints[0].y);
             this.debugGfx.strokePath();
           }
+        } else if (plot.level <= 25) {
+          // TwoStoreyHouse: same polygon projection as Tier1House, fixed body height 88 (foundH 6 = bodyH 82)
+          const tsBw    = Math.round(w * 0.82);
+          const tsBx    = x + Math.round((w - tsBw) / 2);
+          const tsBodyH = 82;
+          const tsBuildGY = groundY - YARD_H;
+          const tsTop   = tsBuildGY - tsBodyH;
+          const tsRoofH = Math.round(tsBw * 0.38);
+          const tsMid   = tsBx + Math.round(tsBw / 2);
+          const tsOv    = 6;
+          const tsEffH  = tsBodyH + YARD_H;
+
+          const tsOutline = [
+            { x: tsBx,               y: tsBuildGY,       height: 0 },
+            { x: tsBx + tsBw,        y: tsBuildGY,       height: 0 },
+            { x: tsBx + tsBw + tsOv, y: tsTop,           height: tsEffH },
+            { x: tsMid,              y: tsTop - tsRoofH,  height: tsEffH + tsRoofH },
+            { x: tsBx - tsOv,        y: tsTop,           height: tsEffH },
+          ];
+          const tsShadow = tsOutline.map(pt => ({
+            x: pt.height === 0 ? pt.x : pt.x + leanRate * (shadowExtent + pt.height),
+            y: pt.height === 0 ? tsBuildGY : shadBot,
+          }));
+          const tp0 = tsShadow[0];
+          for (let j = 1; j < tsShadow.length - 1; j++) {
+            gfx.fillTriangle(tp0.x, tp0.y, tsShadow[j].x, tsShadow[j].y, tsShadow[j + 1].x, tsShadow[j + 1].y);
+          }
         } else {
           const lean = leanRate * shadowExtent;
           const p1x = bx,             p1y = groundY;
