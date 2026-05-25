@@ -14,7 +14,6 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private windowLights: Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx: Phaser.GameObjects.Graphics | null = null;
-  private streetLampLight: Phaser.GameObjects.Light | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number; upperDay: number; lowerDay: number }> = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
@@ -104,7 +103,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
         [0,           gSashH + 2, gHalfWw - 1,       gph - gSashH - 2],
         [gHalfWw + 1, gSashH + 2, gpw - gHalfWw - 1, gph - gSashH - 2],
       ] as [number, number, number, number][]) {
-        this.windowLights.push(scene.lights.addLight(gpx + offX + pw / 2, gpy + offY + ph / 2, 60, 0xffaa44, 0));
+        this.windowLights.push(scene.lights.addLight(gpx + offX + pw / 2, gpy + offY + ph / 2, 48, 0xffaa44, 0));
       }
     }
 
@@ -324,25 +323,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
       }
     }
 
-    // ── Street lamp ───────────────────────────────────────────────────────────
-    const margin     = bx - x;
-    const lampPX     = x + Math.round(margin / 2);
-    const lampTopY   = gy - 28;
-    const lampCx = lampPX + 1;
-    const lampCy = lampTopY + 2;
-
-    gfx.fillStyle(0x555550, 1);
-    gfx.fillRect(lampPX, lampTopY + 5, 2, gy - lampTopY - 5);  // pole shaft
-    gfx.fillStyle(0x888870, 1);
-    gfx.fillRect(lampPX - 2, lampTopY, 6, 5);                   // lamp head
-
     this.add(gfx);
 
-    // ── Street lamp & fence lens glows + point lights ─────────────────────────
+    // ── Lens glows & point lights ─────────────────────────────────────────────
     const lampConeGfx = scene.add.graphics();
-    // Street lamp lens
-    lampConeGfx.fillStyle(0xfff4cc, 1);
-    lampConeGfx.fillCircle(lampCx, lampCy + 1, 3);
     // Fence post lenses (level 8+)
     for (const { cx, cy } of fencePosts) {
       lampConeGfx.fillStyle(0xfff4cc, 1);
@@ -357,9 +341,6 @@ export class Tier1House extends Phaser.GameObjects.Container {
     lampConeGfx.setBlendMode(Phaser.BlendModes.ADD);
     this.add(lampConeGfx);
     this.lampConeGfx = lampConeGfx;
-
-    const streetLampLight = scene.lights.addLight(lampCx, lampCy, 100, 0xffee88, 0);
-    this.streetLampLight = streetLampLight;
 
     // Fence post point lights (level 8+)
     for (const { cx, cy } of fencePosts) {
@@ -387,7 +368,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
         { px: wxx + halfWw + 1, py: wy + sashH + 2, pw: ww - halfWw - 1, ph: wh - sashH - 2 },
       ];
       for (const { px, py, pw, ph } of panes) {
-        this.windowLights.push(scene.lights.addLight(px + pw / 2, py + ph / 2, 80, 0xffaa44, 0));
+        this.windowLights.push(scene.lights.addLight(px + pw / 2, py + ph / 2, 64, 0xffaa44, 0));
       }
     }
 
@@ -401,7 +382,6 @@ export class Tier1House extends Phaser.GameObjects.Container {
       for (const light of this.windowLights) {
         scene.lights.removeLight(light);
       }
-      if (this.streetLampLight) scene.lights.removeLight(this.streetLampLight);
     });
   }
 
@@ -412,9 +392,6 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
     if (this.windowGlassGfx) {
       this.drawWindowGlass(this.windowGlassGfx, t);
-    }
-    if (this.streetLampLight) {
-      this.streetLampLight.intensity = t * 1.2;
     }
     if (this.lampConeGfx) {
       this.lampConeGfx.setAlpha(t * 0.45);
