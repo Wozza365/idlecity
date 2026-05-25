@@ -13,7 +13,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number }> = [];
+  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number; upperDay: number; lowerDay: number }> = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -90,6 +90,20 @@ export class Tier1House extends Phaser.GameObjects.Container {
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(dx2 + 2, dy2 + 2 + Math.round((dh2 - 4) / 2), dw2 - 4, 2);
       gfx.fillRect(dx2 + 2 + Math.round((dw2 - 4) / 2), dy2 + 2, 2, dh2 - 4);
+
+      // Register glass rect and lights for the gable window
+      const gpx = dx2 + 2, gpy = dy2 + 2, gpw = dw2 - 4, gph = dh2 - 4;
+      const gSashH = Math.round(gph / 2);
+      const gHalfWw = Math.round(gpw / 2);
+      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: 0x8ab4cc, lowerDay: 0x8ab4cc });
+      for (const [offX, offY, pw, ph] of [
+        [0,           0,          gHalfWw - 1,       gSashH],
+        [gHalfWw + 1, 0,          gpw - gHalfWw - 1, gSashH],
+        [0,           gSashH + 2, gHalfWw - 1,       gph - gSashH - 2],
+        [gHalfWw + 1, gSashH + 2, gpw - gHalfWw - 1, gph - gSashH - 2],
+      ] as [number, number, number, number][]) {
+        this.windowLights.push(scene.lights.addLight(gpx + offX + pw / 2, gpy + offY + ph / 2, 60, 0xffaa44, 0));
+      }
     }
 
     // Lv 14+: satellite dish on left roof slope
@@ -313,7 +327,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const halfWw = Math.round(ww / 2);
 
     for (const wxx of [wx1, wx2]) {
-      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw });
+      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: 0x8ab4cc, lowerDay: 0x9ec2d8 });
       const panes = [
         { px: wxx,              py: wy,             pw: halfWw - 1,      ph: sashH },
         { px: wxx + halfWw + 1, py: wy,             pw: ww - halfWw - 1, ph: sashH },
@@ -350,10 +364,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
     gfx.clear();
-    for (const { wx, wy: winY, ww, wh, sashH, halfWw } of this.windowRects) {
-      gfx.fillStyle(lerpColor(0x8ab4cc, 0xffcc66, t), 1);
+    for (const { wx, wy: winY, ww, wh, sashH, halfWw, upperDay, lowerDay } of this.windowRects) {
+      gfx.fillStyle(lerpColor(upperDay, 0xffcc66, t), 1);
       gfx.fillRect(wx, winY, ww, sashH);
-      gfx.fillStyle(lerpColor(0x9ec2d8, 0xffcc66, t), 1);
+      gfx.fillStyle(lerpColor(lowerDay, 0xffcc66, t), 1);
       gfx.fillRect(wx, winY + sashH + 2, ww, wh - sashH - 2);
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(wx, winY + sashH, ww, 2);
