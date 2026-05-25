@@ -282,8 +282,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
       const fenceBot = gy - 2;
       gfx.fillStyle(0xe8e4d8, 1);
       gfx.fillRect(x, fenceBot - 7, w, 2);
-      const spacing = Math.round(w / 6);
-      for (let fx = x + 2; fx < x + w - 1; fx += spacing) {
+      const n = 6;
+      const spacing = w / n;
+      for (let i = 0; i < n; i++) {
+        const fx = Math.round(x + spacing * (i + 0.5)) - 1;
         gfx.fillRect(fx, fenceBot - 10, 3, 10);
         gfx.fillTriangle(fx, fenceBot - 10, fx + 3, fenceBot - 10, fx + 1, fenceBot - 13);
         fencePosts.push({ cx: fx + 1, cy: fenceBot - 6 });
