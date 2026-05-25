@@ -80,7 +80,7 @@ export class PlotUI {
     // ── Income ────────────────────────────────────────────────────────────────
     container.add(
       scene.add
-        .text(cx, colTop + 58, `↑  ${fmtRate(perBuildingIncome(plot.level) * GAME_HOUR_FACTOR)} / hr`, {
+        .text(cx, colTop + 58, `↑  ${fmtRate(perBuildingIncome(plot.level) * GAME_HOUR_FACTOR)}`, {
           fontSize: '11px', color: '#44bb88', fontFamily: MONO_FONT,
         })
         .setOrigin(0.5)
