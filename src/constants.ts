@@ -21,10 +21,10 @@ const _upgradeCosts: number[] = (() => {
   let s = 0xdeadbeef >>> 0;
   const rng = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s = s >>> 0; return s / 0x100000000; };
   const costs: number[] = [];
-  let cost = 500;
+  let cost = 250;
   for (let i = 0; i < 99; i++) {
     costs.push(Math.round(cost));
-    cost *= 1 + 0.20 + rng() * 0.10;
+    cost *= 1 + 0.35 + rng() * 0.10;
   }
   return costs;
 })();
