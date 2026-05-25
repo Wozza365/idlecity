@@ -326,6 +326,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
 
     const windowGlassGfx = scene.add.graphics();
+    windowGlassGfx.setLighting(true);
     this.drawWindowGlass(windowGlassGfx, 0);
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
