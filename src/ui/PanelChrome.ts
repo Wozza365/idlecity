@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PLOT_COUNT } from '../constants';
+import { PLOT_COUNT, STATS_BAR_H } from '../constants';
 
 export class PanelChrome {
   private gfx: Phaser.GameObjects.Graphics;
@@ -13,6 +13,7 @@ export class PanelChrome {
     gfx.clear();
     gfx.lineStyle(1, 0x3a4a5a, 1);
     gfx.moveTo(0, panelTop).lineTo(width, panelTop).strokePath();
+    gfx.moveTo(0, panelTop + STATS_BAR_H).lineTo(width, panelTop + STATS_BAR_H).strokePath();
     gfx.moveTo(0, colTop).lineTo(width, colTop).strokePath();
     for (let i = 1; i < PLOT_COUNT; i++) {
       const x = i * sectionW;

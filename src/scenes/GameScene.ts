@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
-  PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_H, VERGE_H, RIVER_H,
+  PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H, ROAD_H, VERGE_H, RIVER_H,
   UNLOCK_COSTS,
   upgradeCost, perBuildingIncome,
 } from '../constants';
@@ -62,7 +62,7 @@ export class GameScene extends Phaser.Scene {
   private get plotWidth(): number { return this.scale.width / PLOT_COUNT; }
   private get groundY(): number { return this.scale.height - UI_HEIGHT - ROAD_H - VERGE_H - RIVER_H; }
   private get panelTop(): number { return this.scale.height - UI_HEIGHT; }
-  private get colTop(): number { return this.panelTop + STATS_BAR_H; }
+  private get colTop(): number { return this.panelTop + STATS_BAR_H + ROAD_BAR_H; }
   private get sectionW(): number { return this.scale.width / PLOT_COUNT; }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ export class GameScene extends Phaser.Scene {
     this.roadUI = new RoadUI(
       this,
       this.state.road,
-      this.panelTop,
+      this.panelTop + STATS_BAR_H,
       width,
       () => this.onRoadUpgrade()
     );
