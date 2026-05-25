@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { type PlotState } from '../game/GameState';
 import {
-  PLOT_COUNT, ROAD_H, VERGE_H, RIVER_H, YARD_H,
+  PLOT_COUNT, ROAD_H, VERGE_H, RIVER_H, YARD_H, PLOT_BASE_HEIGHT,
   buildingHeight, lerpColor, sunColorAtElevation,
 } from '../constants';
 
@@ -284,7 +284,8 @@ export class SunMoon {
           const tsRoofH = Math.round(tsBw * 0.38);
           const tsMid   = tsBx + Math.round(tsBw / 2);
           const tsOv    = 6;
-          const tsEffH  = tsBodyH + YARD_H;
+          const tsEffH    = tsBodyH + YARD_H;
+          const tsShadBot = Math.min(groundY + shadowExtent * tsEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
 
           const tsOutline = [
             { x: tsBx,               y: tsBuildGY,       height: 0 },
@@ -295,21 +296,76 @@ export class SunMoon {
           ];
           const tsShadow = tsOutline.map(pt => ({
             x: pt.height === 0 ? pt.x : pt.x + leanRate * (shadowExtent + pt.height),
-            y: pt.height === 0 ? tsBuildGY : shadBot,
+            y: pt.height === 0 ? tsBuildGY : tsShadBot,
           }));
           const tp0 = tsShadow[0];
           for (let j = 1; j < tsShadow.length - 1; j++) {
             gfx.fillTriangle(tp0.x, tp0.y, tsShadow[j].x, tsShadow[j].y, tsShadow[j + 1].x, tsShadow[j + 1].y);
           }
-        } else {
-          const lean = leanRate * shadowExtent;
-          const p1x = bx,             p1y = groundY;
-          const p2x = bx + bw,        p2y = groundY;
-          const p3x = bx + bw + lean, p3y = shadBot;
-          const p4x = bx + lean,      p4y = shadBot;
+        } else if (plot.level <= 40) {
+          // Townhouse: 78% width, centered
+          const thBw     = Math.round(w * 0.78);
+          const thBx     = x + Math.round((w - thBw) / 2);
+          const thBuildGY = groundY - YARD_H;
+          const thEffH   = h + YARD_H;
+          const thShadBot = Math.min(groundY + shadowExtent * thEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+          const thLean   = leanRate * (shadowExtent + thEffH);
+          gfx.fillTriangle(thBx,        thBuildGY, thBx + thBw,        thBuildGY, thBx + thBw + thLean, thShadBot);
+          gfx.fillTriangle(thBx,        thBuildGY, thBx + thBw + thLean, thShadBot, thBx + thLean,       thShadBot);
 
-          gfx.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
-          gfx.fillTriangle(p1x, p1y, p3x, p3y, p4x, p4y);
+        } else if (plot.level <= 55) {
+          // SmallApartment: full width
+          const saBuilGY  = groundY - YARD_H;
+          const saEffH    = h + YARD_H;
+          const saShadBot = Math.min(groundY + shadowExtent * saEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+          const saLean    = leanRate * (shadowExtent + saEffH);
+          gfx.fillTriangle(x,     saBuilGY, x + w,     saBuilGY, x + w + saLean, saShadBot);
+          gfx.fillTriangle(x,     saBuilGY, x + w + saLean, saShadBot, x + saLean, saShadBot);
+
+        } else if (plot.level <= 70) {
+          // LargeApartment: full width
+          const laBuildGY = groundY - YARD_H;
+          const laEffH    = h + YARD_H;
+          const laShadBot = Math.min(groundY + shadowExtent * laEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+          const laLean    = leanRate * (shadowExtent + laEffH);
+          gfx.fillTriangle(x,     laBuildGY, x + w,     laBuildGY, x + w + laLean, laShadBot);
+          gfx.fillTriangle(x,     laBuildGY, x + w + laLean, laShadBot, x + laLean, laShadBot);
+
+        } else if (plot.level <= 85) {
+          // OfficeBlock: full width rectangle body + optional antenna spike (lv79+)
+          const obBuildGY = groundY - YARD_H;
+          const obEffH    = h + YARD_H;
+          const obShadBot = Math.min(groundY + shadowExtent * obEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+          const obLean    = leanRate * (shadowExtent + obEffH);
+          gfx.fillTriangle(x,     obBuildGY, x + w,     obBuildGY, x + w + obLean, obShadBot);
+          gfx.fillTriangle(x,     obBuildGY, x + w + obLean, obShadBot, x + obLean, obShadBot);
+          if (plot.level >= 79) {
+            // Antenna mast at x + w*0.4, 28px tall
+            const antX  = x + Math.round(w * 0.4);
+            const antEffH = obEffH + 28;
+            const antShadBot = Math.min(groundY + shadowExtent * antEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+            const antLean = leanRate * (shadowExtent + antEffH);
+            gfx.fillTriangle(antX, obBuildGY, antX + 2, obBuildGY, antX + 2 + antLean, antShadBot);
+            gfx.fillTriangle(antX, obBuildGY, antX + 2 + antLean, antShadBot, antX + antLean, antShadBot);
+          }
+
+        } else {
+          // Tier4Skyscraper: full width body + spire (lv87+, ANTENNA_H=36) polygon shadow
+          const skBuildGY = groundY - YARD_H;
+          const skEffH    = h + YARD_H;
+          const skShadBot = Math.min(groundY + shadowExtent * skEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+          const skLean    = leanRate * (shadowExtent + skEffH);
+          // Body rectangle
+          gfx.fillTriangle(x,     skBuildGY, x + w,     skBuildGY, x + w + skLean, skShadBot);
+          gfx.fillTriangle(x,     skBuildGY, x + w + skLean, skShadBot, x + skLean, skShadBot);
+          if (plot.level >= 87) {
+            // Spire at x + w/2, 36px tall
+            const spX    = x + Math.round(w / 2);
+            const spEffH = skEffH + 36;
+            const spShadBot = Math.min(groundY + shadowExtent * spEffH / (PLOT_BASE_HEIGHT + YARD_H), panelTop);
+            const spLean = leanRate * (shadowExtent + spEffH);
+            gfx.fillTriangle(spX - 1, skBuildGY, spX + 3, skBuildGY, spX + 1 + spLean, spShadBot);
+          }
         }
       }
     }
