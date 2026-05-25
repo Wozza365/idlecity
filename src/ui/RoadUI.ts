@@ -50,17 +50,12 @@ export class RoadUI {
     const atMax = road.level >= 10;
     const cost  = this.roadUpgradeCost(road.level);
     const btnW  = Math.min(sectionW - 24, 200);
-    const btnH  = 24;
-    const btnY  = rowTop + 34;
+    const btnH  = 34;
+    const btnY  = rowTop + 24;
 
     container.add(
       scene.add
-        .text(cx, rowTop + 11, 'ROAD', { fontSize: '10px', color: '#4a5a6a', fontFamily: UI_FONT })
-        .setOrigin(0.5)
-    );
-    container.add(
-      scene.add
-        .text(cx, rowTop + 25, this.roadTierName(road.level), { fontSize: '11px', color: '#88aacc', fontFamily: UI_FONT })
+        .text(cx, rowTop + 13, this.roadTierName(road.level), { fontSize: '11px', color: '#88aacc', fontFamily: UI_FONT })
         .setOrigin(0.5)
     );
 
@@ -131,17 +126,12 @@ export class RoadUI {
     label: string,
   ): void {
     const btnW = Math.min(sectionW - 24, 200);
-    const btnH = 24;
-    const btnY = rowTop + 34;
+    const btnH = 34;
+    const btnY = rowTop + 24;
 
     container.add(
       scene.add
-        .text(cx, rowTop + 11, label, { fontSize: '10px', color: '#3a4a3a', fontFamily: UI_FONT })
-        .setOrigin(0.5)
-    );
-    container.add(
-      scene.add
-        .text(cx, rowTop + 25, '–', { fontSize: '11px', color: '#334433', fontFamily: UI_FONT })
+        .text(cx, rowTop + 13, label, { fontSize: '10px', color: '#3a4a3a', fontFamily: UI_FONT })
         .setOrigin(0.5)
     );
 
