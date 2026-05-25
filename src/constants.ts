@@ -79,9 +79,9 @@ export function fmt(n: number): string {
 }
 
 export function fmtRate(n: number): string {
-  const v = Math.round(n);
-  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
-  return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const v = (Math.round(n * 100) / 100).toFixed(2);
+  const [int, dec] = v.split('.');
+  return '$' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
 }
 
 export function fmtBalance(n: number): string {
