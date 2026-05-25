@@ -78,6 +78,14 @@ export function fmt(n: number): string {
   return `$${n.toFixed(0)}`;
 }
 
+export function fmtRate(n: number): string {
+  const v = Math.round(n * 100) / 100;
+  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(2)}B`;
+  if (v >= 1_000_000)     return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000)         return `$${(v / 1_000).toFixed(2)}K`;
+  return `$${v.toFixed(2)}`;
+}
+
 export function fmtBalance(n: number): string {
   const v = Math.floor(n);
   if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;

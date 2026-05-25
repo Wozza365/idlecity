@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { STATS_BAR_H, fmtBalance, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR } from '../constants';
+import { STATS_BAR_H, fmtBalance, fmtRate, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR } from '../constants';
 
 export class StatsBar {
   private gfx: Phaser.GameObjects.Graphics;
@@ -62,7 +62,7 @@ export class StatsBar {
   }
 
   update(gold: number, taxRate: number): void {
-    this.incomeValue.setText(`${fmtBalance(taxRate * GAME_HOUR_FACTOR)} / hr`);
+    this.incomeValue.setText(`${fmtRate(taxRate * GAME_HOUR_FACTOR)} / hr`);
     this.balanceValue.setText(fmtBalance(gold));
   }
 

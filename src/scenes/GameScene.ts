@@ -336,7 +336,7 @@ export class GameScene extends Phaser.Scene {
       const neighbours =
         (i > 0 && plots[i - 1].unlocked ? 1 : 0) +
         (i < plots.length - 1 && plots[i + 1].unlocked ? 1 : 0);
-      total += Math.floor(base * (1 + neighbours * 0.15));
+      total += base * (1 + neighbours * 0.15);
     }
     return total;
   }

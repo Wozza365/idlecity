@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type PlotState } from '../game/GameState';
-import { MAX_LEVEL, UNLOCK_COSTS, upgradeCost, perBuildingIncome, fmtBalance, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR } from '../constants';
+import { MAX_LEVEL, UNLOCK_COSTS, upgradeCost, perBuildingIncome, fmtBalance, fmtRate, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR } from '../constants';
 
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
@@ -80,7 +80,7 @@ export class PlotUI {
     // ── Income ────────────────────────────────────────────────────────────────
     container.add(
       scene.add
-        .text(cx, colTop + 58, `↑  ${fmtBalance(perBuildingIncome(plot.level) * GAME_HOUR_FACTOR)} / hr`, {
+        .text(cx, colTop + 58, `↑  ${fmtRate(perBuildingIncome(plot.level) * GAME_HOUR_FACTOR)} / hr`, {
           fontSize: '11px', color: '#44bb88', fontFamily: MONO_FONT,
         })
         .setOrigin(0.5)
