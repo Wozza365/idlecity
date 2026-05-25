@@ -4,7 +4,7 @@ import { YARD_H, buildingHeight } from '../constants';
 export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
-  private windowGlows: Phaser.GameObjects.Rectangle[] = [];
+  private glowGfx: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -299,8 +299,12 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const sashH = Math.round(wh / 2) - 1;
     const halfWw = Math.round(ww / 2);
 
+    // Separate Graphics drawn last so it's always on top; no setLighting so it
+    // renders through the default pipeline and isn't darkened by night ambient.
+    const glowGfx = scene.add.graphics();
+    glowGfx.setAlpha(0);
+
     for (const wxx of [wx1, wx2]) {
-      // Pane bounds excluding the 2px divider lines
       const panes = [
         { px: wxx,              py: wy,             pw: halfWw - 1,      ph: sashH },
         { px: wxx + halfWw + 1, py: wy,             pw: ww - halfWw - 1, ph: sashH },
@@ -309,17 +313,16 @@ export class Tier1House extends Phaser.GameObjects.Container {
       ];
 
       for (const { px, py, pw, ph } of panes) {
-        const cx = px + pw / 2;
-        const cy = py + ph / 2;
+        glowGfx.fillStyle(0xffcc66, 1);
+        glowGfx.fillRect(px, py, pw, ph);
 
-        const glow = scene.add.rectangle(cx, cy, pw, ph, 0xffcc66).setAlpha(0);
-        this.add(glow);
-        this.windowGlows.push(glow);
-
-        const light = scene.lights.addLight(cx, cy, 80, 0xffaa44, 0);
+        const light = scene.lights.addLight(px + pw / 2, py + ph / 2, 80, 0xffaa44, 0);
         this.windowLights.push(light);
       }
     }
+
+    this.add(glowGfx);
+    this.glowGfx = glowGfx;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) {
@@ -333,8 +336,8 @@ export class Tier1House extends Phaser.GameObjects.Container {
     for (const light of this.windowLights) {
       light.intensity = t * 0.375;
     }
-    for (const glow of this.windowGlows) {
-      glow.setAlpha(t * 0.425);
+    if (this.glowGfx) {
+      this.glowGfx.setAlpha(t * 0.425);
     }
   }
 
