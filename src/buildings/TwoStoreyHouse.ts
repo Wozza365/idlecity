@@ -9,7 +9,6 @@ function lerpColor(a: number, b: number, t: number): number {
            Math.round(ab + (bb - ab) * t));
 }
 
-// Fixed body height — two-storey house does not grow with level
 const BODY_H = 88;
 
 export class TwoStoreyHouse extends Phaser.GameObjects.Container {
@@ -32,11 +31,13 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const bodyH    = BODY_H - foundH;
     const buildGY  = gy - YARD_H;
     const top      = buildGY - bodyH;
-    const floorH   = Math.round(bodyH / 2);
-    const floorDivY = top + floorH;
 
-    // ── Body ──────────────────────────────────────────────────
-    const body = scene.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xfdf7ed);
+    // Upper floor is 43% of body height — ground floor gets the extra headroom
+    const upperH    = Math.round(bodyH * 0.43);
+    const floorDivY = top + upperH;
+
+    // ── Body — warm limestone ──────────────────────────────────
+    const body = scene.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xf2ead8);
     body.setLighting(true);
     this.add(body);
 
@@ -49,9 +50,13 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     gfx.lineStyle(1, 0x7e7870, 1);
     gfx.moveTo(bx, buildGY - foundH).lineTo(bx + bw, buildGY - foundH).strokePath();
 
-    // ── Floor divider band ────────────────────────────────────
-    gfx.fillStyle(0xe8dcc8, 1);
-    gfx.fillRect(bx, floorDivY - 1, bw, 3);
+    // ── String course (floor divider) — 3-layer architectural band
+    gfx.fillStyle(0xb0a48c, 1);
+    gfx.fillRect(bx, floorDivY - 1, bw, 1);       // shadow above
+    gfx.fillStyle(0xddd0b4, 1);
+    gfx.fillRect(bx, floorDivY, bw, 5);            // main course
+    gfx.fillStyle(0xede0c4, 1);
+    gfx.fillRect(bx, floorDivY + 5, bw, 1);        // highlight below
 
     // ── Front yard lawn ───────────────────────────────────────
     gfx.fillStyle(0x5a8c3a, 1);
@@ -72,7 +77,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
 
     // ── Roof ──────────────────────────────────────────────────
-    gfx.fillStyle(0xb04030, 1);
+    gfx.fillStyle(0xa03828, 1);
     gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
 
     // Lv 23+: gable window
@@ -122,24 +127,50 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     gfx.fillStyle(0x7a6e64, 1);
     gfx.fillRect(chx - 2, chimneyTopY, cw + 4, 3);
 
+    // ── Corner quoins ─────────────────────────────────────────
+    const qW = 7;
+    for (const qbx of [bx, bx + bw - qW]) {
+      const shadowX = qbx === bx ? qbx + qW - 1 : qbx;
+      let qy = top; let wide = true;
+      while (qy < buildGY - foundH - 2) {
+        const qh = wide ? 9 : 5;
+        gfx.fillStyle(0xe4d8be, 1);
+        gfx.fillRect(qbx, qy, qW, Math.min(qh, buildGY - foundH - qy));
+        gfx.fillStyle(0xbcb09a, 1);
+        gfx.fillRect(shadowX, qy, 1, Math.min(qh, buildGY - foundH - qy));
+        qy += qh + 2; wide = !wide;
+      }
+    }
+
     // ── Windows ───────────────────────────────────────────────
     const ww   = Math.round(bw * 0.15);
     const wh   = Math.round(ww * 1.4);
     const sw   = Math.round(ww * 0.40);
     const wx1  = bx + Math.round(bw * 0.16);
     const wx2  = bx + Math.round(bw * 0.66);
-    const wyUp = top + Math.round((floorH - wh) / 2);
-    const wyLo = floorDivY + Math.round((floorH - wh) / 2);
+    const wyUp = top + Math.round((upperH - wh) / 2);
+    const groundH = bodyH - upperH - 6; // subtract string course
+    const wyLo = floorDivY + 6 + Math.round((groundH - wh) / 2);
 
     for (const [wxx, wy] of [[wx1, wyUp], [wx2, wyUp], [wx1, wyLo], [wx2, wyLo]] as [number, number][]) {
+      // Stone lintel above window
+      gfx.fillStyle(0xd4c8ae, 1);
+      gfx.fillRect(wxx - 4, wy - 6, ww + 8, 4);
+      gfx.fillStyle(0xb0a48c, 1);
+      gfx.fillRect(wxx - 4, wy - 7, ww + 8, 1);
+
       // Lv 17+: shutters
       if (level >= 17) {
         gfx.fillStyle(0x265c22, 1);
         gfx.fillRect(wxx - sw - 1, wy, sw, wh);
         gfx.fillRect(wxx + ww + 1, wy, sw, wh);
       }
+
+      // White frame
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
+
+      // Glass panes
       const sashH = Math.round(wh / 2) - 1;
       gfx.fillStyle(0x8ab4cc, 1);
       gfx.fillRect(wxx, wy, ww, sashH);
@@ -148,51 +179,65 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(wxx, wy + sashH, ww, 2);
       gfx.fillRect(wxx + Math.round(ww / 2) - 1, wy, 2, wh);
-      gfx.fillRect(wxx - 3, wy + wh + 2, ww + 6, 3);
+
+      // Deeper projecting sill with shadow
+      gfx.fillStyle(0xd4c8ae, 1);
+      gfx.fillRect(wxx - 4, wy + wh + 2, ww + 8, 4);
+      gfx.fillStyle(0xb0a48c, 1);
+      gfx.fillRect(wxx - 4, wy + wh + 6, ww + 8, 1);
     }
 
     // ── Door ──────────────────────────────────────────────────
     const dw     = Math.round(bw * 0.20);
-    const dh     = Math.round(floorH * 0.78);
+    const dh     = Math.round((bodyH - upperH - 6) * 0.82);
     const dx     = bx + Math.round((bw - dw) / 2);
     const dy     = buildGY - foundH - dh;
     const pInset = Math.round(dw * 0.12);
     const ph     = Math.round(dh * 0.30);
+
+    // Classical pediment above door
+    const portW = dw + 18;
+    const portX = dx - 9;
+    gfx.fillStyle(0xe0d4bc, 1);
+    gfx.fillRect(portX, dy - 9, portW, 7);
+    gfx.fillStyle(0xb0a48c, 1);
+    gfx.fillRect(portX, dy - 9, portW, 1);
+    gfx.fillStyle(0xe8dcca, 1);
+    gfx.fillTriangle(portX, dy - 9, portX + portW, dy - 9, portX + Math.round(portW / 2), dy - 17);
+    gfx.lineStyle(1, 0xb0a48c, 1);
+    gfx.moveTo(portX, dy - 9)
+       .lineTo(portX + Math.round(portW / 2), dy - 17)
+       .lineTo(portX + portW, dy - 9).strokePath();
+
+    // Door surround + body
     gfx.fillStyle(0xffffff, 1);
-    gfx.fillRect(dx - 2, dy - 2, dw + 4, dh + 2);
-    gfx.fillStyle(0xb02e1e, 1);
+    gfx.fillRect(dx - 3, dy - 2, dw + 6, dh + 2);
+    gfx.fillStyle(0x8a2010, 1);
     gfx.fillRect(dx, dy, dw, dh);
-    gfx.fillStyle(0xc84030, 1);
+    gfx.fillStyle(0xa02818, 1);
     gfx.fillRect(dx + pInset, dy + 4,      dw - pInset * 2, ph);
     gfx.fillRect(dx + pInset, dy + ph + 8, dw - pInset * 2, ph);
-    gfx.lineStyle(1, 0x7a1e10, 1);
+    gfx.lineStyle(1, 0x601408, 1);
     gfx.strokeRect(dx + pInset, dy + 4,      dw - pInset * 2, ph);
     gfx.strokeRect(dx + pInset, dy + ph + 8, dw - pInset * 2, ph);
     gfx.fillStyle(0xd4a820, 1);
     gfx.fillCircle(dx + dw - 5, dy + Math.round(dh * 0.52), 2);
-    gfx.fillStyle(0xe8dcc8, 1);
-    gfx.fillRect(dx - 3, dy - 5, dw + 6, 5);
     gfx.fillStyle(0xb0b0a4, 1);
     gfx.fillRect(dx - 3, buildGY - foundH, dw + 6, foundH);
     gfx.fillStyle(0xa0a094, 1);
     gfx.fillRect(dx - 6, buildGY - 3, dw + 12, 3);
 
-    // ── Corner trim boards ────────────────────────────────────
-    gfx.fillStyle(0xffffff, 1);
-    gfx.fillRect(bx,          top, 4, bodyH);
-    gfx.fillRect(bx + bw - 4, top, 4, bodyH);
-
     // ── Lv 18+: flower boxes under ground-floor windows ───────
     if (level >= 18) {
       for (const wxx of [wx1, wx2]) {
-        const fbY = wyLo + wh + 6;
+        const fbY = wyLo + wh + 8;
         const fbX = wxx - 3;
         const fbW = ww + 6;
         gfx.fillStyle(0x5c3818, 1);
         gfx.fillRect(fbX, fbY, fbW, 5);
-        const cols = [0xe83030, 0xffcc00, 0xff88aa];
+        const flowerCols = [0xe83030, 0xffcc00, 0xff88aa];
         for (let f = 0; f < 3; f++) {
-          gfx.fillStyle(cols[f % 3], 1);
+          gfx.fillStyle(flowerCols[f % 3], 1);
           gfx.fillCircle(fbX + Math.round(fbW * (f + 0.5) / 3), fbY - 2, 2);
         }
       }
@@ -200,7 +245,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
     // ── Lv 19+: left bush ─────────────────────────────────────
     if (level >= 19) {
-      const bshX = bx + 8;
+      const bshX = bx + 10;
       const bshY = buildGY - foundH;
       gfx.fillStyle(0x4a2808, 1);
       gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
@@ -212,7 +257,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
     // ── Lv 20+: right bush ────────────────────────────────────
     if (level >= 20) {
-      const bshX = bx + bw - 8;
+      const bshX = bx + bw - 10;
       const bshY = buildGY - foundH;
       gfx.fillStyle(0x4a2808, 1);
       gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
@@ -271,7 +316,6 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       gfx.fillRect(mbX + 9, mbY + 1, 1, 4);
       gfx.fillStyle(0xff6622, 1);
       gfx.fillRect(mbX + 10, mbY + 1, 4, 3);
-
       gfx.fillStyle(0xc8b898, 1);
       for (let py = buildGY + 2; py < gy - 3; py += 7) {
         gfx.fillRect(dx + 2, py, dw - 4, 4);
@@ -317,7 +361,6 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       }
     }
 
-    // Gable window pane lights (Lv 23+)
     if (gableRect) {
       const { gpx, gpy, gpw, gph } = gableRect;
       const gSashH  = Math.round(gph / 2);
