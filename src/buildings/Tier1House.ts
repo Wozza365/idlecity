@@ -322,9 +322,8 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const margin     = bx - x;
     const lampPX     = x + Math.round(margin / 2);
     const lampTopY   = gy - 28;
-    const lampCx     = lampPX + 1;
-    const lampCy     = lampTopY + 2;
-    const coneSpread = Math.round(w * 0.10);
+    const lampCx = lampPX + 1;
+    const lampCy = lampTopY + 2;
 
     gfx.fillStyle(0x555550, 1);
     gfx.fillRect(lampPX, lampTopY + 5, 2, gy - lampTopY - 5);  // pole shaft
@@ -333,15 +332,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Street lamp cone & point light ────────────────────────────────────────
+    // ── Street lamp lens glow & point light ───────────────────────────────────
     const lampConeGfx = scene.add.graphics();
-    // Lamp lens glow — small bright circle at the head so the lamp visually
-    // appears "on" at night even when the head housing is dark from low ambient.
     lampConeGfx.fillStyle(0xfff4cc, 1);
     lampConeGfx.fillCircle(lampCx, lampCy + 1, 3);
-    // Downward cone
-    lampConeGfx.fillStyle(0xffee88, 1);
-    lampConeGfx.fillTriangle(lampCx, lampCy + 3, lampCx - coneSpread, gy - 2, lampCx + coneSpread, gy - 2);
     lampConeGfx.setAlpha(0);
     lampConeGfx.setBlendMode(Phaser.BlendModes.ADD);
     this.add(lampConeGfx);
