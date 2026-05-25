@@ -65,18 +65,16 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
 
     // ── Sign bulb lights ──────────────────────────────────────────────────────
     const bulbs: Array<{ px: number; py: number }> = [];
-    // Top and bottom edges (every 8px, corners included)
-    for (let i = 0; i <= 6; i++) {
-      const bx = bX + Math.round((i / 6) * bW);
+    // Top and bottom edges (every 12px, corners included)
+    for (let i = 0; i <= 4; i++) {
+      const bx = bX + Math.round((i / 4) * bW);
       bulbs.push({ px: bx, py: bY - 1 });
       bulbs.push({ px: bx, py: bY + bH + 1 });
     }
-    // Left and right edges (2 inner positions, corners excluded)
-    for (let j = 1; j <= 2; j++) {
-      const by = bY + Math.round((j / 3) * bH);
-      bulbs.push({ px: bX - 1,      py: by });
-      bulbs.push({ px: bX + bW + 1, py: by });
-    }
+    // Left and right edges (midpoint only)
+    const midY = bY + Math.round(bH / 2);
+    bulbs.push({ px: bX - 1,      py: midY });
+    bulbs.push({ px: bX + bW + 1, py: midY });
 
     const bulbGfx = scene.add.graphics();
     for (const { px, py } of bulbs) {
