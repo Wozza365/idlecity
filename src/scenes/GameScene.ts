@@ -261,7 +261,7 @@ export class GameScene extends Phaser.Scene {
     this.roadUI = new RoadUI(
       this,
       this.state.road,
-      this.panelTop,
+      this.panelTop + STATS_BAR_H,
       this.scale.width,
       () => this.onRoadUpgrade()
     );
