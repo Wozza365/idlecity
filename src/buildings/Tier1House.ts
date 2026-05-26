@@ -422,7 +422,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
       });
       this.nextSmoke = now + 200 + Math.random() * 150;
     }
-    for (const p of this.smokeParticles) { p.y -= 0.35; p.x += p.dx; p.alpha -= 0.006; }
+    for (const p of this.smokeParticles) { p.y -= 0.18; p.x += p.dx; p.alpha -= 0.006; }
     for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
       if (this.smokeParticles[i].alpha <= 0) this.smokeParticles.splice(i, 1);
     }
