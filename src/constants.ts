@@ -35,8 +35,12 @@ export function upgradeCost(level: number): number {
 
 export function buildingHeight(level: number): number {
   if (level <= 15) return PLOT_BASE_HEIGHT;
-  const clamped = Math.max(1, Math.min(level, MAX_LEVEL));
-  return PLOT_BASE_HEIGHT + (clamped - 1) * HEIGHT_PER_LEVEL;
+  if (level <= 25) return PLOT_BASE_HEIGHT + 15 * HEIGHT_PER_LEVEL;
+  if (level <= 40) return PLOT_BASE_HEIGHT + 25 * HEIGHT_PER_LEVEL;
+  if (level <= 55) return PLOT_BASE_HEIGHT + 40 * HEIGHT_PER_LEVEL;
+  if (level <= 70) return PLOT_BASE_HEIGHT + 55 * HEIGHT_PER_LEVEL;
+  if (level <= 85) return PLOT_BASE_HEIGHT + 70 * HEIGHT_PER_LEVEL;
+  return PLOT_BASE_HEIGHT + 85 * HEIGHT_PER_LEVEL;
 }
 
 // Tiered income: each tier has a fixed increment per level, with the rate and base compounding.
