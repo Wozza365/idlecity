@@ -165,16 +165,23 @@ export class Townhouse extends Phaser.GameObjects.Container {
     // ── Door ─────────────────────────────────────────────────────
     const dy = bodyBot - dh;
 
-    // Lv 29+: triangular door pediment
+    // Lv 29+: stone quoins at corners
     if (level >= 29) {
-      const portW = dw + 14;
-      const portX = dx - 7;
-      gfx.fillStyle(0xd0c4b0, 1);
-      gfx.fillRect(portX, dy - 7, portW, 5);
-      gfx.fillStyle(0xe0d8c4, 1);
-      gfx.fillTriangle(portX, dy - 7, portX + portW, dy - 7, portX + Math.round(portW / 2), dy - 14);
-      gfx.lineStyle(1, 0xb0a080, 1);
-      gfx.moveTo(portX, dy - 7).lineTo(portX + Math.round(portW / 2), dy - 14).lineTo(portX + portW, dy - 7).strokePath();
+      const qW = 8;
+      const heights = [10, 6];
+      let qy = bodyTop;
+      let i  = 0;
+      while (qy < bodyBot) {
+        const qh = Math.min(heights[i % 2], bodyBot - qy);
+        gfx.fillStyle(0xd8ccb0, 1);
+        gfx.fillRect(bx,              qy, qW, qh);
+        gfx.fillRect(bx + bw - qW,    qy, qW, qh);
+        gfx.fillStyle(0xb8ac90, 1);
+        gfx.fillRect(bx + qW,         qy, 1,  qh);
+        gfx.fillRect(bx + bw - qW - 1, qy, 1, qh);
+        qy += qh + 4;
+        i++;
+      }
     }
 
     // Lv 38+: fanlight
