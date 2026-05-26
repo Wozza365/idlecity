@@ -165,22 +165,24 @@ export class Townhouse extends Phaser.GameObjects.Container {
     // ── Door ─────────────────────────────────────────────────────
     const dy = bodyBot - dh;
 
-    // Lv 29+: stone quoins at corners
+    // Lv 29+: flower boxes along building base
     if (level >= 29) {
-      const qW = 8;
-      const heights = [10, 6];
-      let qy = bodyTop;
-      let i  = 0;
-      while (qy < bodyBot) {
-        const qh = Math.min(heights[i % 2], bodyBot - qy);
-        gfx.fillStyle(0xd8ccb0, 1);
-        gfx.fillRect(bx,              qy, qW, qh);
-        gfx.fillRect(bx + bw - qW,    qy, qW, qh);
-        gfx.fillStyle(0xb8ac90, 1);
-        gfx.fillRect(bx + qW,         qy, 1,  qh);
-        gfx.fillRect(bx + bw - qW - 1, qy, 1, qh);
-        qy += qh + 4;
-        i++;
+      const boxColors = [0xcc2222, 0xffcc00, 0xdd44aa, 0xff6600, 0x44aa44];
+      const boxW = 10, boxH = 5;
+      const boxY = buildGY - boxH - 1;
+      let bxPos = bx + 4;
+      let ci = 0;
+      while (bxPos + boxW <= bx + bw - 4) {
+        gfx.fillStyle(0x5a3818, 1);
+        gfx.fillRect(bxPos, boxY, boxW, boxH);
+        gfx.fillStyle(boxColors[ci % boxColors.length], 1);
+        gfx.fillCircle(bxPos + 2, boxY - 1, 3);
+        gfx.fillCircle(bxPos + 5, boxY - 2, 3);
+        gfx.fillCircle(bxPos + 8, boxY - 1, 3);
+        gfx.fillStyle(0x2a6018, 1);
+        gfx.fillRect(bxPos + 4, boxY - 3, 2, 3);
+        bxPos += boxW + 3;
+        ci++;
       }
     }
 
