@@ -90,6 +90,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     for (let f = 0; f < nFloors; f++) {
       const wy = bodyBot - (f + 1) * actualFH + Math.round((actualFH - wh) / 2);
       if (wy < bodyTop + 2 || wy + wh > bodyBot - 2) continue;
+      if (f === 0) continue;
 
       for (const wxx of [wx1, wx2]) {
         // Lv 27+: shutters
