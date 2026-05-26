@@ -23,7 +23,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
 
     const w       = plotWidth;
-    const h       = buildingHeight(level);
+    const h       = buildingHeight(level) - FLOOR_H;
     const bw      = Math.round(w * 0.78);
     const bx      = x + Math.round((w - bw) / 2);
     const buildGY = groundY - YARD_H;
@@ -47,12 +47,22 @@ export class Townhouse extends Phaser.GameObjects.Container {
     gfx.moveTo(bx, bodyBot).lineTo(bx + bw, bodyBot).strokePath();
 
     // ── Parapet/cornice ───────────────────────────────────────────
-    gfx.fillStyle(0x9a8870, 1);
+    // Cornice base band
+    gfx.fillStyle(0xb8ac90, 1);
     gfx.fillRect(bx, top, bw, PARAPET_H);
-    gfx.fillStyle(0xd0c4b0, 1);
-    gfx.fillRect(bx - 1, top, bw + 2, 3);
-    gfx.fillStyle(0x7a6850, 1);
+    // Stepped overhang
+    gfx.fillStyle(0xc8bc9e, 1);
+    gfx.fillRect(bx - 2, top + 3, bw + 4, 5);
+    // Coping stones (top, widest overhang, lightest)
+    gfx.fillStyle(0xe0d4bc, 1);
+    gfx.fillRect(bx - 3, top, bw + 6, 4);
+    // Shadow under coping
+    gfx.fillStyle(0x807060, 1);
+    gfx.fillRect(bx - 3, top + 4, bw + 6, 1);
+    // Base shadow where parapet meets brick
+    gfx.fillStyle(0x8a2818, 0.3);
     gfx.fillRect(bx, top + PARAPET_H - 1, bw, 1);
+
 
     // ── Sidewalk ──────────────────────────────────────────────────
     gfx.fillStyle(0xc8b898, 1);
@@ -80,12 +90,12 @@ export class Townhouse extends Phaser.GameObjects.Container {
     }
 
     // ── Windows: 2 per floor ──────────────────────────────────────
-    const ww    = Math.round(bw * 0.18);
-    const wh    = Math.round(ww * 1.35);
-    const wx1   = bx + Math.round(bw * 0.18);
-    const wx2   = bx + Math.round(bw * 0.60);
+    const ww    = Math.round(bw * 0.38);
+    const wh    = Math.round(bw * 0.17);
+    const gap   = Math.round((bw - 2 * ww) / 3);
+    const wx1   = bx + gap;
+    const wx2   = bx + bw - gap - ww;
     const sw    = Math.round(ww * 0.35);
-    const sashH = Math.round(wh / 2) - 1;
 
     for (let f = 0; f < nFloors; f++) {
       const wy = bodyBot - (f + 1) * actualFH + Math.round((actualFH - wh) / 2);
@@ -126,16 +136,38 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
         this.windowRects.push({ wx: wxx, wy, ww, wh });
         this.windowLights.push(
-          scene.lights.addLight(wxx + ww / 2, wy + sashH / 2,           44, 0xffaa44, 0),
-          scene.lights.addLight(wxx + ww / 2, wy + sashH + (wh - sashH) / 2, 44, 0xffaa44, 0),
+          scene.lights.addLight(wxx + Math.round(ww * 0.25), wy + wh / 2, 92, 0xffaa44, 0),
+          scene.lights.addLight(wxx + Math.round(ww * 0.75), wy + wh / 2, 92, 0xffaa44, 0),
+        );
+      }
+    }
+
+    // ── Ground floor window (left of door) ───────────────────────
+    const dw = Math.round(bw * 0.20);
+    const dh = Math.round(actualFH * 0.82);
+    const dx = bx + Math.round(bw * 0.65) - 3;
+    {
+      const gfWx = wx1;
+      const gfWy = bodyBot - actualFH + Math.round((actualFH - wh) / 2);
+      if (gfWy >= bodyTop + 2 && gfWy + wh <= bodyBot - 2) {
+        // Surround
+        gfx.fillStyle(0xffffff, 1);
+        gfx.fillRect(gfWx - 2, gfWy - 2, ww + 4, wh + 4);
+        if (level >= 28) {
+          gfx.fillStyle(0xd0c4b0, 1);
+          gfx.fillRect(gfWx - 3, gfWy + wh + 2, ww + 6, 3);
+          gfx.fillStyle(0xb0a080, 1);
+          gfx.fillRect(gfWx - 3, gfWy + wh + 5, ww + 6, 1);
+        }
+        this.windowRects.push({ wx: gfWx, wy: gfWy, ww, wh });
+        this.windowLights.push(
+          scene.lights.addLight(gfWx + Math.round(ww * 0.25), gfWy + wh / 2, 92, 0xffaa44, 0),
+          scene.lights.addLight(gfWx + Math.round(ww * 0.75), gfWy + wh / 2, 92, 0xffaa44, 0),
         );
       }
     }
 
     // ── Door ─────────────────────────────────────────────────────
-    const dw = Math.round(bw * 0.20);
-    const dh = Math.round(actualFH * 0.82);
-    const dx = bx + Math.round((bw - dw) / 2);
     const dy = bodyBot - dh;
 
     // Lv 29+: triangular door pediment
@@ -316,13 +348,9 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
     gfx.clear();
     for (const { wx, wy, ww, wh } of this.windowRects) {
-      const sashH = Math.round(wh / 2) - 1;
       gfx.fillStyle(lerpColor(0x8ab4cc, 0xffcc66, t), 1);
-      gfx.fillRect(wx, wy, ww, sashH);
-      gfx.fillStyle(lerpColor(0x9ec2d8, 0xffcc66, t), 1);
-      gfx.fillRect(wx, wy + sashH + 2, ww, wh - sashH - 2);
+      gfx.fillRect(wx, wy, ww, wh);
       gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(wx, wy + sashH, ww, 2);
       gfx.fillRect(wx + Math.round(ww / 2) - 1, wy, 2, wh);
     }
   }
