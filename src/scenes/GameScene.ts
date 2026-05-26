@@ -271,7 +271,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onAddGold(): void {
-    this.state.gold += 10_000_000;
+    this.state.gold += 1_000_000_000;
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
   }

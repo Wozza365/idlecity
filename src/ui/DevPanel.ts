@@ -28,7 +28,7 @@ export class DevPanel {
       .setInteractive({ useHandCursor: true });
     container.add(btn1);
     container.add(
-      scene.add.text(leftX, row1Y, '+$100K', { fontSize: '13px', color: '#88ff88', fontFamily: UI_FONT }).setOrigin(0.5)
+      scene.add.text(leftX, row1Y, '+$1B', { fontSize: '13px', color: '#88ff88', fontFamily: UI_FONT }).setOrigin(0.5)
     );
     btn1.on('pointerover', () => btn1.setFillStyle(0x285e00));
     btn1.on('pointerout', () => btn1.setFillStyle(0x1a4400));
