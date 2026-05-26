@@ -95,7 +95,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     const gap   = Math.round((bw - 2 * ww) / 3);
     const wx1   = bx + gap;
     const wx2   = bx + bw - gap - ww;
-    const sw    = Math.round(ww * 0.35);
+    const sw    = Math.round(ww * 0.20);
 
     for (let f = 0; f < nFloors; f++) {
       const wy = bodyBot - (f + 1) * actualFH + Math.round((actualFH - wh) / 2);
@@ -108,11 +108,6 @@ export class Townhouse extends Phaser.GameObjects.Container {
           gfx.fillStyle(0x285020, 1);
           gfx.fillRect(wxx - sw - 2, wy, sw, wh);
           gfx.fillRect(wxx + ww + 2, wy, sw, wh);
-          gfx.lineStyle(1, 0x1a3010, 0.5);
-          for (let sl = 3; sl < wh; sl += 4) {
-            gfx.moveTo(wxx - sw - 2, wy + sl).lineTo(wxx - 2, wy + sl).strokePath();
-            gfx.moveTo(wxx + ww + 2, wy + sl).lineTo(wxx + ww + 2 + sw, wy + sl).strokePath();
-          }
         }
 
         // Lv 34+: stone keystone
