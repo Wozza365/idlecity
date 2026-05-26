@@ -331,19 +331,21 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Flagpole (preview — always shown) ─────────────────────────
-    const fpX   = bx + Math.round(bw / 2);
-    const fpTop = top - 30;
-    gfx.fillStyle(0xa0a0a8, 1);
-    gfx.fillRect(fpX - 1, fpTop, 2, 30);
-    gfx.fillStyle(0xd0d0d8, 1);
-    gfx.fillRect(fpX - 1, fpTop, 2, 2);
+    // ── Lv 30+: flagpole ─────────────────────────────────────────
+    if (level >= 30) {
+      const fpX   = bx + Math.round(bw / 2);
+      const fpTop = top - 30;
+      gfx.fillStyle(0xa0a0a8, 1);
+      gfx.fillRect(fpX - 1, fpTop, 2, 30);
+      gfx.fillStyle(0xd0d0d8, 1);
+      gfx.fillRect(fpX - 1, fpTop, 2, 2);
 
-    const flagGfx = scene.add.graphics();
-    this.add(flagGfx);
-    this.flagGfx   = flagGfx;
-    this.flagPoleX = fpX;
-    this.flagTop   = fpTop;
+      const flagGfx = scene.add.graphics();
+      this.add(flagGfx);
+      this.flagGfx   = flagGfx;
+      this.flagPoleX = fpX;
+      this.flagTop   = fpTop;
+    }
 
     // ── Lamp cone ─────────────────────────────────────────────────
     const lampConeGfx = scene.add.graphics();
