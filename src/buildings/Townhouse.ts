@@ -17,6 +17,9 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private windowLights:   Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
+  private flagGfx:        Phaser.GameObjects.Graphics | null = null;
+  private flagPoleX = 0;
+  private flagTop   = 0;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
@@ -328,6 +331,20 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
+    // ── Flagpole (preview — always shown) ─────────────────────────
+    const fpX   = bx + Math.round(bw / 2);
+    const fpTop = top - 30;
+    gfx.fillStyle(0xa0a0a8, 1);
+    gfx.fillRect(fpX - 1, fpTop, 2, 30);
+    gfx.fillStyle(0xd0d0d8, 1);
+    gfx.fillRect(fpX - 1, fpTop, 2, 2);
+
+    const flagGfx = scene.add.graphics();
+    this.add(flagGfx);
+    this.flagGfx   = flagGfx;
+    this.flagPoleX = fpX;
+    this.flagTop   = fpTop;
+
     // ── Lamp cone ─────────────────────────────────────────────────
     const lampConeGfx = scene.add.graphics();
     lampConeGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
@@ -356,6 +373,30 @@ export class Townhouse extends Phaser.GameObjects.Container {
     for (const light of this.windowLights) light.intensity = t * 0.375;
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
+    if (this.flagGfx) this.drawFlag(this.flagGfx, this.scene.time.now / 1000);
+  }
+
+  private drawFlag(gfx: Phaser.GameObjects.Graphics, time: number): void {
+    gfx.clear();
+    const fx = this.flagPoleX + 1;
+    const fy = this.flagTop;
+    const fw = 16, fh = 10;
+    // Wave: right edge oscillates, mid point follows
+    const wave = Math.sin(time * 4) * 2;
+    const mid  = Math.sin(time * 4 + 1) * 1.2;
+    // Draw flag as two triangles forming a wavy quad
+    // top-left, bottom-left, bottom-right, top-right
+    const tlx = fx,      tly = fy;
+    const blx = fx,      bly = fy + fh;
+    const brx = fx + fw, bry = fy + fh + wave;
+    const trx = fx + fw, try_ = fy + wave;
+    const mcx = fx + Math.round(fw / 2), mcy_t = fy + mid, mcy_b = fy + fh + mid;
+    gfx.fillStyle(0xcc2222, 1);
+    gfx.fillTriangle(tlx, tly, blx, bly, mcx, mcy_b);
+    gfx.fillTriangle(tlx, tly, mcx, mcy_b, mcx, mcy_t);
+    gfx.fillStyle(0xee4444, 1);
+    gfx.fillTriangle(mcx, mcy_t, mcx, mcy_b, brx, bry);
+    gfx.fillTriangle(mcx, mcy_t, brx, bry, trx, try_);
   }
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
