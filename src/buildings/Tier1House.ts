@@ -13,8 +13,14 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
-  private lampConeGfx: Phaser.GameObjects.Graphics | null = null;
+  private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
+  private smokeGfx:       Phaser.GameObjects.Graphics | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number; upperDay: number; lowerDay: number }> = [];
+  private smokeParticles: Array<{ x: number; y: number; alpha: number; dx: number }> = [];
+  private chimneyX    = 0;
+  private chimneyTopY = 0;
+  private nextSmoke   = 0;
+  private lightPhases: number[] = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -71,6 +77,8 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const cw          = Math.round(bw * 0.10);
     const chx         = bx + Math.round(bw * 0.67);
     const chimneyTopY = top - roofH - 2;
+    this.chimneyX     = chx + Math.round(cw / 2);
+    this.chimneyTopY  = chimneyTopY;
     gfx.fillStyle(0x9a3e2e, 1);
     gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
 
@@ -379,6 +387,12 @@ export class Tier1House extends Phaser.GameObjects.Container {
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
 
+    const smokeGfx = scene.add.graphics();
+    this.add(smokeGfx);
+    this.smokeGfx = smokeGfx;
+
+    this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) {
         scene.lights.removeLight(light);
@@ -387,15 +401,37 @@ export class Tier1House extends Phaser.GameObjects.Container {
   }
 
   updateWindowLights(elevation: number): void {
-    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
-    for (const light of this.windowLights) {
-      light.intensity = t * 0.375;
+    const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    const time = this.scene.time.now / 1000;
+
+    this.windowLights.forEach((light, i) => {
+      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
+      light.intensity = t * 0.375 * flicker;
+    });
+    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
+    if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
+
+    // Chimney smoke
+    const now = this.scene.time.now;
+    if (now > this.nextSmoke) {
+      this.smokeParticles.push({
+        x: this.chimneyX + (Math.random() - 0.5) * 2,
+        y: this.chimneyTopY,
+        alpha: 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
+      });
+      this.nextSmoke = now + 900 + Math.random() * 600;
     }
-    if (this.windowGlassGfx) {
-      this.drawWindowGlass(this.windowGlassGfx, t);
+    for (const p of this.smokeParticles) { p.y -= 0.35; p.x += p.dx; p.alpha -= 0.006; }
+    for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
+      if (this.smokeParticles[i].alpha <= 0) this.smokeParticles.splice(i, 1);
     }
-    if (this.lampConeGfx) {
-      this.lampConeGfx.setAlpha(t * 0.45);
+    if (this.smokeGfx) {
+      this.smokeGfx.clear();
+      for (const p of this.smokeParticles) {
+        this.smokeGfx.fillStyle(0xb8b8b8, p.alpha);
+        this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), 2);
+      }
     }
   }
 

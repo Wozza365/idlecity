@@ -20,6 +20,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private flagGfx:        Phaser.GameObjects.Graphics | null = null;
   private flagPoleX = 0;
   private flagTop   = 0;
+  private lightPhases: number[] = [];
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
@@ -365,17 +366,27 @@ export class Townhouse extends Phaser.GameObjects.Container {
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
 
+    this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
     });
   }
 
   updateWindowLights(elevation: number): void {
-    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
-    for (const light of this.windowLights) light.intensity = t * 0.375;
+    const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    const time = this.scene.time.now / 1000;
+
+    this.windowLights.forEach((light, i) => {
+      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
+      light.intensity = t * 0.375 * flicker;
+    });
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
-    if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
-    if (this.flagGfx) this.drawFlag(this.flagGfx, this.scene.time.now / 1000);
+    if (this.lampConeGfx) {
+      const pulse = 1 + Math.sin(time * 1.8) * 0.08;
+      this.lampConeGfx.setAlpha(t * 0.45 * pulse);
+    }
+    if (this.flagGfx) this.drawFlag(this.flagGfx, time);
   }
 
   private drawFlag(gfx: Phaser.GameObjects.Graphics, time: number): void {

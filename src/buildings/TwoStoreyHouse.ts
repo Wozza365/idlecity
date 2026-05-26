@@ -12,13 +12,21 @@ function lerpColor(a: number, b: number, t: number): number {
 const BODY_H = 88;
 
 export class TwoStoreyHouse extends Phaser.GameObjects.Container {
-  private windowLights: Phaser.GameObjects.Light[] = [];
+  private windowLights:   Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
-  private lampConeGfx: Phaser.GameObjects.Graphics | null = null;
+  private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
+  private smokeGfx:       Phaser.GameObjects.Graphics | null = null;
+  private catGfx:         Phaser.GameObjects.Graphics | null = null;
   private windowRects: Array<{
     wx: number; wy: number; ww: number; wh: number;
     sashH: number; halfWw: number; upperDay: number; lowerDay: number;
   }> = [];
+  private smokeParticles: Array<{ x: number; y: number; alpha: number; dx: number }> = [];
+  private chimneyX    = 0;
+  private chimneyTopY = 0;
+  private nextSmoke   = 0;
+  private catWx = 0; private catWy = 0; private catWw = 0; private catWh = 0;
+  private lightPhases: number[] = [];
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -73,6 +81,8 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const cw          = Math.round(bw * 0.10);
     const chx         = bx + Math.round(bw * 0.67);
     const chimneyTopY = top - roofH - 2;
+    this.chimneyX    = chx + Math.round(cw / 2);
+    this.chimneyTopY = chimneyTopY;
     gfx.fillStyle(0x9a3e2e, 1);
     gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
 
@@ -136,6 +146,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const wx1  = bx + Math.round(bw * 0.16);
     const wx2  = bx + Math.round(bw * 0.66);
     const wyUp = top + Math.round((upperH - wh) / 2);
+    this.catWx = wx2; this.catWy = wyUp; this.catWw = ww; this.catWh = wh;
     const groundH = bodyH - upperH - 6; // subtract string course
     const wyLo = floorDivY + 6 + Math.round((groundH - wh) / 2);
 
@@ -369,16 +380,70 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
 
+    const smokeGfx = scene.add.graphics();
+    this.add(smokeGfx);
+    this.smokeGfx = smokeGfx;
+
+    const catGfx = scene.add.graphics();
+    this.add(catGfx);
+    this.catGfx = catGfx;
+
+    this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
     });
   }
 
   updateWindowLights(elevation: number): void {
-    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
-    for (const light of this.windowLights) light.intensity = t * 0.375;
+    const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    const time = this.scene.time.now / 1000;
+
+    this.windowLights.forEach((light, i) => {
+      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
+      light.intensity = t * 0.375 * flicker;
+    });
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
+
+    // Chimney smoke
+    const now = this.scene.time.now;
+    if (now > this.nextSmoke) {
+      this.smokeParticles.push({
+        x: this.chimneyX + (Math.random() - 0.5) * 2,
+        y: this.chimneyTopY,
+        alpha: 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
+      });
+      this.nextSmoke = now + 850 + Math.random() * 550;
+    }
+    for (const p of this.smokeParticles) { p.y -= 0.35; p.x += p.dx; p.alpha -= 0.006; }
+    for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
+      if (this.smokeParticles[i].alpha <= 0) this.smokeParticles.splice(i, 1);
+    }
+    if (this.smokeGfx) {
+      this.smokeGfx.clear();
+      for (const p of this.smokeParticles) {
+        this.smokeGfx.fillStyle(0xb8b8b8, p.alpha);
+        this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), 2);
+      }
+    }
+
+    // Cat silhouette — appears in upper-right window periodically
+    if (this.catGfx) {
+      this.catGfx.clear();
+      if (Math.sin(time * 0.35 + 1.2) > 0.75) {
+        const cx = this.catWx + Math.round(this.catWw * 0.65);
+        const cy = this.catWy + Math.round(this.catWh * 0.55);
+        this.catGfx.fillStyle(0x181010, 0.85);
+        this.catGfx.fillRect(cx - 2, cy - 2, 5, 4);                              // body
+        this.catGfx.fillRect(cx - 1, cy - 5, 4, 3);                              // head
+        this.catGfx.fillTriangle(cx - 1, cy - 5, cx,     cy - 7, cx + 1, cy - 5); // left ear
+        this.catGfx.fillTriangle(cx + 2, cy - 5, cx + 3, cy - 7, cx + 4, cy - 5); // right ear
+        this.catGfx.fillRect(cx + 3, cy - 1, 3, 2);                              // tail base
+        this.catGfx.fillRect(cx + 5, cy - 3, 2, 3);                              // tail tip
+      }
+    }
   }
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
