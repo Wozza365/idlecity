@@ -11,7 +11,7 @@ function lerpColor(a: number, b: number, t: number): number {
 
 const FOUND_H   = 8;
 const PARAPET_H = 10;
-const FLOOR_H   = 28;
+const FLOOR_H   = 36;
 
 export class Townhouse extends Phaser.GameObjects.Container {
   private windowLights:   Phaser.GameObjects.Light[] = [];
@@ -71,15 +71,17 @@ export class Townhouse extends Phaser.GameObjects.Container {
     // ── Floor dividers ────────────────────────────────────────────
     const nFloors  = Math.max(2, Math.floor(bodyH / FLOOR_H));
     const actualFH = Math.round(bodyH / nFloors);
-    gfx.lineStyle(1, 0x8a2818, 0.35);
     for (let f = 1; f < nFloors; f++) {
       const fy = bodyBot - f * actualFH;
-      gfx.moveTo(bx, fy).lineTo(bx + bw, fy).strokePath();
+      gfx.fillStyle(0x9a8870, 1);
+      gfx.fillRect(bx, fy - 1, bw, 3);
+      gfx.fillStyle(0xc8bc9e, 1);
+      gfx.fillRect(bx, fy - 1, bw, 1);
     }
 
     // ── Windows: 2 per floor ──────────────────────────────────────
     const ww    = Math.round(bw * 0.18);
-    const wh    = Math.round(ww * 1.55);
+    const wh    = Math.round(ww * 1.35);
     const wx1   = bx + Math.round(bw * 0.18);
     const wx2   = bx + Math.round(bw * 0.60);
     const sw    = Math.round(ww * 0.35);
