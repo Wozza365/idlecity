@@ -384,12 +384,15 @@ export class GameScene extends Phaser.Scene {
   // ── Plot rendering ─────────────────────────────────────────────────────────
 
   private renderPlot(index: number): Phaser.GameObjects.Container {
-    this.plotContainers[index]?.destroy();
+    const oldBuilding = this.plotContainers[index];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const savedParticles: object[] = (oldBuilding as any)?.getSmokeParticles?.() ?? [];
+    oldBuilding?.destroy();
     const x    = this.plotLeft(index);
     const plot = this.state.plots[index];
 
     const building = plot.unlocked
-      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level)
+      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level, savedParticles)
       : new EmptyPlot(this, x, this.plotWidth, this.groundY);
 
     building.setDepth(9);

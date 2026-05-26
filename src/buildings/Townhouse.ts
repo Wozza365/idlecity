@@ -18,6 +18,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private flagGfx:        Phaser.GameObjects.Graphics | null = null;
+  private flagLight:      Phaser.GameObjects.Light | null = null;
   private flagPoleX = 0;
   private flagTop   = 0;
   private lightPhases: number[] = [];
@@ -342,10 +343,12 @@ export class Townhouse extends Phaser.GameObjects.Container {
       gfx.fillRect(fpX - 1, fpTop, 2, 2);
 
       const flagGfx = scene.add.graphics();
+      flagGfx.setLighting(true);
       this.add(flagGfx);
       this.flagGfx   = flagGfx;
       this.flagPoleX = fpX;
       this.flagTop   = fpTop;
+      this.flagLight = scene.lights.addLight(fpX + 9, fpTop + 5, 40, 0xfff0cc, 0);
     }
 
     // ── Lamp cone ─────────────────────────────────────────────────
@@ -370,6 +373,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      if (this.flagLight) scene.lights.removeLight(this.flagLight);
     });
   }
 
@@ -387,6 +391,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
       this.lampConeGfx.setAlpha(t * 0.45 * pulse);
     }
     if (this.flagGfx) this.drawFlag(this.flagGfx, time);
+    if (this.flagLight) this.flagLight.intensity = t * 0.6;
   }
 
   private drawFlag(gfx: Phaser.GameObjects.Graphics, time: number): void {

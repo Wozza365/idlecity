@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { YARD_H, buildingHeight } from '../constants';
+import { YARD_H, buildingHeight, lerpColor } from '../constants';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -9,6 +9,8 @@ function lerpColor(a: number, b: number, t: number): number {
            Math.round(ab + (bb - ab) * t));
 }
 
+type SmokeParticle = { x: number; y: number; alpha: number; dx: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
+
 export class Tier1House extends Phaser.GameObjects.Container {
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
@@ -16,13 +18,15 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private smokeGfx:       Phaser.GameObjects.Graphics | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; sashH: number; halfWw: number; upperDay: number; lowerDay: number }> = [];
-  private smokeParticles: Array<{ x: number; y: number; alpha: number; dx: number }> = [];
+  private smokeParticles: SmokeParticle[] = [];
   private chimneyX    = 0;
   private chimneyTopY = 0;
   private nextSmoke   = 0;
   private lightPhases: number[] = [];
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
+  getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
+
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, initialParticles?: SmokeParticle[]) {
     super(scene, 0, 0);
 
     const w      = plotWidth;
@@ -393,6 +397,8 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
 
+    if (initialParticles?.length) this.smokeParticles = [...initialParticles];
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) {
         scene.lights.removeLight(light);
@@ -417,20 +423,29 @@ export class Tier1House extends Phaser.GameObjects.Container {
       this.smokeParticles.push({
         x: this.chimneyX + (Math.random() - 0.5) * 2,
         y: this.chimneyTopY,
-        alpha: 0.5,
-        dx: (Math.random() - 0.5) * 0.4,
+        alpha: 0,
+        dx: 0.02 + Math.random() * 0.015,
+        fadeRate: 0.0003 + Math.random() * 0.001,
+        radius: 1 + Math.floor(Math.random() * 4),
+        maxAlpha: 0,
+        color: (() => { const c = 0x7a + Math.floor(Math.random() * 40); return (c << 16) | (c << 8) | c; })(),
+        growing: true,
       });
-      this.nextSmoke = now + 200 + Math.random() * 150;
+      this.nextSmoke = now + 40 + Math.random() * 40;
     }
-    for (const p of this.smokeParticles) { p.y -= 0.07; p.x += p.dx; p.alpha -= 0.002; }
+    for (const p of this.smokeParticles) {
+      p.y -= 0.03; p.x += p.dx;
+      if (p.growing) { if (p.maxAlpha === 0) p.maxAlpha = 0.5 - (p.radius - 1) * 0.08; p.alpha += 0.04; if (p.alpha >= p.maxAlpha) { p.alpha = p.maxAlpha; p.growing = false; } }
+      else { p.alpha -= p.fadeRate; }
+    }
     for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
       if (this.smokeParticles[i].alpha <= 0) this.smokeParticles.splice(i, 1);
     }
     if (this.smokeGfx) {
       this.smokeGfx.clear();
       for (const p of this.smokeParticles) {
-        this.smokeGfx.fillStyle(0xb8b8b8, p.alpha);
-        this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), 2);
+        this.smokeGfx.fillStyle(lerpColor(p.color, 0x1a1a2e, t * 0.75), p.alpha);
+        this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), p.radius);
       }
     }
   }

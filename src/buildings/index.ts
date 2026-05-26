@@ -15,9 +15,10 @@ export function createBuilding(
   plotWidth: number,
   groundY: number,
   level: number,
+  savedParticles?: object[],
 ): Phaser.GameObjects.Container {
-  if (level <= 15) return new Tier1House(scene, x, plotWidth, groundY, level);
-  if (level <= 25) return new TwoStoreyHouse(scene, x, plotWidth, groundY, level);
+  if (level <= 15) return new Tier1House(scene, x, plotWidth, groundY, level, savedParticles as never);
+  if (level <= 25) return new TwoStoreyHouse(scene, x, plotWidth, groundY, level, savedParticles as never);
   if (level <= 40) return new Townhouse(scene, x, plotWidth, groundY, level);
   if (level <= 55) return new SmallApartment(scene, x, plotWidth, groundY, level);
   if (level <= 70) return new LargeApartment(scene, x, plotWidth, groundY, level);
