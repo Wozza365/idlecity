@@ -12,7 +12,7 @@ export class DirectionalLightTest {
     this.cx = screenW / 2;
     this.cy = groundY / 2;
 
-    this.light = scene.lights.addLight(this.cx, this.cy, 350, 0xffffff, 4);
+    this.light = scene.lights.addLight(this.cx, this.cy, 80, 0xffffff, 2);
 
     this.gfx = scene.add.graphics().setDepth(12);
     this.draw();
