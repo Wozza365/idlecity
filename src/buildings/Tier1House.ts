@@ -415,22 +415,22 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const now = this.scene.time.now;
     if (now > this.nextSmoke) {
       this.smokeParticles.push({
-        x: this.chimneyX + (Math.random() - 0.5) * 3,
+        x: this.chimneyX + (Math.random() - 0.5) * 2,
         y: this.chimneyTopY,
-        alpha: 0.7,
-        dx: (Math.random() - 0.5) * 0.7,
+        alpha: 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
       });
-      this.nextSmoke = now + 400 + Math.random() * 350;
+      this.nextSmoke = now + 200 + Math.random() * 150;
     }
-    for (const p of this.smokeParticles) { p.y -= 0.5; p.x += p.dx; p.alpha -= 0.004; }
+    for (const p of this.smokeParticles) { p.y -= 0.35; p.x += p.dx; p.alpha -= 0.006; }
     for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
       if (this.smokeParticles[i].alpha <= 0) this.smokeParticles.splice(i, 1);
     }
     if (this.smokeGfx) {
       this.smokeGfx.clear();
       for (const p of this.smokeParticles) {
-        this.smokeGfx.fillStyle(0xc0c0c0, p.alpha);
-        this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), 3);
+        this.smokeGfx.fillStyle(0xb8b8b8, p.alpha);
+        this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), 2);
       }
     }
   }
