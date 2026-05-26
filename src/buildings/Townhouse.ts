@@ -95,7 +95,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     const gap   = Math.round((bw - 2 * ww) / 3);
     const wx1   = bx + gap;
     const wx2   = bx + bw - gap - ww;
-    const sw    = Math.round(ww * 0.20);
+    const sw    = Math.round(ww * 0.12);
 
     for (let f = 0; f < nFloors; f++) {
       const wy = bodyBot - (f + 1) * actualFH + Math.round((actualFH - wh) / 2);
