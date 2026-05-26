@@ -57,9 +57,9 @@ export class DirectionalLightTest {
 
   private draw(): void {
     const lx = this.cx, ly = this.cy;
-    const gap  = 18;  // distance from light centre to near edge of each box
-    const long = 55;  // half-length of box
-    const thin = 8;   // half-thickness of box
+    const gap  = 8;   // distance from light centre to near edge of each box
+    const long = 20;  // half-length of box
+    const thin = 3;   // half-thickness of box
 
     // Top box (horizontal, above light)
     const top = { x: lx - long, y: ly - gap - thin * 2, w: long * 2, h: thin * 2 };
