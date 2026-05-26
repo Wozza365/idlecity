@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { YARD_H, lerpColor } from '../constants';
+import { YARD_H } from '../constants';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
