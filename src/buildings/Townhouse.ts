@@ -229,13 +229,22 @@ export class Townhouse extends Phaser.GameObjects.Container {
     gfx.fillRect(dx - 5, buildGY - 4, dw + 10, 4);
     gfx.fillRect(dx - 2, buildGY,     dw + 4,  3);
 
-    // ── Lv 30+: string course ─────────────────────────────────────
+    // ── Lv 30+: rooftop balustrade ────────────────────────────────
     if (level >= 30) {
-      const scY = bodyBot - Math.round(bodyH * 0.38);
-      gfx.fillStyle(0x9a8870, 1);
-      gfx.fillRect(bx - 2, scY, bw + 4, 4);
-      gfx.fillStyle(0xd0c4b0, 1);
-      gfx.fillRect(bx - 2, scY, bw + 4, 1);
+      const balY = top - 9;
+      // Bottom rail
+      gfx.fillStyle(0xc8bc9e, 1);
+      gfx.fillRect(bx - 1, balY + 7, bw + 2, 2);
+      // Top rail
+      gfx.fillStyle(0xe0d4bc, 1);
+      gfx.fillRect(bx - 1, balY, bw + 2, 2);
+      gfx.fillStyle(0xb8ac90, 1);
+      gfx.fillRect(bx - 1, balY + 2, bw + 2, 1);
+      // Balusters
+      gfx.fillStyle(0xd0c4a8, 1);
+      for (let bpx = bx + 2; bpx < bx + bw - 2; bpx += 5) {
+        gfx.fillRect(bpx, balY + 3, 2, 4);
+      }
     }
 
     // ── Lv 31+: left topiary pot ─────────────────────────────────
