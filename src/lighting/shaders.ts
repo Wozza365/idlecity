@@ -10,19 +10,27 @@
 //
 // Coordinate conventions
 // ─────────────────────────────────────────────────────────────────────────────
-// Phaser 4 framebuffer Y convention (documented in BaseFilterShader.js):
-//   "gl_FragCoord.y = 0 = bottom of framebuffer = TOP of canvas"
-//   → physical framebuffer y=0 corresponds to game y=0 (visual top).
+// Phaser 4 uses ortho(0, width, height, 0) for its projection matrix (flipY=false).
+// This maps: game y=0 (visual top) → NDC y=+1 (physical top) → texture UV y=1
+//            game y=H (visual bottom) → NDC y=-1 (physical bottom) → texture UV y=0
 //
-// Therefore in the shadow-map FBO (and any FBO Phaser renders to):
-//   UV (0, 0) = physical bottom = visual top  = game (0, 0)
-//   UV (1, 1) = physical top    = visual bottom = game (W, H)
+// Scene texture UV convention: UV (0,0) = physical bottom = game y=H (visual bottom)
+//                              UV (1,1) = physical top    = game y=0 (visual top)
 //
-// This means vUV * uResolution == game pixel coords directly — no flip needed.
+// The composite filter's outTexCoord follows the same convention:
+//   outTexCoord.y=0 = visual bottom (where the UI panel is)
+//   outTexCoord.y=1 = visual top
 //
-// The composite filter (BaseFilterShader) uses SimpleTexture-vert.js which
-// assigns texcoord (0, 0) to NDC (-1, -1) = physical bottom = visual top.
-// So outTexCoord also has y=0 at visual top, matching the shadow map UV.
+// The shadow-map FBO uses the SAME convention by mapping:
+//   POLY_VERT: game y=0 → NDC y=+1 (physical top) → UV y=1
+//              game y=H → NDC y=-1 (physical bottom) → UV y=0
+//
+// fragPos in LIGHT_DISC_FRAG/SPOT_DISC_FRAG is derived as:
+//   fragPos.x = vUV.x * W
+//   fragPos.y = (1 - vUV.y) * H   ← inverts UV y back to game y (y=0 at top)
+//
+// This means both the scene and shadow map share the same UV y direction,
+// so the composite can sample uShadowSampler with plain outTexCoord (no flip).
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Fullscreen quad vertex shader (used by light disc and spot disc) ──────────
@@ -40,7 +48,7 @@ void main() {
 
 // ── Visibility polygon vertex shader ─────────────────────────────────────────
 // Receives polygon points in game pixel coordinates (y=0 at top).
-// Maps to NDC so that game y=0 → NDC y=-1 (physical bottom = visual top).
+// Maps to NDC matching Phaser's projection: game y=0 → NDC y=+1 (physical top).
 export const POLY_VERT = /* glsl */`
 attribute vec2 aPosition;
 uniform vec2 uResolution;
@@ -48,7 +56,7 @@ uniform vec2 uResolution;
 void main() {
     vec2 ndc = vec2(
         (aPosition.x / uResolution.x) * 2.0 - 1.0,
-        (aPosition.y / uResolution.y) * 2.0 - 1.0
+        1.0 - (aPosition.y / uResolution.y) * 2.0
     );
     gl_Position = vec4(ndc, 0.0, 1.0);
 }
@@ -79,8 +87,8 @@ uniform float uIntensity;
 uniform vec2  uResolution;  // viewport width × height in pixels
 
 void main() {
-    // vUV * uResolution == game pixel position (y=0 at top) — see file header
-    vec2  fragPos = vUV * uResolution;
+    // vUV.y=0 at physical bottom (game bottom); invert to get game y (y=0 at top)
+    vec2  fragPos = vec2(vUV.x * uResolution.x, (1.0 - vUV.y) * uResolution.y);
     float dist    = length(fragPos - uLightPos) / uRadius;
     float falloff = pow(max(0.0, 1.0 - dist), 2.0);
     if (falloff < 0.002) discard;
@@ -104,7 +112,7 @@ uniform vec2  uLightDir;     // normalised direction vector in game space
 uniform float uCosHalfCone;  // cos(coneAngle / 2), pre-computed on CPU
 
 void main() {
-    vec2  fragPos  = vUV * uResolution;
+    vec2  fragPos  = vec2(vUV.x * uResolution.x, (1.0 - vUV.y) * uResolution.y);
     vec2  toFrag   = fragPos - uLightPos;
     float dist     = length(toFrag) / uRadius;
     float falloff  = pow(max(0.0, 1.0 - dist), 2.0);
@@ -123,10 +131,13 @@ void main() {
 // Inputs:
 //   uMainSampler   – scene texture (auto-bound to slot 0 by Phaser)
 //   uShadowSampler – shadow map accumulated in Pass 1 (bound to slot 1)
-// Both textures share the same UV orientation: y=0 at visual top.
+// Both textures share the same UV orientation (y=0 at visual bottom, matching Phaser).
 //
 // Output: scene.rgb × clamp(ambient + lightMap.rgb, 0, 1.5)
 // The 1.5 clamp allows slight overexposure (warm bloom) near bright lights.
+// uGameFraction = gameH / screenH.  Pixels with outTexCoord.y < (1 - uGameFraction)
+// are in the UI panel — pass them through unmodified so the UI is never
+// darkened by the night ambient multiply.
 export const COMPOSITE_FRAG = /* glsl */`
 precision mediump float;
 
@@ -134,13 +145,23 @@ uniform sampler2D uMainSampler;
 uniform sampler2D uShadowSampler;
 uniform vec3      uAmbientColor;
 uniform float     uAmbientIntensity;
+uniform float     uGameFraction;
 
 varying vec2 outTexCoord;
 
 void main() {
-    vec4 scene = texture2D(uMainSampler,  outTexCoord);
+    vec4 scene = texture2D(uMainSampler, outTexCoord);
+    if (outTexCoord.y < (1.0 - uGameFraction)) {
+        gl_FragColor = scene;
+        return;
+    }
+    // Shadow map shares the same UV convention as the scene texture — no flip needed.
     vec4 lmap  = texture2D(uShadowSampler, outTexCoord);
-    vec3 total = uAmbientColor * uAmbientIntensity + lmap.rgb;
-    gl_FragColor = vec4(scene.rgb * clamp(total, 0.0, 1.5), scene.a);
+    // Ambient uses actual scene colour (dark surfaces stay dark without lights).
+    // Light map uses a minimum reflectance floor so spotlights are visible even
+    // on near-black surfaces like road asphalt or dark sign backgrounds.
+    vec3 ambient = scene.rgb * uAmbientColor * uAmbientIntensity;
+    vec3 lit     = max(scene.rgb, vec3(0.2)) * lmap.rgb;
+    gl_FragColor = vec4(clamp(ambient + lit, 0.0, 1.5), scene.a);
 }
 `;

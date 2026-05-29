@@ -57,9 +57,18 @@ interface PolyProgram {
   uResolution: WebGLUniformLocation;
 }
 
+// Minimal WebGLTextureWrapper-compatible shim so Phaser's texture unit system
+// (WebGLTextureUnitsWrapper.bind) can bind our raw WebGLTexture via
+// texture.webGLTexture without receiving undefined.
+export interface ShadowMapTextureWrapper {
+  webGLTexture: WebGLTexture;
+  needsMipmapRegeneration: boolean;
+}
+
 // Shadow map texture + FBO for the light accumulation buffer.
 export interface ShadowMap {
   texture: WebGLTexture;
+  textureWrapper: ShadowMapTextureWrapper;
   width: number;
   height: number;
 }
@@ -136,12 +145,20 @@ export class ShadowMapRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    this.shadowMap = { texture: tex, width, height };
+    this.shadowMap = {
+      texture: tex,
+      textureWrapper: { webGLTexture: tex, needsMipmapRegeneration: false },
+      width,
+      height,
+    };
 
-    // Depth+stencil renderbuffer (required to use stencil in WebGL 1)
+    // Depth+stencil renderbuffer.
+    // WebGL 2 requires DEPTH24_STENCIL8; WebGL 1 uses DEPTH_STENCIL (with OES_packed_depth_stencil).
+    const depthStencilFmt: number =
+      (gl as unknown as WebGL2RenderingContext).DEPTH24_STENCIL8 ?? gl.DEPTH_STENCIL;
     this.depthStencilRbo = gl.createRenderbuffer()!;
     gl.bindRenderbuffer(gl.RENDERBUFFER, this.depthStencilRbo);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, width, height);
+    gl.renderbufferStorage(gl.RENDERBUFFER, depthStencilFmt, width, height);
 
     // Assemble FBO
     this.fbo = gl.createFramebuffer()!;
@@ -160,7 +177,12 @@ export class ShadowMapRenderer {
 
   // Call once per frame before renderLight() calls.
   beginFrame(): void {
-    const { gl } = this;
+    const { gl, renderer } = this;
+    // Unbind any active VAO before our raw vertex calls so we don't corrupt
+    // Phaser's named VAO objects (gl.vertexAttribPointer writes into the
+    // currently bound VAO in WebGL 2).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (renderer as any).glWrapper.updateVAO({ vao: null });
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
     gl.viewport(0, 0, this.shadowMap.width, this.shadowMap.height);
     gl.clearColor(0, 0, 0, 0);
@@ -204,15 +226,46 @@ export class ShadowMapRenderer {
     });
   }
 
+  // Spot light rendered without visibility-polygon stencil — used for lights
+  // that are embedded inside an occluder (e.g. a wall-mounted lantern).
+  // The GLSL cone math still clips the angular shape; only the polygon mask is skipped.
+  renderSpotLightNoOcclusion(light: LightSource & { type: 'spot' }): void {
+    const { gl } = this;
+    gl.disable(gl.STENCIL_TEST);
+    gl.colorMask(true, true, true, true);
+
+    const prog = this.spotProg;
+    gl.useProgram(prog.program);
+
+    const r = ((light.color >> 16) & 0xff) / 255;
+    const g = ((light.color >>  8) & 0xff) / 255;
+    const b = ( light.color        & 0xff) / 255;
+    gl.uniform2f(prog.uLightPos,    light.x, light.y);
+    gl.uniform1f(prog.uRadius,      light.radius);
+    gl.uniform3f(prog.uLightColor,  r, g, b);
+    gl.uniform1f(prog.uIntensity,   light.intensity ?? 1.0);
+    gl.uniform2f(prog.uResolution,  this.shadowMap.width, this.shadowMap.height);
+    gl.uniform2f(prog.uLightDir,    Math.cos(light.angle), Math.sin(light.angle));
+    gl.uniform1f(prog.uCosHalfCone, Math.cos(light.coneAngle / 2));
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf);
+    gl.enableVertexAttribArray(prog.aPosition);
+    gl.vertexAttribPointer(prog.aPosition, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
   // Restore Phaser's WebGL state after all lights have been rendered.
   endFrame(): void {
     const { gl, renderer } = this;
     gl.disable(gl.STENCIL_TEST);
     gl.colorMask(true, true, true, true);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // Phaser's default premultiplied
-    gl.useProgram(null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, renderer.width, renderer.height);
+    // Resync Phaser's program state cache to null so its next program.bind()
+    // call always issues gl.useProgram() instead of skipping it.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (renderer as any).glWrapper.updateBindingsProgram({ bindings: { program: null } });
   }
 
   destroy(): void {
