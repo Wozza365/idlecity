@@ -4,7 +4,7 @@ import { Car, CAR_W } from './Car';
 import { type LightSource } from '../lighting/LightingSystem';
 import { LightingSystem } from '../lighting/LightingSystem';
 
-const OFFSCREEN_BUFFER = 300;
+const OFFSCREEN_BUFFER = 600;
 const CAR_Y_OFFSET = -7;
 
 interface LaneConfig {
