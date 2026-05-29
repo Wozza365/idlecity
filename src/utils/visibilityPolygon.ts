@@ -157,6 +157,6 @@ export function computeSpotVisibilityPolygon(
 // Shift angle into [base, base + 2π).
 function normaliseAngle(angle: number, base: number): number {
   const TWO_PI = 2 * Math.PI;
-  let a = ((angle - base) % TWO_PI + TWO_PI) % TWO_PI;
+  const a = ((angle - base) % TWO_PI + TWO_PI) % TWO_PI;
   return a;
 }
