@@ -16,7 +16,7 @@ import { PanelChrome } from '../ui/PanelChrome';
 import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
 import { DevPanel } from '../ui/DevPanel';
-import { DirectionalLightTest } from '../objects/DirectionalLightTest';
+import { LightingSystem } from '../lighting/LightingSystem';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -48,7 +48,7 @@ export class GameScene extends Phaser.Scene {
   // Panel background — destroyed and recreated on resize
   private panelBg!: Phaser.GameObjects.Rectangle;
 
-  private dirLightTest: DirectionalLightTest | null = null;
+  private lightingSystem: LightingSystem | null = null;
 
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
@@ -140,8 +140,15 @@ export class GameScene extends Phaser.Scene {
       this.plotContainers[i] = this.renderPlot(i);
     }
 
-    this.dirLightTest?.destroy(this);
-    this.dirLightTest = new DirectionalLightTest(this, width, this.groundY);
+    this.lightingSystem?.destroy();
+    this.lightingSystem = new LightingSystem(this, this.groundY);
+    this.lightingSystem.addLight({
+      x: width / 2,
+      y: this.groundY - 60,
+      radius: 280,
+      color: 0xffaa44,
+      intensity: 1.5,
+    });
 
     this.panelChrome.draw(width, height, this.panelTop, this.colTop, this.sectionW);
 
@@ -324,7 +331,7 @@ export class GameScene extends Phaser.Scene {
       if (isWindowLightable(c)) c.updateWindowLights(elev);
     }
     this.devPanel?.updateClock(this.gameTimeString());
-    this.dirLightTest?.update();
+    this.lightingSystem?.update(this.sunAngle);
   }
 
   private advanceTime(): void {
