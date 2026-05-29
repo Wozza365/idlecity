@@ -308,9 +308,14 @@ export class GameScene extends Phaser.Scene {
     this.state.road.level = Math.min(this.state.road.level + 1, 10);
     this.road.render(this.state.road.level, this.scale.width, this.groundY);
     if (this.carManager && this.lightingSystem) {
-      this.carManager.detachLights(this.lightingSystem);
-      this.carManager.rebuild(this.state.road.level, this.groundY);
-      this.carManager.attachLights(this.lightingSystem);
+      if (this.carManager.needsRebuild(this.state.road.level)) {
+        this.carManager.detachLights(this.lightingSystem);
+        this.carManager.rebuild(this.state.road.level, this.groundY);
+        this.carManager.attachLights(this.lightingSystem);
+      } else {
+        const added = this.carManager.upgradeInPlace(this.state.road.level, this.groundY);
+        for (const l of added) this.lightingSystem.addLight(l);
+      }
     }
     this.roadUI.destroy();
     this.roadUI = new RoadUI(

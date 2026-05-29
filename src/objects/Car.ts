@@ -18,7 +18,7 @@ export class Car {
   private readonly rect: Phaser.GameObjects.Rectangle;
   private x: number;
   private readonly y: number;
-  private readonly speed: number;
+  private speed: number;
   private readonly direction: 1 | -1;
   private readonly sceneWidth: number;
   private readonly offscreenBuffer: number;
@@ -90,6 +90,10 @@ export class Car {
     this.tailGlow.y = this.y;
     this.tailBeam.x = tailX;
     this.tailBeam.y = this.y;
+  }
+
+  setSpeed(speed: number): void {
+    this.speed = speed;
   }
 
   destroy(): void {

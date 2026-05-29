@@ -15,10 +15,10 @@ import { LightingComposite, type AmbientState } from './LightingComposite';
 // ── Light source types ─────────────────────────────────────────────────────
 
 export type LightSource =
-  | { type?: 'point'; x: number; y: number; radius: number; color: number; intensity?: number }
+  | { type?: 'point'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean }
   | { type: 'spot';   x: number; y: number; radius: number; color: number;
-      angle: number; coneAngle: number; intensity?: number }
-  | { type: 'window'; x: number; y: number; radius: number; color: number; intensity?: number };
+      angle: number; coneAngle: number; intensity?: number; noOcclusion?: boolean }
+  | { type: 'window'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean };
 
 interface HasOutlinePoints {
   getOutlinePoints(): Array<{ x: number; y: number }>;
@@ -50,14 +50,14 @@ function ambientFromElevation(elevation: number): AmbientState {
     // Twilight → deep night
     const t = (e + 0.2) / 0.2;
     return {
-      r: lerp(0.03, 0.3, t),
-      g: lerp(0.05, 0.25, t),
-      b: lerp(0.12, 0.4, t),
+      r: lerp(0.68, 0.3, t),
+      g: lerp(0.72, 0.25, t),
+      b: lerp(0.87, 0.4, t),
       intensity: lerp(1.0, 0.35, t),
     };
   } else {
     // Full night
-    return { r: 0.03, g: 0.05, b: 0.12, intensity: 1.0 };
+    return { r: 0.68, g: 0.72, b: 0.87, intensity: 1.0 };
   }
 }
 
@@ -79,8 +79,16 @@ export class LightingSystem {
     const { width, height } = scene.scale;
     const gameH = height - UI_HEIGHT;
 
-    this.shadowRenderer = new ShadowMapRenderer(scene, width, gameH);
-    this.composite = new LightingComposite(scene, this.shadowRenderer.shadowMap);
+    // Shadow map must match the camera output size (full screen) so that the
+    // composite filter's UV coordinates align 1:1 with the shadow map.
+    // Lights are positioned in game pixel coords (y=0 at top), which maps
+    // directly into the full-height FBO.
+    this.shadowRenderer = new ShadowMapRenderer(scene, width, height);
+    this.composite = new LightingComposite(
+      scene,
+      this.shadowRenderer.shadowMap,
+      gameH / height,  // fraction of screen that is game area (not UI)
+    );
 
     // Kick off with full-day ambient so first frame is correct.
     this.composite.setAmbient({ r: 1.0, g: 0.95, b: 0.85, intensity: 1.0 });
@@ -104,7 +112,11 @@ export class LightingSystem {
 
     this.shadowRenderer.beginFrame();
     for (const light of this.lights) {
-      if (light.type === 'spot') {
+      if (light.noOcclusion) {
+        if (light.type === 'spot') {
+          this.shadowRenderer.renderSpotLightNoOcclusion(light);
+        }
+      } else if (light.type === 'spot') {
         const poly = computeSpotVisibilityPolygon(
           { x: light.x, y: light.y },
           light.angle,

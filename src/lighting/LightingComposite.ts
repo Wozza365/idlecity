@@ -27,7 +27,7 @@ export class LightingComposite {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly renderNodes: any;
 
-  constructor(scene: Phaser.Scene, shadowMap: ShadowMap) {
+  constructor(scene: Phaser.Scene, shadowMap: ShadowMap, gameFraction: number) {
     this.camera = scene.cameras.main;
     const renderer = scene.renderer as AnyObj;
     this.renderNodes = renderer.renderNodes;
@@ -50,12 +50,14 @@ export class LightingComposite {
 
     // Bind the shadow map texture to slot 1 in the textures array.
     // textures[0] = scene (auto-populated by BaseFilterShader.run)
+    // Must use textureWrapper (has .webGLTexture) — raw WebGLTexture won't work
+    // because WebGLTextureUnitsWrapper.bind() reads texture.webGLTexture.
     node.setupTextures = (
       _controller: AnyObj,
       textures: AnyObj[],
       _drawingContext: AnyObj,
     ) => {
-      textures[1] = shadowMap.texture;
+      textures[1] = shadowMap.textureWrapper;
     };
 
     // Set shader uniforms from controller's ambient state.
@@ -67,6 +69,7 @@ export class LightingComposite {
       pm.setUniform('uShadowSampler', 1);
       pm.setUniform('uAmbientColor', [controller.ambientR, controller.ambientG, controller.ambientB]);
       pm.setUniform('uAmbientIntensity', controller.ambientIntensity);
+      pm.setUniform('uGameFraction', controller.gameFraction);
     };
 
     this.renderNodes.addNode(NODE_NAME, node);
@@ -77,6 +80,7 @@ export class LightingComposite {
     (this.controller as AnyObj).ambientG = 0.95;
     (this.controller as AnyObj).ambientB = 0.85;
     (this.controller as AnyObj).ambientIntensity = 1.0;
+    (this.controller as AnyObj).gameFraction = gameFraction;
 
     // Attach to camera's external filter list.
     this.camera.filters!.external.add(this.controller);

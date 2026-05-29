@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
+import { type LightSource } from '../lighting/LightingSystem';
+import { SoftSpotLight } from '../lighting/SoftSpotLight';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -23,6 +25,11 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private chimneyTopY = 0;
   private nextSmoke   = 0;
   private lightPhases: number[] = [];
+  private porchSoftLight: SoftSpotLight | null = null;
+
+  get extraLights(): LightSource[] {
+    return this.porchSoftLight ? this.porchSoftLight.beams : [];
+  }
 
   getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
 
@@ -217,12 +224,12 @@ export class Tier1House extends Phaser.GameObjects.Container {
     if (level >= 9) {
       const lx = dx + Math.round(dw / 2);
       gfx.fillStyle(0x404038, 1);
-      gfx.fillRect(lx - 3, dy - 10, 6, 8);
+      gfx.fillRect(lx - 4, dy - 13, 8, 6);
       gfx.fillStyle(0xffdd88, 1);
-      gfx.fillRect(lx - 2, dy - 9, 4, 6);
+      gfx.fillRect(lx - 3, dy - 12, 6, 4);
       gfx.fillStyle(0x606058, 1);
-      gfx.fillRect(lx - 1, dy - 2, 2, 3);
-      porchLightPos = { cx: lx, cy: dy - 6 };
+      gfx.fillRect(lx - 1, dy - 5, 2, 3);
+      porchLightPos = { cx: lx, cy: dy - 11 };
     }
 
     // ── Corner trim boards ────────────────────────────────────
@@ -362,6 +369,18 @@ export class Tier1House extends Phaser.GameObjects.Container {
     // Porch lantern point light (level 9+)
     if (porchLightPos) {
       this.windowLights.push(scene.lights.addLight(porchLightPos.cx, porchLightPos.cy, 45, 0xffcc44, 0));
+      this.porchSoftLight = new SoftSpotLight({
+        x: porchLightPos.cx,
+        y: porchLightPos.cy,
+        radius: 70,
+        color: 0xffcc44,
+        intensity: 0,
+        angle: Math.PI / 2,
+        coneAngle: (Math.PI / 18) * 3.0,
+      });
+      for (const beam of this.porchSoftLight.beams) {
+        beam.noOcclusion = true;
+      }
     }
 
     // ── Window glass overlay & lights ─────────────────────────────────────────
@@ -414,6 +433,10 @@ export class Tier1House extends Phaser.GameObjects.Container {
       const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
       light.intensity = t * 0.375 * flicker;
     });
+    if (this.porchSoftLight) {
+      const flicker = 1 + Math.sin(time * 1.3 + 1.2) * 0.08;
+      this.porchSoftLight.setIntensity(t * 2.5 * flicker);
+    }
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
 
