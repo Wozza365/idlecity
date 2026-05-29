@@ -25,7 +25,7 @@ export class Car {
 
   private readonly headlight: SoftSpotLight;
   private readonly tailGlow: LightSource;
-  private readonly tailBeam: LightSource & { type: 'spot' };
+  private readonly tailBeam: Extract<LightSource, { type: 'spot' }>;
 
   constructor(scene: Phaser.Scene, config: CarConfig) {
     const { x, y, speed, direction, sceneWidth, offscreenBuffer } = config;
