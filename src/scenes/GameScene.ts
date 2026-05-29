@@ -16,11 +16,17 @@ import { PanelChrome } from '../ui/PanelChrome';
 import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
 import { DevPanel } from '../ui/DevPanel';
-import { LightingSystem } from '../lighting/LightingSystem';
+import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
+import { SoftSpotLight } from '../lighting/SoftSpotLight';
+import { CarManager } from '../objects/CarManager';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
-  typeof (o as WindowLightable).updateWindowLights === 'function';
+  o != null && typeof (o as WindowLightable).updateWindowLights === 'function';
+
+interface HasExtraLights { extraLights: LightSource[]; }
+const hasExtraLights = (o: unknown): o is HasExtraLights =>
+  o != null && Array.isArray((o as HasExtraLights).extraLights);
 
 // ── Scene ──────────────────────────────────────────────────────────────────────
 
@@ -49,6 +55,7 @@ export class GameScene extends Phaser.Scene {
   private panelBg!: Phaser.GameObjects.Rectangle;
 
   private lightingSystem: LightingSystem | null = null;
+  private carManager: CarManager | null = null;
 
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
@@ -120,6 +127,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  update(_time: number, delta: number): void {
+    this.carManager?.update(delta);
+  }
+
   // ── Layout build / rebuild ─────────────────────────────────────────────────
 
   private buildLayout(): void {
@@ -136,19 +147,45 @@ export class GameScene extends Phaser.Scene {
     this.road.render(this.state.road.level, width, this.groundY);
     this.vergeRiver.render(width, this.groundY);
 
+    this.lightingSystem?.destroy();
+    this.lightingSystem = new LightingSystem(this, this.groundY);
+
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);
     }
 
-    this.lightingSystem?.destroy();
-    this.lightingSystem = new LightingSystem(this, this.groundY);
+    const lightY = this.groundY - 80;
+    // Left — warm yellow, angled down-right
     this.lightingSystem.addLight({
-      x: width / 2,
-      y: this.groundY - 60,
-      radius: 280,
-      color: 0xffaa44,
-      intensity: 1.5,
+      type: 'spot',
+      x: width * 0.25,
+      y: lightY,
+      radius: 150,
+      color: 0xffe566,
+      intensity: 2.5,
+      angle: Math.PI * 0.38,
+      coneAngle: Math.PI / 3,
     });
+    // Centre — cool blue-white, straight down (soft)
+    for (const l of new SoftSpotLight({ x: width * 0.5, y: lightY - 30, radius: 188, color: 0xaad4ff, intensity: 2.5, angle: Math.PI / 2, coneAngle: Math.PI / 6 }).beams) {
+      this.lightingSystem.addLight(l);
+    }
+    // Right — orange, angled down-left
+    this.lightingSystem.addLight({
+      type: 'spot',
+      x: width * 0.75,
+      y: lightY,
+      radius: 150,
+      color: 0xff9944,
+      intensity: 2.5,
+      angle: Math.PI * 0.62,
+      coneAngle: Math.PI / 3,
+    });
+
+    this.carManager?.destroy();
+    this.carManager = new CarManager(this);
+    this.carManager.rebuild(this.state.road.level, this.groundY);
+    this.carManager.attachLights(this.lightingSystem);
 
     this.panelChrome.draw(width, height, this.panelTop, this.colTop, this.sectionW);
 
@@ -270,6 +307,11 @@ export class GameScene extends Phaser.Scene {
     this.state.gold -= cost;
     this.state.road.level = Math.min(this.state.road.level + 1, 10);
     this.road.render(this.state.road.level, this.scale.width, this.groundY);
+    if (this.carManager && this.lightingSystem) {
+      this.carManager.detachLights(this.lightingSystem);
+      this.carManager.rebuild(this.state.road.level, this.groundY);
+      this.carManager.attachLights(this.lightingSystem);
+    }
     this.roadUI.destroy();
     this.roadUI = new RoadUI(
       this,
@@ -324,7 +366,7 @@ export class GameScene extends Phaser.Scene {
 
     const elev = Math.sin(this.sunAngle);
     this.sky.updateGradient(elev, this.scale.width, this.groundY);
-    this.sky.updateOverlay(elev);
+
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
     this.stars.update(elev, this.sunAngle, this.scale.width);
     for (const c of this.plotContainers) {
@@ -401,6 +443,9 @@ export class GameScene extends Phaser.Scene {
     const oldBuilding = this.plotContainers[index];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const savedParticles: object[] = (oldBuilding as any)?.getSmokeParticles?.() ?? [];
+    if (hasExtraLights(oldBuilding)) {
+      for (const l of oldBuilding.extraLights) this.lightingSystem?.removeLight(l);
+    }
     oldBuilding?.destroy();
     const x    = this.plotLeft(index);
     const plot = this.state.plots[index];
@@ -411,6 +456,9 @@ export class GameScene extends Phaser.Scene {
 
     building.setDepth(9);
     this.add.existing(building);
+    if (hasExtraLights(building)) {
+      for (const l of building.extraLights) this.lightingSystem?.addLight(l);
+    }
     return building;
   }
 }

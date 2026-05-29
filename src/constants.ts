@@ -8,6 +8,7 @@ export const UI_HEIGHT = 276;
 export const STATS_BAR_H = 68;
 export const ROAD_BAR_H = 62;
 export const ROAD_H = 48;
+export const ROAD_DIVIDER_H = 4;
 export const VERGE_H = 24;
 export const RIVER_H = 48;
 export const YARD_H = 20;

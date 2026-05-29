@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H } from '../constants';
+import { ROAD_H, ROAD_DIVIDER_H } from '../constants';
 
 export class Road {
   private gfx: Phaser.GameObjects.Graphics;
@@ -46,7 +46,7 @@ export class Road {
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
       return;
     }
-    if (level <= 8) {
+    if (level === 7) {
       const midY = gy + ROAD_H / 2;
       gfx.fillStyle(0x333333, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
@@ -56,16 +56,32 @@ export class Road {
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
       return;
     }
-    // Level 9–10: Highway
+    if (level <= 9) {
+      // Level 8–9: two lanes with solid grey centre divider
+      const midY = gy + ROAD_H / 2;
+      gfx.fillStyle(0x333333, 1);
+      gfx.fillRect(0, gy, width, ROAD_H);
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillRect(0, gy + 2, width, 2);
+      gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
+      gfx.fillStyle(0x888888, 1);
+      gfx.fillRect(0, midY - ROAD_DIVIDER_H / 2, width, ROAD_DIVIDER_H);
+      return;
+    }
+    // Level 10: highway — 2 lanes each direction, grey centre divider
+    const midY = gy + ROAD_H / 2;
     gfx.fillStyle(0x222222, 1);
     gfx.fillRect(0, gy, width, ROAD_H);
     gfx.fillStyle(0xffd700, 1);
     gfx.fillRect(0, gy + 2, width, 2);
     gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
+    // Lane dividers at 25% and 75% (50% is replaced by the grey divider)
     gfx.fillStyle(0xffffff, 1);
-    for (const frac of [0.25, 0.5, 0.75]) {
+    for (const frac of [0.25, 0.75]) {
       const dy = Math.round(gy + ROAD_H * frac) - 1;
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, dy, 20, 2);
     }
+    gfx.fillStyle(0x888888, 1);
+    gfx.fillRect(0, midY - ROAD_DIVIDER_H / 2, width, ROAD_DIVIDER_H);
   }
 }
