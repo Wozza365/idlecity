@@ -64,7 +64,6 @@ export class Car {
       intensity: 2.0,
       angle: tailAngle,
       coneAngle: Math.PI / 4,
-      noOcclusion: true,
     };
   }
 
