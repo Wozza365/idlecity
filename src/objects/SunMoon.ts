@@ -145,14 +145,14 @@ export class SunMoon {
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
     const SHADOW_NUM_SAMPLES = 33;
-    const SHADOW_DISC_SPREAD = 0.50;
+    const SHADOW_DISC_SPREAD = 0.40;
     const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
 
     // ── Sign shadow setup ─────────────────────────────────────────────────────
     const signLightY    = sunY - 300;
     const buildGroundY  = groundY - YARD_H;
     const signGapY      = 12;
-    const signShadowH   = 2;
+    const signShadowH   = 3;
     const hasSignShadow = signLightY < buildGroundY;
     const signT1 = (buildGroundY + signGapY              - signLightY) / (buildGroundY - signLightY);
     const signT2 = (buildGroundY + signGapY + signShadowH - signLightY) / (buildGroundY - signLightY);
