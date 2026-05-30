@@ -64,6 +64,7 @@ export class GameScene extends Phaser.Scene {
   private timeOffsetMs: number = 0;
 
   private sunAngle: number = Math.PI / 2;
+  private lastWindowElev: number = 2; // out-of-range → forces first update
 
   constructor() {
     super({ key: 'GameScene' });
@@ -361,8 +362,11 @@ export class GameScene extends Phaser.Scene {
 
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
     this.stars.update(elev, this.sunAngle, this.scale.width);
-    for (const c of this.plotContainers) {
-      if (isWindowLightable(c)) c.updateWindowLights(elev);
+    if (Math.abs(elev - this.lastWindowElev) >= 0.003) {
+      this.lastWindowElev = elev;
+      for (const c of this.plotContainers) {
+        if (isWindowLightable(c)) c.updateWindowLights(elev);
+      }
     }
     this.carManager?.updateLighting(elev);
     this.devPanel?.updateClock(this.gameTimeString());
