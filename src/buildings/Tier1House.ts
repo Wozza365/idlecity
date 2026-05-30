@@ -423,13 +423,28 @@ export class Tier1House extends Phaser.GameObjects.Container {
     if (initialParticles?.length) this.smokeParticles = [...initialParticles];
 
     // ── Shadow overlay ────────────────────────────────────────────────────────
-    // Drawn once with the building's exact silhouette. Alpha is controlled via
-    // setShadowAlpha() each frame — no per-frame redraw needed.
+    // Single polygon path traces the exact outer silhouette — no overlapping
+    // fills, so alpha compositing stays uniform across the whole shape.
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(bx, top, bw, h);                                          // body + foundation
-    sg.fillRect(chx - 2, chimneyTopY, cw + 4, top - chimneyTopY);        // chimney + cap overhang
-    sg.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);  // gabled roof + eave overhangs
+    const chLeft    = chx - 2;
+    const chRight   = chx + cw + 2;
+    const rEaveX    = bx + bw + ov;
+    const roofSlopeY = (px: number) => top - ((px - rEaveX) / (mid - rEaveX)) * roofH;
+    sg.beginPath();
+    sg.moveTo(bx, buildGY);
+    sg.lineTo(bx + bw, buildGY);
+    sg.lineTo(bx + bw, top);
+    sg.lineTo(rEaveX, top);
+    sg.lineTo(chRight, roofSlopeY(chRight));
+    sg.lineTo(chRight, chimneyTopY);
+    sg.lineTo(chLeft, chimneyTopY);
+    sg.lineTo(chLeft, roofSlopeY(chLeft));
+    sg.lineTo(mid, top - roofH);
+    sg.lineTo(bx - ov, top);
+    sg.lineTo(bx, top);
+    sg.closePath();
+    sg.fillPath();
     sg.setAlpha(0);
     this.add(sg);
     this.shadowGfx = sg;

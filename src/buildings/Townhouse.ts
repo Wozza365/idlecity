@@ -377,7 +377,12 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(bx, buildGY - h, bw, h);  // full building silhouette (parapet + body + foundation)
+    sg.fillRect(bx - 3, top, bw + 6, h);  // body + foundation, widened to cover 3px coping overhang
+    if (level >= 30) {
+      sg.fillRect(bx - 1, top - 9, bw + 2, 9);          // balustrade above parapet
+      const fpX = bx + Math.round(bw / 2);
+      sg.fillRect(fpX - 1, top - 30, 2, 21);             // flagpole (stops at balustrade top to avoid overlap)
+    }
     sg.setAlpha(0);
     this.add(sg);
     this.shadowGfx = sg;
