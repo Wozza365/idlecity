@@ -16,6 +16,8 @@ export class SunMoon {
   readonly sunLight:    Phaser.GameObjects.Light;
   readonly moonLight:   Phaser.GameObjects.Light;
   private DEBUG_SHADOWS = false;
+  private _shadowAlpha  = 0;
+  get shadowAlpha(): number { return this._shadowAlpha; }
 
   constructor(private scene: Phaser.Scene, groundY: number) {
     const { width } = scene.scale;
@@ -134,6 +136,7 @@ export class SunMoon {
     sunY: number,
     _width: number,
   ): void {
+    this._shadowAlpha = 0;
     const gfx = this.shadowGfx;
     gfx.clear();
     this.debugGfx.clear();
@@ -144,51 +147,11 @@ export class SunMoon {
     const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5)) * 0.3;
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
+    this._shadowAlpha = totalAlpha * 0.4;
+
     const SHADOW_NUM_SAMPLES = 33;
     const SHADOW_DISC_SPREAD = 0.40;
     const MAX_LEAN_RATIO = Math.cos(0.55) / Math.sin(0.55);
-
-    // ── Building face shadow overlay ──────────────────────────────────────────
-    // Darken each building body by the same factor as the cast ground shadows,
-    // using each building type's actual silhouette rather than a bounding box.
-    gfx.fillStyle(0x000022, totalAlpha * 0.4);
-    for (let i = 0; i < PLOT_COUNT; i++) {
-      const plot = plots[i];
-      if (!plot.unlocked) continue;
-      const ox  = i * plotWidth;
-      const ow  = plotWidth;
-      const buildGY = groundY - YARD_H;
-
-      if (plot.level <= 15) {
-        // Tier1House: body rect + gabled roof triangle with eave overhangs
-        const bw = Math.round(ow * 0.82);
-        const bx = ox + Math.round((ow - bw) / 2);
-        const bodyTop = buildGY - buildingHeight(plot.level);
-        const roofH   = Math.round(bw * 0.42);
-        const mid     = bx + Math.round(bw / 2);
-        gfx.fillRect(bx, bodyTop, bw, buildingHeight(plot.level));
-        gfx.fillTriangle(bx - 6, bodyTop, bx + bw + 6, bodyTop, mid, bodyTop - roofH);
-      } else if (plot.level <= 25) {
-        // TwoStoreyHouse: body rect (BODY_H 88 - foundH 6 = 82) + gabled roof
-        const bw = Math.round(ow * 0.82);
-        const bx = ox + Math.round((ow - bw) / 2);
-        const bodyTop = buildGY - 82;
-        const roofH   = Math.round(bw * 0.38);
-        const mid     = bx + Math.round(bw / 2);
-        gfx.fillRect(bx, bodyTop, bw, 82);
-        gfx.fillTriangle(bx - 6, bodyTop, bx + bw + 6, bodyTop, mid, bodyTop - roofH);
-      } else if (plot.level <= 40) {
-        // Townhouse: centered 78%-width rect; height = buildingHeight - FLOOR_H(36)
-        const bw = Math.round(ow * 0.78);
-        const bx = ox + Math.round((ow - bw) / 2);
-        const h  = buildingHeight(plot.level) - 36;
-        gfx.fillRect(bx, buildGY - h, bw, h);
-      } else {
-        // SmallApartment / LargeApartment / OfficeBlock / Tier4Skyscraper: full-width rect
-        const h = buildingHeight(plot.level);
-        gfx.fillRect(ox, buildGY - h, ow, h);
-      }
-    }
 
     // ── Sign shadow setup ─────────────────────────────────────────────────────
     const signLightY    = sunY - 300;

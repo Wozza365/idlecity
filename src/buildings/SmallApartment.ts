@@ -20,6 +20,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
+  private shadowGfx!: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -272,10 +273,25 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
 
+    const sg = scene.add.graphics();
+    sg.fillStyle(0x000022, 1);
+    sg.fillRect(x, top, w, h);  // full building silhouette
+    if (level >= 53) {
+      const antX = x + Math.round(w * 0.3);
+      sg.fillRect(antX, top - 20, 2, 20);
+      sg.fillRect(antX - 4, top - 15, 10, 1);
+      sg.fillRect(antX - 2, top - 10, 6, 1);
+    }
+    sg.setAlpha(0);
+    this.add(sg);
+    this.shadowGfx = sg;
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
     });
   }
+
+  setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
   updateWindowLights(elevation: number): void {
     const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));

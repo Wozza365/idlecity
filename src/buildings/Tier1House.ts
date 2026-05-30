@@ -28,6 +28,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
   private nextSmoke   = 0;
   private lightPhases: number[] = [];
   private porchSoftLight: SoftSpotLight | null = null;
+  private shadowGfx!: Phaser.GameObjects.Graphics;
 
   get extraLights(): LightSource[] {
     return this.porchSoftLight ? this.porchSoftLight.beams : [];
@@ -421,12 +422,26 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     if (initialParticles?.length) this.smokeParticles = [...initialParticles];
 
+    // ── Shadow overlay ────────────────────────────────────────────────────────
+    // Drawn once with the building's exact silhouette. Alpha is controlled via
+    // setShadowAlpha() each frame — no per-frame redraw needed.
+    const sg = scene.add.graphics();
+    sg.fillStyle(0x000022, 1);
+    sg.fillRect(bx, top, bw, h);                                          // body + foundation
+    sg.fillRect(chx - 2, chimneyTopY, cw + 4, top - chimneyTopY);        // chimney + cap overhang
+    sg.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);  // gabled roof + eave overhangs
+    sg.setAlpha(0);
+    this.add(sg);
+    this.shadowGfx = sg;
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) {
         scene.lights.removeLight(light);
       }
     });
   }
+
+  setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
   updateWindowLights(elevation: number): void {
     const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));

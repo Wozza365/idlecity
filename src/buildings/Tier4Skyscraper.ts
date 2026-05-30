@@ -19,6 +19,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; accent: boolean }> = [];
+  private shadowGfx!: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -255,10 +256,37 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
 
+    const sg = scene.add.graphics();
+    sg.fillStyle(0x000022, 1);
+    sg.fillRect(x, top, w, h);  // full building silhouette
+    if (level >= 87) {
+      const antX = x + Math.round(w / 2);
+      sg.fillRect(antX - 1, top - ANTENNA_H, 3, ANTENNA_H);
+      sg.fillRect(antX - 5, top - ANTENNA_H + 8, 12, 1);
+      sg.fillRect(antX - 3, top - ANTENNA_H + 16, 8, 1);
+      sg.fillCircle(antX, top - ANTENNA_H, 2);
+    }
+    if (level >= 92) {
+      const m2X = x + Math.round(w * 0.68);
+      sg.fillRect(m2X, top - 20, 2, 20);
+      sg.fillRect(m2X - 3, top - 14, 8, 1);
+    }
+    if (level >= 94) {
+      const baX = x + Math.round(w * 0.3);
+      sg.fillRect(baX - 8, top - 10, 16, 2);
+      sg.fillRect(baX - 5, top - 16, 10, 2);
+      sg.fillRect(baX - 2, top - 22, 4, 2);
+    }
+    sg.setAlpha(0);
+    this.add(sg);
+    this.shadowGfx = sg;
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
     });
   }
+
+  setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
   updateWindowLights(elevation: number): void {
     const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));

@@ -25,6 +25,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private flagTop   = 0;
   private lightPhases: number[] = [];
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
+  private shadowGfx!: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -374,11 +375,20 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
     this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
 
+    const sg = scene.add.graphics();
+    sg.fillStyle(0x000022, 1);
+    sg.fillRect(bx, buildGY - h, bw, h);  // full building silhouette (parapet + body + foundation)
+    sg.setAlpha(0);
+    this.add(sg);
+    this.shadowGfx = sg;
+
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
       if (this.flagLight) scene.lights.removeLight(this.flagLight);
     });
   }
+
+  setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
   updateWindowLights(elevation: number): void {
     const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));

@@ -6,6 +6,7 @@ import {
   upgradeCost, perBuildingIncome,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
+import { hasShadowOverlay } from '../buildings/types';
 import { Sky } from '../objects/Sky';
 import { SunMoon } from '../objects/SunMoon';
 import { Stars } from '../objects/Stars';
@@ -362,6 +363,10 @@ export class GameScene extends Phaser.Scene {
 
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
     this.stars.update(elev, this.sunAngle, this.scale.width);
+    const shadowAlpha = this.sunMoon.shadowAlpha;
+    for (const c of this.plotContainers) {
+      if (hasShadowOverlay(c)) c.setShadowAlpha(shadowAlpha);
+    }
     if (Math.abs(elev - this.lastWindowElev) >= 0.003) {
       this.lastWindowElev = elev;
       for (const c of this.plotContainers) {
