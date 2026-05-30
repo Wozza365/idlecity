@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
+import { type CarDef } from './CarAssets';
 
 export const CAR_W = 38;
-const CAR_H = 14;
 
 export interface CarConfig {
+  def: CarDef;
   x: number;
   y: number;
   speed: number;
@@ -15,7 +16,8 @@ export interface CarConfig {
 }
 
 export class Car {
-  private readonly rect: Phaser.GameObjects.Rectangle;
+  private readonly sprite: Phaser.GameObjects.Image;
+  private readonly def: CarDef;
   private x: number;
   private readonly y: number;
   private speed: number;
@@ -24,11 +26,13 @@ export class Car {
   private readonly offscreenBuffer: number;
 
   private readonly headlight: SoftSpotLight;
-  private readonly tailGlow: LightSource;
-  private readonly tailBeam: Extract<LightSource, { type: 'spot' }>;
+  private readonly headSpot: Extract<LightSource, { type?: 'point' }>;
+  private readonly taillight: SoftSpotLight;
+  private readonly tailSpot: Extract<LightSource, { type?: 'point' }>;
 
   constructor(scene: Phaser.Scene, config: CarConfig) {
-    const { x, y, speed, direction, sceneWidth, offscreenBuffer } = config;
+    const { def, x, y, speed, direction, sceneWidth, offscreenBuffer } = config;
+    this.def = def;
     this.x = x;
     this.y = y;
     this.speed = speed;
@@ -36,60 +40,64 @@ export class Car {
     this.sceneWidth = sceneWidth;
     this.offscreenBuffer = offscreenBuffer;
 
-    const bodyColor = direction === 1 ? 0x778899 : 0x887766;
-    this.rect = scene.add.rectangle(x, y, CAR_W, CAR_H, bodyColor).setDepth(8);
+    // Sprites face right by default; flip for leftward traffic
+    this.sprite = scene.add.image(x, y, def.key)
+      .setFlipX(direction === -1)
+      .setDepth(8);
 
-    const headX = direction === 1 ? x + CAR_W / 2 : x - CAR_W / 2;
+    const hw = def.w / 2;
+    const headX = direction === 1 ? x + hw : x - hw;
+    const tailX = direction === 1 ? x - hw : x + hw;
     const headAngle = direction === 1 ? 0 : Math.PI;
+    const tailAngle = direction === 1 ? Math.PI : 0;
+
     this.headlight = new SoftSpotLight({
-      x: headX,
-      y,
-      radius: 90,
-      color: 0xfff2cc,
-      intensity: 4.5,
-      angle: headAngle,
-      coneAngle: Math.PI / 5,
+      x: headX, y,
+      radius: 90, color: 0xfff2cc, intensity: 4.5,
+      angle: headAngle, coneAngle: Math.PI / 5,
       noOcclusion: true,
     });
 
-    const tailX = direction === 1 ? x - CAR_W / 2 : x + CAR_W / 2;
-    const tailAngle = direction === 1 ? Math.PI : 0;
-    this.tailGlow = { x: tailX, y, radius: 22, color: 0xff1100, intensity: 2.5 };
-    this.tailBeam = {
-      type: 'spot',
-      x: tailX,
-      y,
-      radius: 45,
-      color: 0xff2200,
-      intensity: 2.0,
-      angle: tailAngle,
-      coneAngle: Math.PI / 4,
-    };
+    // Tiny bright source dot at the headlight position
+    this.headSpot = { x: headX, y, radius: 2, color: 0xfffae0, intensity: 6, noOcclusion: true };
+
+    this.taillight = new SoftSpotLight({
+      x: tailX, y,
+      radius: 50, color: 0xff2200, intensity: 2.5,
+      angle: tailAngle, coneAngle: Math.PI / 5,
+      noOcclusion: true,
+    });
+
+    // Tiny bright source dot at the tail light position
+    this.tailSpot = { x: tailX, y, radius: 2, color: 0xff0000, intensity: 6, noOcclusion: true };
   }
 
   get lights(): LightSource[] {
-    return [...this.headlight.beams, this.tailGlow, this.tailBeam];
+    return [...this.headlight.beams, this.headSpot, ...this.taillight.beams, this.tailSpot];
   }
 
   update(delta: number): void {
     this.x += this.direction * this.speed * (delta / 1000);
 
-    if (this.direction === 1 && this.x > this.sceneWidth + this.offscreenBuffer) {
-      this.x = -this.offscreenBuffer;
-    } else if (this.direction === -1 && this.x < -this.offscreenBuffer) {
-      this.x = this.sceneWidth + this.offscreenBuffer;
+    const buf = this.offscreenBuffer;
+    if (this.direction === 1 && this.x > this.sceneWidth + buf) {
+      this.x = -buf;
+    } else if (this.direction === -1 && this.x < -buf) {
+      this.x = this.sceneWidth + buf;
     }
 
-    this.rect.setPosition(this.x, this.y);
+    this.sprite.setPosition(this.x, this.y);
 
-    const headX = this.direction === 1 ? this.x + CAR_W / 2 : this.x - CAR_W / 2;
-    const tailX = this.direction === 1 ? this.x - CAR_W / 2 : this.x + CAR_W / 2;
+    const hw = this.def.w / 2;
+    const headX = this.direction === 1 ? this.x + hw : this.x - hw;
+    const tailX = this.direction === 1 ? this.x - hw : this.x + hw;
 
     this.headlight.update(headX, this.y);
-    this.tailGlow.x = tailX;
-    this.tailGlow.y = this.y;
-    this.tailBeam.x = tailX;
-    this.tailBeam.y = this.y;
+    this.headSpot.x = headX;
+    this.headSpot.y = this.y;
+    this.taillight.update(tailX, this.y);
+    this.tailSpot.x = tailX;
+    this.tailSpot.y = this.y;
   }
 
   setSpeed(speed: number): void {
@@ -97,6 +105,6 @@ export class Car {
   }
 
   destroy(): void {
-    this.rect.destroy();
+    this.sprite.destroy();
   }
 }

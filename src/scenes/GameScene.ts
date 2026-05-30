@@ -19,6 +19,7 @@ import { DevPanel } from '../ui/DevPanel';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import { CarManager } from '../objects/CarManager';
+import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -76,6 +77,12 @@ export class GameScene extends Phaser.Scene {
   private get sectionW(): number { return this.scale.width / PLOT_COUNT; }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+  preload(): void {
+    for (const key of ALL_CAR_KEYS) {
+      this.load.image(key, getCarUrl(key));
+    }
+  }
 
   create(): void {
     this.lights.enable();

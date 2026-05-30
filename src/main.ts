@@ -18,4 +18,9 @@ const config: Phaser.Types.Core.GameConfig = {
   },
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Prevent HMR from stacking multiple Phaser instances on top of each other
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => game.destroy(true));
+}

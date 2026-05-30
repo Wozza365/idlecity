@@ -3,6 +3,7 @@ import { ROAD_H, ROAD_DIVIDER_H } from '../constants';
 import { Car, CAR_W } from './Car';
 import { type LightSource } from '../lighting/LightingSystem';
 import { LightingSystem } from '../lighting/LightingSystem';
+import { pickRandomCar } from './CarAssets';
 
 const OFFSCREEN_BUFFER = 600;
 const CAR_Y_OFFSET = -7;
@@ -81,6 +82,7 @@ export class CarManager {
   private makeCar(lane: LaneConfig, x: number, speed: number): Car {
     const { width } = this.scene.scale;
     return new Car(this.scene, {
+      def: pickRandomCar(),
       x,
       y: lane.y + CAR_Y_OFFSET,
       speed,
