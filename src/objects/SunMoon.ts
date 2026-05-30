@@ -167,7 +167,7 @@ export class SunMoon {
         // Shadow for empty plot sign using raycasting with penumbra
         if (!plot.unlocked) {
           const cx = x + Math.round(w * 0.5);
-          const signWidth = 48;
+          const signWidth = 24;
           const signLeft = cx - Math.round(signWidth / 2);
           const signRight = signLeft + signWidth;
           const shadowGapDistance = 22;
