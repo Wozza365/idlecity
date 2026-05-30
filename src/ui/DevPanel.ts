@@ -4,6 +4,7 @@ import { UI_FONT } from '../constants';
 export class DevPanel {
   readonly container: Phaser.GameObjects.Container;
   private clockText: Phaser.GameObjects.Text;
+  private fpsText: Phaser.GameObjects.Text;
 
   constructor(
     scene: Phaser.Scene,
@@ -52,6 +53,13 @@ export class DevPanel {
       .setOrigin(0.5);
     container.add(this.clockText);
 
+    this.fpsText = scene.add
+      .text(width - 12, row2Y, '', {
+        fontSize: '13px', color: '#ffdd88', fontFamily: UI_FONT,
+      })
+      .setOrigin(1, 0.5);
+    container.add(this.fpsText);
+
     const resetBtn = scene.add
       .rectangle(width / 2 + 60, row2Y, 110, 22, 0x440000)
       .setInteractive({ useHandCursor: true });
@@ -68,6 +76,10 @@ export class DevPanel {
 
   updateClock(timeString: string): void {
     this.clockText.setText(timeString);
+  }
+
+  updateFps(fps: number): void {
+    this.fpsText.setText(`${Math.round(fps)} fps`);
   }
 
   destroy(): void {

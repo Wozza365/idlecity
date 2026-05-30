@@ -386,6 +386,7 @@ export class GameScene extends Phaser.Scene {
       if (isWindowLightable(c)) c.updateWindowLights(elev);
     }
     this.devPanel?.updateClock(this.gameTimeString());
+    this.devPanel?.updateFps(this.game.loop.actualFps);
     this.lightingSystem?.update(this.sunAngle);
   }
 
