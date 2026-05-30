@@ -58,8 +58,8 @@ export class Car {
       noOcclusion: true,
     });
 
-    // Bright source dot at the headlight position (radius large enough to saturate multiple pixels)
-    this.headSpot = { x: headX, y, radius: 10, color: 0xfffae0, intensity: 40, noOcclusion: true };
+    // Bright source dot at the headlight position
+    this.headSpot = { x: headX, y, radius: 4, color: 0xfffae0, intensity: 120, noOcclusion: true };
 
     this.taillight = new SoftSpotLight({
       x: tailX, y,
@@ -69,7 +69,7 @@ export class Car {
     });
 
     // Bright source dot at the tail light position
-    this.tailSpot = { x: tailX, y, radius: 10, color: 0xff0000, intensity: 40, noOcclusion: true };
+    this.tailSpot = { x: tailX, y, radius: 4, color: 0xff0000, intensity: 120, noOcclusion: true };
   }
 
   get lights(): LightSource[] {
@@ -113,9 +113,9 @@ export class Car {
     this.sprite.setTint((v << 16) | (v << 8) | v);
 
     this.headlight.setIntensity(4.5 * nightFactor);
-    this.headSpot.intensity  = 40  * nightFactor;
+    this.headSpot.intensity  = 120 * nightFactor;
     this.taillight.setIntensity(2.5 * nightFactor);
-    this.tailSpot.intensity  = 40  * nightFactor;
+    this.tailSpot.intensity  = 120 * nightFactor;
   }
 
   setSpeed(speed: number): void {

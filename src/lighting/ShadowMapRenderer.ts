@@ -138,9 +138,17 @@ export class ShadowMapRenderer {
     this.polyBuf = gl.createBuffer()!;
 
     // ── Shadow map FBO ──────────────────────────────────────────────────────
+    // Prefer RGBA16F (half-float) so light intensities > 1.0 accumulate without
+    // clamping, enabling HDR bright spots. Falls back to RGBA8 on WebGL1 or
+    // when EXT_color_buffer_float is unavailable.
+    const gl2       = gl as unknown as WebGL2RenderingContext;
+    const canHDR    = gl2.RGBA16F != null && !!gl.getExtension('EXT_color_buffer_float');
+    const internalFmt = canHDR ? gl2.RGBA16F   : gl.RGBA;
+    const pixelType   = canHDR ? gl2.HALF_FLOAT : gl.UNSIGNED_BYTE;
+
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internalFmt, width, height, 0, gl.RGBA, pixelType, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
