@@ -226,6 +226,30 @@ export class ShadowMapRenderer {
     });
   }
 
+  // Point light rendered without visibility-polygon stencil.
+  renderPointLightNoOcclusion(light: LightSource): void {
+    const { gl } = this;
+    gl.disable(gl.STENCIL_TEST);
+    gl.colorMask(true, true, true, true);
+
+    const prog = this.discProg;
+    gl.useProgram(prog.program);
+
+    const r = ((light.color >> 16) & 0xff) / 255;
+    const g = ((light.color >>  8) & 0xff) / 255;
+    const b = ( light.color        & 0xff) / 255;
+    gl.uniform2f(prog.uLightPos,   light.x, light.y);
+    gl.uniform1f(prog.uRadius,     light.radius);
+    gl.uniform3f(prog.uLightColor, r, g, b);
+    gl.uniform1f(prog.uIntensity,  light.intensity ?? 1.0);
+    gl.uniform2f(prog.uResolution, this.shadowMap.width, this.shadowMap.height);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf);
+    gl.enableVertexAttribArray(prog.aPosition);
+    gl.vertexAttribPointer(prog.aPosition, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
   // Spot light rendered without visibility-polygon stencil — used for lights
   // that are embedded inside an occluder (e.g. a wall-mounted lantern).
   // The GLSL cone math still clips the angular shape; only the polygon mask is skipped.

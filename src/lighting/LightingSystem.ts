@@ -115,6 +115,8 @@ export class LightingSystem {
       if (light.noOcclusion) {
         if (light.type === 'spot') {
           this.shadowRenderer.renderSpotLightNoOcclusion(light);
+        } else {
+          this.shadowRenderer.renderPointLightNoOcclusion(light);
         }
       } else if (light.type === 'spot') {
         const poly = computeSpotVisibilityPolygon(
