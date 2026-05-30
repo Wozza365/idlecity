@@ -284,12 +284,31 @@ export class ShadowMapRenderer {
 
   private drawLightWithStencil(
     discProg: DiscProgram,
-    _light: LightSource,
+    light: LightSource,
     poly: Point[],
     setUniforms: (prog: DiscProgram) => void,
   ): void {
     const { gl } = this;
     const { width, height } = this.shadowMap;
+
+    // When a light is off-screen its visibility polygon vertices all land on the
+    // buildScreenBoundary segments (x = -1 / W+1, y = -1 / H+1), which map to NDC
+    // ≈ ±1.001 — just outside the WebGL clip volume. The GPU discards every stencil
+    // triangle, so the disc pass sees stencil=0 everywhere and produces no light,
+    // even when the radius still reaches on-screen pixels. Off-screen lights can't
+    // be occluded by on-screen buildings (no building extends past the viewport), so
+    // dropping the stencil for these lights is both a correct and complete fix.
+    if (light.x < 0 || light.x > width || light.y < 0 || light.y > height) {
+      gl.disable(gl.STENCIL_TEST);
+      gl.colorMask(true, true, true, true);
+      gl.useProgram(discProg.program);
+      setUniforms(discProg);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf);
+      gl.enableVertexAttribArray(discProg.aPosition);
+      gl.vertexAttribPointer(discProg.aPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      return;
+    }
 
     // ── Step 1: write polygon to stencil (no colour write) ─────────────────
     gl.enable(gl.STENCIL_TEST);
