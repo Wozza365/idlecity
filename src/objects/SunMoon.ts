@@ -149,7 +149,7 @@ export class SunMoon {
     const buildGroundY = groundY - YARD_H;
     if (signLightY < buildGroundY) {
       gfx.fillStyle(0x000022, totalAlpha * 0.45);
-      const gapY    = 22;
+      const gapY    = 12;
       const shadowH = 2;
       for (let i = 0; i < PLOT_COUNT; i++) {
         if (plots[i].unlocked) continue;
