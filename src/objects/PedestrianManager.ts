@@ -27,6 +27,13 @@ function smoothstep(t: number): number {
   return c * c * (3 - 2 * c);
 }
 
+function darkenColor(color: number, factor: number): number {
+  const r = Math.round(((color >> 16) & 0xff) * factor);
+  const g = Math.round(((color >> 8)  & 0xff) * factor);
+  const b = Math.round((color & 0xff)          * factor);
+  return (r << 16) | (g << 8) | b;
+}
+
 type PedPhase =
   | { k: 'walk' }
   | { k: 'enter'; startY: number; targetY: number; t: number }
@@ -185,12 +192,21 @@ export class PedestrianManager {
     }
   }
 
+  private nightBrightness(): number {
+    const e = this.elevation;
+    if (e >= 0.2)  return 1.0;
+    if (e >= -0.1) return 0.3 + ((e + 0.1) / 0.3) * 0.7;
+    return 0.3;
+  }
+
   private syncGO(p: Pedestrian): void {
-    const go  = this.pool[p.poolIdx];
-    const top = p.bottomY - p.h;
+    const go         = this.pool[p.poolIdx];
+    const top        = p.bottomY - p.h;
+    const brightness = this.nightBrightness();
+    const drawColor  = darkenColor(p.color, brightness);
     go.body
       .setPosition(p.x + p.w / 2, top + p.h / 2)
-      .setFillStyle(p.color, p.alpha)
+      .setFillStyle(drawColor, p.alpha)
       .setVisible(true);
     go.shadow
       .setPosition(p.x + p.w / 2, p.bottomY + 2)
