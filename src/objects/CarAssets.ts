@@ -11,12 +11,52 @@ export function getCarUrl(key: string): string {
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary';
 
+export interface CarSpotLightConfig {
+  radius?: number;
+  color?: number;
+  intensity?: number;
+  coneAngle?: number;
+}
+
+export interface CarPointLightConfig {
+  radius?: number;
+  color?: number;
+  intensity?: number;
+}
+
+export interface CarLightPlacement {
+  /** Pixels inward from the outer edge of the car toward its centre. */
+  xOffset?: number;
+  /** Pixels from the car's lane y position. */
+  yOffset?: number;
+  spot?: CarSpotLightConfig;
+  point?: CarPointLightConfig;
+}
+
+export interface CarLightingDef {
+  /** Additional y offset for the whole vehicle on its lane. */
+  yOffset?: number;
+  headlight?: CarLightPlacement;
+  taillight?: CarLightPlacement;
+}
+
 export interface CarDef {
   key: string;
   w: number;
   h: number;
   rarity: Rarity;
+  lighting?: CarLightingDef;
 }
+
+const LARGE_VEHICLE_LIGHTING: CarLightingDef = {
+  yOffset: -5,
+};
+
+const LARGE_TRUCK_LIGHTING: CarLightingDef = {
+  yOffset: -5,
+  headlight: { yOffset: 5, spot: { coneAngle: Math.PI / 8 } },
+  taillight: { yOffset: 5 },
+};
 
 const RARITY_WEIGHTS: Record<Rarity, number> = {
   common:    45,
@@ -53,25 +93,25 @@ export const CAR_DEFS: readonly CarDef[] = [
   { key: 'vintage',            w:  36, h: 12, rarity: 'uncommon'  },
 
   // rare — you notice when you see one
-  { key: 'bus',                w:  45, h: 21, rarity: 'rare'      },
-  { key: 'bus_school',         w:  46, h: 21, rarity: 'rare'      },
-  { key: 'ambulance',          w:  38, h: 21, rarity: 'rare'      },
-  { key: 'firetruck',          w:  44, h: 21, rarity: 'rare'      },
-  { key: 'truck',              w:  59, h: 24, rarity: 'rare'      },
-  { key: 'truckdelivery',      w:  44, h: 24, rarity: 'rare'      },
-  { key: 'truckcabin',         w:  39, h: 24, rarity: 'rare'      },
+  { key: 'bus',                w:  45, h: 21, rarity: 'rare',      lighting: LARGE_VEHICLE_LIGHTING },
+  { key: 'bus_school',         w:  46, h: 21, rarity: 'rare',      lighting: LARGE_VEHICLE_LIGHTING },
+  { key: 'ambulance',          w:  38, h: 21, rarity: 'rare',      lighting: LARGE_VEHICLE_LIGHTING },
+  { key: 'firetruck',          w:  44, h: 21, rarity: 'rare',      lighting: LARGE_VEHICLE_LIGHTING },
+  { key: 'truck',              w:  59, h: 24, rarity: 'uncommon',  lighting: LARGE_TRUCK_LIGHTING },
+  { key: 'truckdelivery',      w:  44, h: 24, rarity: 'common',    lighting: LARGE_TRUCK_LIGHTING },
+  { key: 'truckcabin',         w:  39, h: 24, rarity: 'uncommon',  lighting: LARGE_TRUCK_LIGHTING },
   { key: 'transport',          w:  35, h: 17, rarity: 'rare'      },
   { key: 'van_flat',           w:  37, h: 17, rarity: 'rare'      },
-  { key: 'van_large',          w:  35, h: 19, rarity: 'rare'      },
+  { key: 'van_large',          w:  35, h: 19, rarity: 'rare',      lighting: LARGE_VEHICLE_LIGHTING },
   { key: 'sedan_vintage',      w:  36, h: 13, rarity: 'rare'      },
 
   // very_rare — turns heads
   { key: 'tractor',            w:  24, h: 18, rarity: 'very_rare' },
-  { key: 'towtruck',           w:  45, h: 20, rarity: 'very_rare' },
-  { key: 'truckdark',          w:  37, h: 21, rarity: 'very_rare' },
-  { key: 'truckcabin_vintage', w:  30, h: 20, rarity: 'very_rare' },
-  { key: 'trucktank',          w:  65, h: 24, rarity: 'very_rare' },
-  { key: 'riot',               w:  40, h: 21, rarity: 'very_rare' },
+  { key: 'towtruck',           w:  45, h: 20, rarity: 'rare',      lighting: LARGE_TRUCK_LIGHTING },
+  { key: 'truckdark',          w:  37, h: 21, rarity: 'rare',      lighting: LARGE_TRUCK_LIGHTING },
+  { key: 'truckcabin_vintage', w:  30, h: 20, rarity: 'rare',      lighting: LARGE_TRUCK_LIGHTING },
+  { key: 'trucktank',          w:  65, h: 24, rarity: 'very_rare', lighting: LARGE_TRUCK_LIGHTING },
+  { key: 'riot',               w:  40, h: 21, rarity: 'very_rare', lighting: LARGE_VEHICLE_LIGHTING },
   { key: 'suv_military',       w:  28, h: 14, rarity: 'very_rare' },
   { key: 'sports_race',        w:  34, h: 12, rarity: 'very_rare' },
   { key: 'kart',               w:  22, h:  8, rarity: 'very_rare' },
@@ -81,9 +121,9 @@ export const CAR_DEFS: readonly CarDef[] = [
   { key: 'scooter',            w:  15, h:  9, rarity: 'very_rare' },
 
   // legendary — once-in-a-lifetime sighting
-  { key: 'hotdog',             w:  40, h: 29, rarity: 'legendary' },
+  { key: 'hotdog',             w:  40, h: 29, rarity: 'legendary', lighting: LARGE_VEHICLE_LIGHTING },
   { key: 'formula',            w:  33, h:  9, rarity: 'legendary' },
-  { key: 'vendor',             w:  38, h: 22, rarity: 'legendary' },
+  { key: 'vendor',             w:  38, h: 22, rarity: 'legendary', lighting: LARGE_VEHICLE_LIGHTING },
 ];
 
 const TOTAL_WEIGHT = CAR_DEFS.reduce((s, d) => s + RARITY_WEIGHTS[d.rarity], 0);
