@@ -17,7 +17,6 @@ import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
 import { DevPanel } from '../ui/DevPanel';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
-import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import { CarManager } from '../objects/CarManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 
@@ -163,33 +162,6 @@ export class GameScene extends Phaser.Scene {
       this.plotContainers[i] = this.renderPlot(i);
     }
 
-    const lightY = this.groundY - 80;
-    // Left — warm yellow, angled down-right
-    this.lightingSystem.addLight({
-      type: 'spot',
-      x: width * 0.25,
-      y: lightY,
-      radius: 150,
-      color: 0xffe566,
-      intensity: 2.5,
-      angle: Math.PI * 0.38,
-      coneAngle: Math.PI / 3,
-    });
-    // Centre — cool blue-white, straight down (soft)
-    for (const l of new SoftSpotLight({ x: width * 0.5, y: lightY - 30, radius: 188, color: 0xaad4ff, intensity: 2.5, angle: Math.PI / 2, coneAngle: Math.PI / 6 }).beams) {
-      this.lightingSystem.addLight(l);
-    }
-    // Right — orange, angled down-left
-    this.lightingSystem.addLight({
-      type: 'spot',
-      x: width * 0.75,
-      y: lightY,
-      radius: 150,
-      color: 0xff9944,
-      intensity: 2.5,
-      angle: Math.PI * 0.62,
-      coneAngle: Math.PI / 3,
-    });
 
     this.carManager?.destroy();
     this.carManager = new CarManager(this);
