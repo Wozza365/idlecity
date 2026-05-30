@@ -105,6 +105,13 @@ export class Car {
   updateLighting(elevation: number): void {
     // nightFactor: 0 at full day (elev ≥ 0.1), 1 at full night (elev ≤ -0.2)
     const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+
+    // Tint the sprite darker at night so the car body dims against the ambient.
+    // The ambient stays at intensity 1.0 at night (moonlit sky), so without a tint
+    // car sprites appear at ~75% daytime brightness. The tint reduces them to ~20%.
+    const v = Math.round(255 * (1 - 0.75 * nightFactor));
+    this.sprite.setTint((v << 16) | (v << 8) | v);
+
     this.headlight.setIntensity(4.5 * nightFactor);
     this.headSpot.intensity  = 6   * nightFactor;
     this.taillight.setIntensity(2.5 * nightFactor);
