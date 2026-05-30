@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
+import { type DoorEntrance } from './types';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -12,6 +13,7 @@ function lerpColor(a: number, b: number, t: number): number {
 const FLOOR_H = 14;
 
 export class OfficeBlock extends Phaser.GameObjects.Container {
+  readonly doorEntrances: DoorEntrance[] = [];
   private windowLights:   Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
@@ -23,6 +25,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
     const w       = plotWidth;
     const h       = buildingHeight(level);
     const buildGY = groundY - YARD_H;
+    this.doorEntrances = [{ x: x + Math.round(w / 2), y: buildGY }];
     const top     = buildGY - h;
 
     // Lv 82+: upper setback — top 20% slightly narrower

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
+import { type DoorEntrance } from './types';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -13,6 +14,7 @@ const FLOOR_H    = 12;
 const ANTENNA_H  = 36;
 
 export class Tier4Skyscraper extends Phaser.GameObjects.Container {
+  readonly doorEntrances: DoorEntrance[] = [];
   private windowLights:   Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
@@ -25,6 +27,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
     const h       = buildingHeight(level);
     const buildGY = groundY - YARD_H;
     const top     = buildGY - h;
+    this.doorEntrances = [{ x: x + Math.round(w / 2), y: buildGY }];
 
     // Lv 88+: setback at 75% height — upper section narrower
     const setbackFrac = level >= 88 ? 0.25 : 0;

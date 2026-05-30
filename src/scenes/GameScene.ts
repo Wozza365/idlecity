@@ -18,6 +18,7 @@ import { RoadUI } from '../ui/RoadUI';
 import { DevPanel } from '../ui/DevPanel';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
 import { CarManager } from '../objects/CarManager';
+import { PedestrianManager } from '../objects/PedestrianManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
@@ -56,6 +57,7 @@ export class GameScene extends Phaser.Scene {
 
   private lightingSystem: LightingSystem | null = null;
   private carManager: CarManager | null = null;
+  private pedestrianManager: PedestrianManager | null = null;
 
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
@@ -137,6 +139,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
+    this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
   }
 
   // ── Layout build / rebuild ─────────────────────────────────────────────────
@@ -167,6 +170,9 @@ export class GameScene extends Phaser.Scene {
     this.carManager = new CarManager(this);
     this.carManager.rebuild(this.state.road.level, this.groundY);
     this.carManager.attachLights(this.lightingSystem);
+
+    this.pedestrianManager?.destroy();
+    this.pedestrianManager = new PedestrianManager(this, this.groundY, this.plotWidth);
 
     this.panelChrome.draw(width, height, this.panelTop, this.colTop, this.sectionW);
 

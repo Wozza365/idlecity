@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
+import { type DoorEntrance } from './types';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -14,6 +15,7 @@ const PARAPET_H = 12;
 const FLOOR_H   = 20;
 
 export class SmallApartment extends Phaser.GameObjects.Container {
+  readonly doorEntrances: DoorEntrance[] = [];
   private windowLights:   Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
@@ -173,6 +175,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     const dh = Math.round(actualFH * 0.80);
     const dx = x + Math.round((w - dw) / 2);
     const dy = bodyBot - dh;
+    this.doorEntrances = [{ x: dx + Math.round(dw / 2), y: bodyBot }];
 
     // Lv 48+: entrance awning
     if (level >= 48) {

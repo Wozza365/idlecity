@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
+import { type DoorEntrance } from './types';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -14,6 +15,7 @@ function lerpColor(a: number, b: number, t: number): number {
 type SmokeParticle = { x: number; y: number; alpha: number; dx: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
 
 export class Tier1House extends Phaser.GameObjects.Container {
+  readonly doorEntrances: DoorEntrance[] = [];
   private outlinePoints: Array<{ x: number; y: number; height: number }> = [];
   private windowLights: Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
@@ -198,6 +200,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
     const dh     = Math.round(bodyH * 0.52);
     const dx     = bx + Math.round((bw - dw) / 2);
     const dy     = buildGY - foundH - dh;
+    this.doorEntrances = [{ x: dx + Math.round(dw / 2), y: buildGY - foundH }];
     const pInset = Math.round(dw * 0.12);
     const ph     = Math.round(dh * 0.32);
     gfx.fillStyle(0xffffff, 1);
