@@ -144,38 +144,52 @@ export class SunMoon {
     const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5)) * 0.5;
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
-    // ── Sign shadows: single ray, tiny extent ─────────────────────────────────
-    const signLightY = sunY - 300;
-    const buildGroundY = groundY - YARD_H;
-    if (signLightY < buildGroundY) {
-      gfx.fillStyle(0x000022, totalAlpha * 0.45);
-      const gapY    = 12;
-      const shadowH = 2;
-      for (let i = 0; i < PLOT_COUNT; i++) {
-        if (plots[i].unlocked) continue;
-        const scx = i * plotWidth + Math.round(plotWidth * 0.5);
-        const sL  = scx - 12;
-        const sR  = scx + 12;
-        const t1  = (buildGroundY + gapY          - signLightY) / (buildGroundY - signLightY);
-        const t2  = (buildGroundY + gapY + shadowH - signLightY) / (buildGroundY - signLightY);
-        gfx.fillTriangle(sunX + t1 * (sL - sunX), buildGroundY + gapY,   sunX + t1 * (sR - sunX), buildGroundY + gapY,   sunX + t2 * (sR - sunX), buildGroundY + gapY + shadowH);
-        gfx.fillTriangle(sunX + t1 * (sL - sunX), buildGroundY + gapY,   sunX + t2 * (sR - sunX), buildGroundY + gapY + shadowH, sunX + t2 * (sL - sunX), buildGroundY + gapY + shadowH);
-      }
-    }
-
-    const NUM_SAMPLES    = 33;
-    const DISC_SPREAD    = 0.10;
+    const SHADOW_NUM_SAMPLES = 33;
+    const SHADOW_DISC_SPREAD = 0.50;
     const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
 
-    for (let s = 0; s < NUM_SAMPLES; s++) {
-      const t      = (s / (NUM_SAMPLES - 1)) - 0.5;
-      const sAngle = sunAngle + t * DISC_SPREAD;
+    // ── Sign shadow setup ─────────────────────────────────────────────────────
+    const signLightY    = sunY - 300;
+    const buildGroundY  = groundY - YARD_H;
+    const signGapY      = 12;
+    const signShadowH   = 2;
+    const hasSignShadow = signLightY < buildGroundY;
+    const signT1 = (buildGroundY + signGapY              - signLightY) / (buildGroundY - signLightY);
+    const signT2 = (buildGroundY + signGapY + signShadowH - signLightY) / (buildGroundY - signLightY);
+    const baseLeanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, Math.cos(sunAngle) / Math.sin(sunAngle)));
+
+    for (let s = 0; s < SHADOW_NUM_SAMPLES; s++) {
+      const t      = (s / (SHADOW_NUM_SAMPLES - 1)) - 0.5;
+      const sAngle = sunAngle + t * SHADOW_DISC_SPREAD;
       const sElev  = Math.sin(sAngle);
       const sHoriz = Math.cos(sAngle);
       if (sElev <= 0.01) continue;
 
       const leanRate = Math.max(-MAX_LEAN_RATIO, Math.min(MAX_LEAN_RATIO, sHoriz / sElev));
-      gfx.fillStyle(0x000022, totalAlpha / NUM_SAMPLES);
+
+      // ── Sign shadows: disc-spread penumbra ───────────────────────────────────
+      if (hasSignShadow) {
+        gfx.fillStyle(0x000022, totalAlpha * 0.45 / SHADOW_NUM_SAMPLES);
+        const signSunX = sunX + (leanRate - baseLeanRate) * (buildGroundY - signLightY);
+        for (let i = 0; i < PLOT_COUNT; i++) {
+          if (plots[i].unlocked) continue;
+          const scx = i * plotWidth + Math.round(plotWidth * 0.5);
+          const sL  = scx - 12;
+          const sR  = scx + 12;
+          gfx.fillTriangle(
+            signSunX + signT1 * (sL - signSunX), buildGroundY + signGapY,
+            signSunX + signT1 * (sR - signSunX), buildGroundY + signGapY,
+            signSunX + signT2 * (sR - signSunX), buildGroundY + signGapY + signShadowH,
+          );
+          gfx.fillTriangle(
+            signSunX + signT1 * (sL - signSunX), buildGroundY + signGapY,
+            signSunX + signT2 * (sR - signSunX), buildGroundY + signGapY + signShadowH,
+            signSunX + signT2 * (sL - signSunX), buildGroundY + signGapY + signShadowH,
+          );
+        }
+      }
+
+      gfx.fillStyle(0x000022, totalAlpha / SHADOW_NUM_SAMPLES);
 
       for (let i = 0; i < PLOT_COUNT; i++) {
         const plot = plots[i];

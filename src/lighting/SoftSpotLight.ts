@@ -8,6 +8,7 @@ export type SoftSpotParams = {
   x: number; y: number;
   radius: number; color: number; intensity: number;
   angle: number; coneAngle: number;
+  penumbraRatio?: number;
   noOcclusion?: boolean;
 };
 
@@ -27,7 +28,7 @@ export class SoftSpotLight {
       intensity: p.intensity,
       angle: p.angle,
       coneAngle: p.coneAngle,
-      penumbraAngle: p.coneAngle * PENUMBRA_RATIO,
+      penumbraAngle: p.coneAngle * (p.penumbraRatio ?? PENUMBRA_RATIO),
       ...(p.noOcclusion ? { noOcclusion: true as const } : {}),
     }];
   }
