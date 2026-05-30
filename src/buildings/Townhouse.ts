@@ -377,11 +377,32 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(bx - 3, top, bw + 6, h);  // body + foundation, widened to cover 3px coping overhang
+    // Polygon traces the exact parapet outline: 3px wider only where the coping
+    // stones draw (top 4px), 2px wider for the stepped overhang (next 4px),
+    // then back to body width — no shadow beyond the visible building edges.
+    sg.beginPath();
+    sg.moveTo(bx - 3, top);             // coping top-left
+    sg.lineTo(bx + bw + 3, top);        // coping top-right
+    sg.lineTo(bx + bw + 3, top + 4);    // coping right (4px tall)
+    sg.lineTo(bx + bw + 2, top + 4);    // step in to stepped overhang
+    sg.lineTo(bx + bw + 2, top + 8);    // stepped right (ends at top+8)
+    sg.lineTo(bx + bw, top + 8);        // step in to body width
+    sg.lineTo(bx + bw, buildGY);        // right body wall to ground
+    sg.lineTo(bx, buildGY);             // building bottom
+    sg.lineTo(bx, top + 8);             // left body wall up to stepped
+    sg.lineTo(bx - 2, top + 8);         // step out to stepped overhang
+    sg.lineTo(bx - 2, top + 4);         // stepped left
+    sg.lineTo(bx - 3, top + 4);         // step out to coping width
+    sg.closePath();
+    sg.fillPath();
     if (level >= 30) {
-      sg.fillRect(bx - 1, top - 9, bw + 2, 9);          // balustrade above parapet
       const fpX = bx + Math.round(bw / 2);
-      sg.fillRect(fpX - 1, top - 30, 2, 21);             // flagpole (stops at balustrade top to avoid overlap)
+      sg.fillRect(fpX - 1, top - 30, 2, 21);           // flagpole (top-30 to top-9)
+      sg.fillRect(bx - 1, top - 9, bw + 2, 3);         // balustrade top rail + shadow strip
+      sg.fillRect(bx - 1, top - 2, bw + 2, 2);         // balustrade bottom rail
+      for (let bpx = bx + 2; bpx < bx + bw - 2; bpx += 5) {
+        sg.fillRect(bpx, top - 6, 2, 4);               // individual balusters (no gap fill)
+      }
     }
     sg.setAlpha(0);
     this.add(sg);
