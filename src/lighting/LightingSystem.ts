@@ -17,7 +17,7 @@ import { LightingComposite, type AmbientState } from './LightingComposite';
 export type LightSource =
   | { type?: 'point'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean }
   | { type: 'spot';   x: number; y: number; radius: number; color: number;
-      angle: number; coneAngle: number; intensity?: number; noOcclusion?: boolean }
+      angle: number; coneAngle: number; penumbraAngle?: number; intensity?: number; noOcclusion?: boolean }
   | { type: 'window'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean };
 
 interface HasOutlinePoints {
@@ -122,7 +122,7 @@ export class LightingSystem {
         const poly = computeSpotVisibilityPolygon(
           { x: light.x, y: light.y },
           light.angle,
-          light.coneAngle / 2,
+          (light.coneAngle + (light.penumbraAngle ?? 0)) / 2,
           segs,
         );
         this.shadowRenderer.renderSpotLight(light, poly);

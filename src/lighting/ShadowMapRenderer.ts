@@ -48,7 +48,8 @@ interface DiscProgram {
 
 interface SpotProgram extends DiscProgram {
   uLightDir: WebGLUniformLocation;
-  uCosHalfCone: WebGLUniformLocation;
+  uCosInnerHalfCone: WebGLUniformLocation;
+  uCosOuterHalfCone: WebGLUniformLocation;
 }
 
 interface PolyProgram {
@@ -115,8 +116,9 @@ export class ShadowMapRenderer {
       uLightColor:  gl.getUniformLocation(spotRaw, 'uLightColor')!,
       uIntensity:   gl.getUniformLocation(spotRaw, 'uIntensity')!,
       uResolution:  gl.getUniformLocation(spotRaw, 'uResolution')!,
-      uLightDir:    gl.getUniformLocation(spotRaw, 'uLightDir')!,
-      uCosHalfCone: gl.getUniformLocation(spotRaw, 'uCosHalfCone')!,
+      uLightDir:         gl.getUniformLocation(spotRaw, 'uLightDir')!,
+      uCosInnerHalfCone: gl.getUniformLocation(spotRaw, 'uCosInnerHalfCone')!,
+      uCosOuterHalfCone: gl.getUniformLocation(spotRaw, 'uCosOuterHalfCone')!,
     };
 
     const polyRaw = linkProgram(gl, POLY_VERT, POLY_FRAG);
@@ -230,7 +232,10 @@ export class ShadowMapRenderer {
       gl.uniform1f(prog.uIntensity, light.intensity ?? 1.0);
       gl.uniform2f(prog.uResolution, this.shadowMap.width, this.shadowMap.height);
       gl.uniform2f(prog.uLightDir, dirX, dirY);
-      gl.uniform1f(prog.uCosHalfCone, Math.cos(light.coneAngle / 2));
+      const halfInner = light.coneAngle / 2;
+      const halfOuter = (light.coneAngle + (light.penumbraAngle ?? 0.1)) / 2;
+      gl.uniform1f(prog.uCosInnerHalfCone, Math.cos(halfInner));
+      gl.uniform1f(prog.uCosOuterHalfCone, Math.cos(halfOuter));
     });
   }
 
@@ -277,8 +282,11 @@ export class ShadowMapRenderer {
     gl.uniform3f(prog.uLightColor,  r, g, b);
     gl.uniform1f(prog.uIntensity,   light.intensity ?? 1.0);
     gl.uniform2f(prog.uResolution,  this.shadowMap.width, this.shadowMap.height);
-    gl.uniform2f(prog.uLightDir,    Math.cos(light.angle), Math.sin(light.angle));
-    gl.uniform1f(prog.uCosHalfCone, Math.cos(light.coneAngle / 2));
+    gl.uniform2f(prog.uLightDir, Math.cos(light.angle), Math.sin(light.angle));
+    const halfInner = light.coneAngle / 2;
+    const halfOuter = (light.coneAngle + (light.penumbraAngle ?? 0.1)) / 2;
+    gl.uniform1f(prog.uCosInnerHalfCone, Math.cos(halfInner));
+    gl.uniform1f(prog.uCosOuterHalfCone, Math.cos(halfOuter));
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf);
     gl.enableVertexAttribArray(prog.aPosition);

@@ -98,7 +98,10 @@ void main() {
 
 // ── Spot-light disc fragment shader ──────────────────────────────────────────
 // Same as LIGHT_DISC_FRAG plus a smoothstep angular cone term.
-// The penumbra half-width is 0.05 radians (≈3°) either side of the cone edge.
+// uCosInnerHalfCone: cos of the full-brightness boundary (inner edge).
+// uCosOuterHalfCone: cos of the zero-brightness boundary (outer penumbra edge).
+// smoothstep returns 0 at the outer edge and 1 at the inner because cosine
+// decreases as angle increases, so outer cos < inner cos.
 export const SPOT_DISC_FRAG = /* glsl */`
 precision mediump float;
 varying vec2 vUV;
@@ -108,8 +111,9 @@ uniform float uRadius;
 uniform vec3  uLightColor;
 uniform float uIntensity;
 uniform vec2  uResolution;
-uniform vec2  uLightDir;     // normalised direction vector in game space
-uniform float uCosHalfCone;  // cos(coneAngle / 2), pre-computed on CPU
+uniform vec2  uLightDir;          // normalised direction vector in game space
+uniform float uCosInnerHalfCone;  // cos(innerConeAngle / 2) — full brightness
+uniform float uCosOuterHalfCone;  // cos(outerConeAngle / 2) — penumbra edge
 
 void main() {
     vec2  fragPos  = vec2(vUV.x * uResolution.x, (1.0 - vUV.y) * uResolution.y);
@@ -118,9 +122,9 @@ void main() {
     float falloff  = pow(max(0.0, 1.0 - dist), 2.0);
     if (falloff < 0.002) discard;
 
-    float cosAngle    = dot(normalize(toFrag), uLightDir);
-    float coneFactor  = smoothstep(uCosHalfCone - 0.05, uCosHalfCone, cosAngle);
-    falloff          *= coneFactor;
+    float cosAngle   = dot(normalize(toFrag), uLightDir);
+    float coneFactor = smoothstep(uCosOuterHalfCone, uCosInnerHalfCone, cosAngle);
+    falloff         *= coneFactor;
     if (falloff < 0.002) discard;
 
     gl_FragColor = vec4(uLightColor * falloff * uIntensity, falloff);

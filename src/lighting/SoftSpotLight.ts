@@ -1,6 +1,8 @@
 import { type LightSource } from './LightingSystem';
 
-const BEAM_COUNT = 15;
+// Outer penumbra edge = coneAngle × (1 + PENUMBRA_RATIO), matching the old
+// 15-beam range which spanned from coneAngle×1.08 to coneAngle×1.50.
+const PENUMBRA_RATIO = 0.5;
 
 export type SoftSpotParams = {
   x: number; y: number;
@@ -9,39 +11,33 @@ export type SoftSpotParams = {
   noOcclusion?: boolean;
 };
 
-// Wraps a spot light as BEAM_COUNT concentric beams with progressively wider
-// cone angles (+1% per beam) and divided intensity, so that the additive sum at
-// the beam centre exactly matches the original intensity × colour, while the
-// edges blend softly as each outer beam falls away.
+// Single spot light with a shader-driven penumbra instead of 15 stacked beams.
+// The GLSL smoothstep between inner (coneAngle) and outer (coneAngle × 1.5)
+// produces the same gradual edge falloff at 1/15th the draw-call cost.
 export class SoftSpotLight {
   readonly beams: Array<LightSource & { type: 'spot' }>;
 
   constructor(p: SoftSpotParams) {
-    this.beams = Array.from({ length: BEAM_COUNT }, (_, i) => ({
-      type: 'spot' as const,
+    this.beams = [{
+      type: 'spot',
       x: p.x,
       y: p.y,
       radius: p.radius,
       color: p.color,
-      intensity: p.intensity / BEAM_COUNT,
+      intensity: p.intensity,
       angle: p.angle,
-      coneAngle: p.coneAngle * (1 + 0.08 + i * 0.03),
+      coneAngle: p.coneAngle,
+      penumbraAngle: p.coneAngle * PENUMBRA_RATIO,
       ...(p.noOcclusion ? { noOcclusion: true as const } : {}),
-    }));
+    }];
   }
 
   update(x: number, y: number): void {
-    for (const beam of this.beams) {
-      beam.x = x;
-      beam.y = y;
-    }
+    this.beams[0].x = x;
+    this.beams[0].y = y;
   }
 
-  // Set the total intensity across all beams (divides evenly so the centre sum equals `total`).
   setIntensity(total: number): void {
-    const perBeam = total / BEAM_COUNT;
-    for (const beam of this.beams) {
-      beam.intensity = perBeam;
-    }
+    this.beams[0].intensity = total;
   }
 }
