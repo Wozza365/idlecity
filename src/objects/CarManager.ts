@@ -65,7 +65,7 @@ function baseSpeed(level: number): number {
 }
 
 const SHADOW_NUM_SAMPLES  = 9;
-const SHADOW_DISC_SPREAD  = 0.10;
+const SHADOW_DISC_SPREAD  = 0.50;
 const SHADOW_MAX_LEAN     = Math.cos(0.35) / Math.sin(0.35);
 
 export class CarManager {
