@@ -63,7 +63,7 @@ export class Car {
 
     this.taillight = new SoftSpotLight({
       x: tailX, y,
-      radius: 50, color: 0xff0000, intensity: 8.0,
+      radius: 30, color: 0xff0000, intensity: 5.0,
       angle: tailAngle, coneAngle: Math.PI / 5,
       noOcclusion: true,
     });
@@ -114,7 +114,7 @@ export class Car {
 
     this.headlight.setIntensity(4.5 * nightFactor);
     this.headSpot.intensity  = 400 * nightFactor;
-    this.taillight.setIntensity(8.0 * nightFactor);
+    this.taillight.setIntensity(5.0 * nightFactor);
     this.tailSpot.intensity  = 400 * nightFactor;
   }
 
