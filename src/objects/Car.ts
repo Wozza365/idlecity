@@ -100,6 +100,17 @@ export class Car {
     this.tailSpot.y = this.y;
   }
 
+  // elevation = Math.sin(sunAngle): +1 noon, -1 midnight.
+  // Mirrors the window-light convention used by buildings.
+  updateLighting(elevation: number): void {
+    // nightFactor: 0 at full day (elev ≥ 0.1), 1 at full night (elev ≤ -0.2)
+    const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+    this.headlight.setIntensity(4.5 * nightFactor);
+    this.headSpot.intensity  = 6   * nightFactor;
+    this.taillight.setIntensity(2.5 * nightFactor);
+    this.tailSpot.intensity  = 6   * nightFactor;
+  }
+
   setSpeed(speed: number): void {
     this.speed = speed;
   }

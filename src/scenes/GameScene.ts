@@ -385,6 +385,7 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.plotContainers) {
       if (isWindowLightable(c)) c.updateWindowLights(elev);
     }
+    this.carManager?.updateLighting(elev);
     this.devPanel?.updateClock(this.gameTimeString());
     this.devPanel?.updateFps(this.game.loop.actualFps);
     this.lightingSystem?.update(this.sunAngle);

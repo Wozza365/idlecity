@@ -187,6 +187,10 @@ export class CarManager {
     for (const car of this.allCars) car.update(delta);
   }
 
+  updateLighting(elevation: number): void {
+    for (const car of this.allCars) car.updateLighting(elevation);
+  }
+
   destroy(): void {
     for (const car of this.allCars) car.destroy();
     this.laneCars = [];
