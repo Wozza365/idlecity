@@ -63,7 +63,7 @@ export class Car {
 
     this.taillight = new SoftSpotLight({
       x: tailX, y,
-      radius: 50, color: 0xff2200, intensity: 8.0,
+      radius: 50, color: 0xff0000, intensity: 8.0,
       angle: tailAngle, coneAngle: Math.PI / 5,
       noOcclusion: true,
     });
