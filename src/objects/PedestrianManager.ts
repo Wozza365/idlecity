@@ -9,20 +9,17 @@ const COLORS = [
   0x55efc4, 0xfd79a8,
 ];
 
-const PED_MIN_H              = 8;
-const PED_MAX_H              = 13;
-const PED_MIN_W              = 3;
-const PED_MAX_W              = 5;
-const PED_MIN_SPEED          = 22;
-const PED_MAX_SPEED          = 62;
-const TURN_ZONE_FRAC         = 0.05;
-const TURN_RATE              = 0.9;
-const DOOR_SPAWN_RATE_FRAC   = 0.20;
-const DOOR_SPAWN_POS_JITTER  = 3;
-const DOOR_VERT_SPEED        = 40;
-const DESPAWN_ARRIVAL_DIST   = 6;
-const DESPAWN_LEAVE_DURATION = 0.45;
-const DESPAWN_BASE_PER_SEC   = 0.025;
+const PED_MIN_H             = 8;
+const PED_MAX_H             = 13;
+const PED_MIN_W             = 3;
+const PED_MAX_W             = 5;
+const PED_MIN_SPEED         = 13;
+const PED_MAX_SPEED         = 37;
+const TURN_ZONE_FRAC        = 0.05;
+const DOOR_SPAWN_RATE_FRAC  = 0.20;
+const DOOR_SPAWN_POS_JITTER = 3;
+const DESPAWN_ARRIVAL_DIST  = 6;
+const DESPAWN_BASE_PER_SEC  = 0.025;
 
 function smoothstep(t: number): number {
   const c = Math.max(0, Math.min(1, t));
@@ -45,6 +42,7 @@ interface Pedestrian {
   dir: 1 | -1;
   alpha: number;
   phase: PedPhase;
+  turnAtX: number | null;
 }
 
 interface DoorEntry { x: number; y: number; level: number; }
@@ -95,7 +93,7 @@ export class PedestrianManager {
 
       if (ph.k === 'enter') {
         const dist = ph.targetY - ph.startY;
-        ph.t       = Math.min(1, ph.t + (DOOR_VERT_SPEED * dt) / Math.max(1, Math.abs(dist)));
+        ph.t       = Math.min(1, ph.t + (p.speed * dt) / Math.max(1, Math.abs(dist)));
         p.bottomY  = ph.startY + dist * smoothstep(ph.t);
         p.alpha    = smoothstep(ph.t);
         // Horizontal speed ramps up with progress (axis transition)
@@ -123,10 +121,11 @@ export class PedestrianManager {
       }
 
       if (ph.k === 'leave') {
-        ph.t      = Math.min(1, ph.t + dt / DESPAWN_LEAVE_DURATION);
-        const dist = ph.doorY - ph.startY;
-        p.bottomY  = ph.startY + dist * smoothstep(ph.t);
-        p.alpha    = 1 - smoothstep(ph.t);
+        const dist     = ph.doorY - ph.startY;
+        const duration = Math.abs(dist) / Math.max(1, p.speed);
+        ph.t      = Math.min(1, ph.t + dt / duration);
+        p.bottomY = ph.startY + dist * smoothstep(ph.t);
+        p.alpha   = 1 - smoothstep(ph.t);
         if (ph.t >= 1) {
           this.pedestrians.splice(i, 1);
         }
@@ -136,10 +135,15 @@ export class PedestrianManager {
       // 'walk' phase
       p.x += p.speed * p.dir * dt;
 
-      if (p.dir === 1 && p.x >= turnZoneX) {
-        if (Math.random() < TURN_RATE * dt) p.dir = -1;
+      // Assign a random turn point the first time a ped enters the turn zone
+      if (p.dir === 1 && p.x >= turnZoneX && p.turnAtX === null) {
+        p.turnAtX = turnZoneX + Math.random() * (rightBound - turnZoneX - p.w);
       }
-      if (p.x + p.w > rightBound) { p.x = rightBound - p.w; p.dir = -1; }
+      if (p.dir === 1 && p.turnAtX !== null && p.x >= p.turnAtX) {
+        p.dir     = -1;
+        p.turnAtX = null;
+      }
+      if (p.x + p.w > rightBound) { p.x = rightBound - p.w; p.dir = -1; p.turnAtX = null; }
       if (p.x + p.w < -40) { this.pedestrians.splice(i, 1); continue; }
 
       if (doors.length > 0 && Math.random() < DESPAWN_BASE_PER_SEC * dt) {
@@ -199,6 +203,7 @@ export class PedestrianManager {
       dir:     Math.random() < 0.5 ? 1 : -1,
       alpha:   0,
       phase:   { k: 'enter', startY: door.y, targetY, t: 0 },
+      turnAtX: null,
     });
   }
 
@@ -218,6 +223,7 @@ export class PedestrianManager {
       dir:     1,
       alpha:   1,
       phase:   { k: 'walk' },
+      turnAtX: null,
     });
   }
 
