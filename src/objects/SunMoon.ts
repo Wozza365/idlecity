@@ -141,12 +141,31 @@ export class SunMoon {
 
     const totalAlpha  = Math.min(0.99, elevation * 1.26 + 0.18);
     const maxShadow   = ROAD_H + VERGE_H + RIVER_H;
-    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5)) * 0.5;
+    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5)) * 0.3;
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
     const SHADOW_NUM_SAMPLES = 33;
     const SHADOW_DISC_SPREAD = 0.40;
-    const MAX_LEAN_RATIO = Math.cos(0.35) / Math.sin(0.35);
+    const MAX_LEAN_RATIO = Math.cos(0.55) / Math.sin(0.55);
+
+    // ── Building face shadow overlay ──────────────────────────────────────────
+    // Darken each building body by the same factor as the cast ground shadows.
+    gfx.fillStyle(0x000022, totalAlpha * 0.4);
+    for (let i = 0; i < PLOT_COUNT; i++) {
+      const plot = plots[i];
+      if (!plot.unlocked) continue;
+      const ox  = i * plotWidth;
+      const ow  = plotWidth;
+      const buildGY = groundY - YARD_H;
+      const obh = plot.level <= 15 ? buildingHeight(plot.level)
+                : plot.level <= 25 ? 88
+                : buildingHeight(plot.level);
+      const obw = plot.level <= 40
+        ? Math.round(ow * (plot.level <= 25 ? 0.82 : 0.78))
+        : ow;
+      const obx = plot.level <= 40 ? ox + Math.round((ow - obw) / 2) : ox;
+      gfx.fillRect(obx, buildGY - obh, obw, obh);
+    }
 
     // ── Sign shadow setup ─────────────────────────────────────────────────────
     const signLightY    = sunY - 300;
