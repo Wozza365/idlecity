@@ -148,6 +148,10 @@ export class Car {
     this.tailSpot.intensity  = this.tailSpotIntensity  * nightFactor;
   }
 
+  getShadowInfo(): { x: number; y: number; w: number; h: number } {
+    return { x: this.x, y: this.y, w: this.def.w, h: this.def.h };
+  }
+
   setSpeed(speed: number): void {
     this.speed = speed;
   }

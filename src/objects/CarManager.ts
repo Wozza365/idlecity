@@ -64,12 +64,17 @@ function baseSpeed(level: number): number {
   return 50 + level * 14;
 }
 
+const SHADOW_NUM_SAMPLES  = 9;
+const SHADOW_DISC_SPREAD  = 0.10;
+const SHADOW_MAX_LEAN     = Math.cos(0.35) / Math.sin(0.35);
+
 export class CarManager {
   private readonly scene: Phaser.Scene;
   private laneCars: Car[][] = [];
   private lanes: LaneConfig[] = [];
   private currentLevel: number = 0;
   private _lights: LightSource[] = [];
+  private shadowGfx: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -100,12 +105,16 @@ export class CarManager {
 
   rebuild(level: number, groundY: number): void {
     for (const car of this.allCars) car.destroy();
+    this.shadowGfx?.destroy();
+    this.shadowGfx = null;
     this.laneCars = [];
     this.lanes    = [];
     this._lights  = [];
     this.currentLevel = 0;
 
     if (level === 0) return;
+
+    this.shadowGfx = this.scene.add.graphics().setDepth(7.5);
 
     const { width } = this.scene.scale;
     this.lanes       = getLanes(level, groundY);
@@ -191,8 +200,43 @@ export class CarManager {
     for (const car of this.allCars) car.updateLighting(elevation);
   }
 
+  updateShadow(sunAngle: number): void {
+    const gfx = this.shadowGfx;
+    if (!gfx) return;
+    gfx.clear();
+
+    const elevation = Math.sin(sunAngle);
+    if (elevation <= 0.02) return;
+
+    const totalAlpha = Math.min(0.65, elevation * 0.82 + 0.12);
+
+    for (let s = 0; s < SHADOW_NUM_SAMPLES; s++) {
+      const t      = (s / (SHADOW_NUM_SAMPLES - 1)) - 0.5;
+      const sAngle = sunAngle + t * SHADOW_DISC_SPREAD;
+      const sElev  = Math.sin(sAngle);
+      const sHoriz = Math.cos(sAngle);
+      if (sElev <= 0.01) continue;
+
+      const leanRate = Math.max(-SHADOW_MAX_LEAN, Math.min(SHADOW_MAX_LEAN, sHoriz / sElev));
+      gfx.fillStyle(0x000022, totalAlpha / SHADOW_NUM_SAMPLES);
+
+      for (const car of this.allCars) {
+        const { x, y, w, h } = car.getShadowInfo();
+        const hw            = w / 2;
+        const baseY         = y + h / 2;
+        const shadowExtent  = Math.min(ROAD_H / 2, h * Math.pow(1 - Math.min(elevation, 1), 0.5));
+        const shadBot       = baseY + shadowExtent;
+        const lean          = leanRate * (shadowExtent + h);
+        gfx.fillTriangle(x - hw, baseY, x + hw, baseY, x + hw + lean, shadBot);
+        gfx.fillTriangle(x - hw, baseY, x + hw + lean, shadBot, x - hw + lean, shadBot);
+      }
+    }
+  }
+
   destroy(): void {
     for (const car of this.allCars) car.destroy();
+    this.shadowGfx?.destroy();
+    this.shadowGfx = null;
     this.laneCars = [];
     this.lanes    = [];
     this._lights  = [];

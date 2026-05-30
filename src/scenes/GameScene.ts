@@ -137,6 +137,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.carManager?.update(delta);
+    this.carManager?.updateShadow(this.sunAngle);
   }
 
   // ── Layout build / rebuild ─────────────────────────────────────────────────
