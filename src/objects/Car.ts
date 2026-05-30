@@ -69,7 +69,7 @@ export class Car {
     });
 
     // Bright source dot at the tail light position
-    this.tailSpot = { x: tailX, y, radius: 3, color: 0xff0000, intensity: 400, noOcclusion: true };
+    this.tailSpot = { x: tailX, y, radius: 3, color: 0xff3333, intensity: 400, noOcclusion: true };
   }
 
   get lights(): LightSource[] {
