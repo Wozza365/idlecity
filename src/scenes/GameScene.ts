@@ -80,7 +80,8 @@ export class GameScene extends Phaser.Scene {
 
   preload(): void {
     for (const key of ALL_CAR_KEYS) {
-      this.load.image(key, getCarUrl(key));
+      const url = getCarUrl(key);
+      if (url) this.load.image(key, url);
     }
   }
 
