@@ -47,7 +47,7 @@ export class Car {
 
     const hw = def.w / 2;
     const headX = direction === 1 ? x + hw : x - hw;
-    const tailX = direction === 1 ? x - hw : x + hw;
+    const tailX = (direction === 1 ? x - hw : x + hw) - 2;
     const headAngle = direction === 1 ? 0 : Math.PI;
     const tailAngle = direction === 1 ? Math.PI : 0;
 
@@ -90,7 +90,7 @@ export class Car {
 
     const hw = this.def.w / 2;
     const headX = this.direction === 1 ? this.x + hw : this.x - hw;
-    const tailX = this.direction === 1 ? this.x - hw : this.x + hw;
+    const tailX = (this.direction === 1 ? this.x - hw : this.x + hw) - 2;
 
     this.headlight.update(headX, this.y);
     this.headSpot.x = headX;
