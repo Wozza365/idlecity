@@ -71,6 +71,7 @@ export class PedestrianManager {
   private doorTimer:  number;
   private elevation = 1.0;
   private shadowAlpha = 0;
+  private shadowedRanges: Array<{ x0: number; x1: number }> = [];
 
   constructor(scene: Phaser.Scene, groundY: number, plotWidth: number) {
     this.groundY    = groundY;
@@ -105,6 +106,9 @@ export class PedestrianManager {
   ): void {
     this.elevation   = Math.sin(sunAngle);
     this.shadowAlpha = shadowAlpha;
+    this.shadowedRanges = plots
+      .map((p, i) => p.unlocked ? { x0: i * this.plotWidth, x1: (i + 1) * this.plotWidth } : null)
+      .filter((r): r is { x0: number; x1: number } => r !== null);
 
     const rightBound = this.getRightBound(plots);
     if (rightBound <= 0) return;
@@ -205,7 +209,9 @@ export class PedestrianManager {
   private syncGO(p: Pedestrian): void {
     const go         = this.pool[p.poolIdx];
     const top        = p.bottomY - p.h;
-    const brightness = this.nightBrightness() * (1 - this.shadowAlpha * 0.85);
+    const cx = p.x + p.w / 2;
+    const underBuilding = this.shadowedRanges.some(r => cx >= r.x0 && cx < r.x1);
+    const brightness = this.nightBrightness() * (underBuilding ? 1 - this.shadowAlpha * 0.85 : 1);
     const drawColor  = darkenColor(p.color, brightness);
     go.body
       .setPosition(p.x + p.w / 2, top + p.h / 2)
