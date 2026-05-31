@@ -286,16 +286,16 @@ export class VergeRiver {
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    // Each entry is [col_a, col_b, col_c] — fully saturated, no pastels/darks
+    // Alternating warm/cool so every bed gets an equal mix — no warm-run dominance
     const bedPalettes = [
-      [0xff1155, 0xff4488, 0xff77aa],  // roses
-      [0xffcc00, 0xffaa00, 0xffee22],  // sunflowers
-      [0xff5500, 0xff7700, 0xff9922],  // marigolds
-      [0xaa33ff, 0xcc66ff, 0xff44ff],  // purple/violet
-      [0x00ddbb, 0x00ffcc, 0x44ffdd],  // aqua/teal
-      [0xff00bb, 0xff33cc, 0xff66dd],  // magenta
-      [0x0099ff, 0x33bbff, 0x00ccff],  // sky blue
-      [0x77ee00, 0x99ff00, 0xbbff33],  // lime green
+      [0xff1155, 0xff4488, 0xff77aa],  // roses       (warm)
+      [0x00ccff, 0x33bbff, 0x0099ff],  // sky blue    (cool)
+      [0xffcc00, 0xffaa00, 0xffee22],  // sunflowers  (warm)
+      [0x00ffcc, 0x00ddbb, 0x44ffdd],  // teal        (cool)
+      [0xff5500, 0xff7700, 0xff9922],  // marigolds   (warm)
+      [0x88ff00, 0xaaff33, 0x66ee00],  // lime green  (cool)
+      [0xff00bb, 0xff33cc, 0xff66dd],  // magenta     (warm)
+      [0xaa33ff, 0xcc66ff, 0x8811ee],  // purple      (cool)
     ];
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
@@ -327,7 +327,7 @@ export class VergeRiver {
       for (const row of rows) {
         for (let fx = gx + row.offset + 3; fx < gx + gw - 3; fx += row.step) {
           const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
-          const useSecond = (h & 3) === 0;
+          const useSecond = (h & 1) === 0; // 50/50 warm/cool mix per flower
           const src = useSecond ? pal2 : pal;
           const colorIdx = (h >>> 2) % 3;
           gfx.fillStyle(src[colorIdx], 0.95);
