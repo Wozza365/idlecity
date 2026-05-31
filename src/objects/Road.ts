@@ -22,9 +22,12 @@ export class Road {
       gfx.fillStyle(0x6b4c2a, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
       gfx.fillStyle(0x8a6040, 1);
-      for (let px = 10; px < width; px += 28) {
-        gfx.fillCircle(px, gy + 8, 2);
-        gfx.fillCircle(px + 14, gy + 16, 2);
+      for (let row = 0; row * 8 + 8 < ROAD_H; row++) {
+        const py = gy + 8 + row * 8;
+        const xStart = row % 2 === 0 ? 10 : 24;
+        for (let px = xStart; px < width; px += 28) {
+          gfx.fillCircle(px, py, 2);
+        }
       }
       return;
     }
