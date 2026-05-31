@@ -70,7 +70,8 @@ export class VergeRiver {
 
     if (level >= 8)  this.drawCyclePath(gfx, width, vergeY);
     if (level >= 13) this.drawPaving(gfx, width, vergeY);
-    if (level >= 3)  this.drawWildflowers(gfx, level, width, vergeY);
+    // Wildflowers only before flower beds take over (levels 3–4)
+    if (level >= 3 && level <= 4) this.drawWildflowers(gfx, level, width, vergeY);
     if (level >= 5)  this.drawFlowerBeds(gfx, level, width, vergeY);
     if (level >= 6)  this.drawBenches(gfx, level, width, vergeY);
     if (level >= 12) this.drawGardenBeds(gfx, width, vergeY);
@@ -98,18 +99,19 @@ export class VergeRiver {
     this.lampBulbs  = [];
     this.lampLights = [];
     if (level >= 11) {
-      const lampHeadY = groundY + ROAD_H - 28;
+      // Head sits just above the cycle lane
+      const lampHeadY = groundY + ROAD_H + VERGE_H - CYCLE_H - 14;
       for (const lx of this.lampXs) {
-        const armX = lx + 10;
+        const armX = lx + 8;
         const spot = new SoftSpotLight({
           x: armX, y: lampHeadY,
-          radius: 110, color: 0xffd070, intensity: 0,
+          radius: 90, color: 0xffd070, intensity: 0,
           angle: Math.PI / 2,       // pointing straight down
-          coneAngle: Math.PI / 2.4, // ~75° cone
+          coneAngle: Math.PI / 2.2, // ~82° cone
           noOcclusion: true,
         });
         const bulb: Extract<LightSource, { type?: 'point' }> = {
-          x: armX, y: lampHeadY, radius: 5,
+          x: lx + 8, y: lampHeadY, radius: 5,
           color: 0xfffae0, intensity: 0, noOcclusion: true,
         };
         this.lampSpots.push(spot);
@@ -239,9 +241,9 @@ export class VergeRiver {
     const backY  = vergeY + VERGE_H - bottomBand - 12;
     const frontY = vergeY + VERGE_H - bottomBand - 4;
     let ci = 0;
-    for (let tx = spacing / 2; tx < width; tx += spacing) {
-      const gx = Math.round(tx - spacing / 2 + 10);
-      const gw = Math.round(spacing - 20);
+    for (let tx = spacing / 2; tx < width; tx += spacing * 2) {
+      const gx = Math.round(tx - spacing / 2 + 14);
+      const gw = Math.round(spacing - 28);
       if (gw <= 0) continue;
       const pal = bedPalettes[ci % bedPalettes.length];
 
@@ -284,7 +286,7 @@ export class VergeRiver {
 
   private drawBenches(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
     const { spacing } = treeGeom(level);
-    for (let tx = spacing; tx < width - spacing * 0.4; tx += spacing) {
+    for (let tx = spacing; tx < width - spacing * 0.4; tx += spacing * 2) {
       const bx = Math.round(tx);
       const by = vergeY + 22;
 
@@ -343,10 +345,10 @@ export class VergeRiver {
     const canopyY    = trunkTopY;
 
     const trunkColor  = 0x5c3a1e;
-    const shadowRing  = level >= 14 ? 0x1a3d1a : 0x1e4a1a;
-    const canopyDark  = level >= 14 ? 0x2d6a4f : 0x336622;
-    const canopyMid   = level >= 14 ? 0x3d8a6f : 0x4a8c32;
-    const canopyLight = level >= 14 ? 0x58b08a : 0x66cc44;
+    const shadowRing  = level >= 14 ? 0x152808 : 0x1e4a1a;
+    const canopyDark  = level >= 14 ? 0x234e10 : 0x336622;
+    const canopyMid   = level >= 14 ? 0x347020 : 0x4a8c32;
+    const canopyLight = level >= 14 ? 0x4ea030 : 0x66cc44;
 
     for (const tx of this.treeXs) {
       gfx.fillStyle(trunkColor, 1);
@@ -365,6 +367,15 @@ export class VergeRiver {
       gfx.fillCircle(tx - 3, canopyY - 3, Math.round(canopyR * 0.72));
       gfx.fillStyle(canopyLight, 0.65);
       gfx.fillCircle(tx - 5, canopyY - 5, Math.round(canopyR * 0.44));
+
+      // Mature trees: extra secondary clusters for a fuller, irregular crown
+      if (level >= 14) {
+        gfx.fillStyle(canopyDark, 0.85);
+        gfx.fillCircle(tx - Math.round(canopyR * 0.65), canopyY + Math.round(canopyR * 0.35), Math.round(canopyR * 0.42));
+        gfx.fillCircle(tx + Math.round(canopyR * 0.58), canopyY + Math.round(canopyR * 0.28), Math.round(canopyR * 0.38));
+        gfx.fillStyle(canopyMid, 0.7);
+        gfx.fillCircle(tx + Math.round(canopyR * 0.45), canopyY - Math.round(canopyR * 0.4), Math.round(canopyR * 0.32));
+      }
     }
   }
 
@@ -372,23 +383,30 @@ export class VergeRiver {
 
   private drawLamps(level: number, vergeY: number): void {
     const gfx = this.treeGfx;
-    const poleH     = 38;
-    const poleBaseY = vergeY + 8;
+    // Short cycle-lane bollard: base at cycle lane edge, head just above it
+    const cycleTopY = vergeY + VERGE_H - CYCLE_H;
+    const poleH     = 16;
+    const poleBaseY = cycleTopY;
     const poleTopY  = poleBaseY - poleH;
+    const armLen    = 8;
     const poleColor = level >= 15 ? 0x6a5040 : 0x44566a;
     const headColor = level >= 15 ? 0xffd060 : 0xd0e0ee;
     const baseColor = level >= 15 ? 0x8a7060 : 0x607080;
 
     for (const lx of this.lampXs) {
+      // Base plate
       gfx.fillStyle(baseColor, 1);
-      gfx.fillRect(lx - 3, poleBaseY - 3, 6, 3);
+      gfx.fillRect(lx - 2, poleBaseY - 2, 4, 2);
+      // Pole
       gfx.fillStyle(poleColor, 1);
-      gfx.fillRect(lx - 1, poleTopY, 2, poleH - 3);
-      gfx.fillRect(lx, poleTopY + 2, 10, 2);
+      gfx.fillRect(lx - 1, poleTopY, 2, poleH - 2);
+      // Arm
+      gfx.fillRect(lx, poleTopY + 1, armLen, 2);
+      // Lamp head
       gfx.fillStyle(headColor, 1);
-      gfx.fillEllipse(lx + 10, poleTopY + 3, 13, 7);
+      gfx.fillEllipse(lx + armLen, poleTopY + 2, 11, 6);
       gfx.fillStyle(0xffffff, 0.4);
-      gfx.fillEllipse(lx + 9, poleTopY + 2, 6, 3);
+      gfx.fillEllipse(lx + armLen - 1, poleTopY + 1, 5, 3);
     }
   }
 
@@ -479,17 +497,6 @@ export class VergeRiver {
       gfx.fillTriangle(tx - hw, trunkBaseY, tx + hw + lean, shadBot, tx - hw + lean, shadBot);
     }
 
-    if (this._level >= 10) {
-      for (const lx of this.lampXs) {
-        const poleBaseY = vergeY + 8;
-        const poleH     = 38;
-        const shadowH   = Math.min(VERGE_H * 0.6, poleH * Math.pow(1 - Math.min(elevation, 1), 0.55));
-        const shadBot   = poleBaseY + shadowH;
-        const lean      = leanRate * (shadowH + poleH);
-        gfx.fillTriangle(lx - 1, poleBaseY, lx + 1, poleBaseY, lx + 1 + lean, shadBot);
-        gfx.fillTriangle(lx - 1, poleBaseY, lx + 1 + lean, shadBot, lx - 1 + lean, shadBot);
-      }
-    }
   }
 
   // ── Day/night lamp glow ───────────────────────────────────────────
