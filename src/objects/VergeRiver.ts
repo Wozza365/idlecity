@@ -22,6 +22,7 @@ const CYCLIST_COLORS = [0x4ecdc4, 0xff6b6b, 0x95e77e, 0xffd93d, 0xc77dff, 0xff9f
 interface Cyclist { x: number; speed: number; dir: 1 | -1; color: number; }
 
 export class VergeRiver {
+  private readonly scene: Phaser.Scene;
   private vergeGfx:   Phaser.GameObjects.Graphics;
   private cyclistGfx: Phaser.GameObjects.Graphics;
   private shadowGfx:  Phaser.GameObjects.Graphics;
@@ -31,9 +32,10 @@ export class VergeRiver {
   private lampXs:    number[]      = [];
   private cyclists:  Cyclist[]     = [];
 
-  private lampSpots:  SoftSpotLight[]                              = [];
-  private lampBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
-  private lampLights: LightSource[]                                = [];
+  private lampSpots:        SoftSpotLight[]                              = [];
+  private lampBulbs:        Array<Extract<LightSource, { type?: 'point' }>> = [];
+  private lampLights:       LightSource[]                                = [];
+  private lampNativeLights: Phaser.GameObjects.Light[]                  = [];
 
   private _level:   number = 0;
   private _width:   number = 0;
@@ -42,6 +44,7 @@ export class VergeRiver {
   get extraLights(): LightSource[] { return this.lampLights; }
 
   constructor(scene: Phaser.Scene) {
+    this.scene      = scene;
     this.vergeGfx   = scene.add.graphics().setDepth(6).setLighting(true);
     this.cyclistGfx = scene.add.graphics().setDepth(6.5).setLighting(true);
     this.shadowGfx  = scene.add.graphics().setDepth(7.1);
@@ -93,6 +96,10 @@ export class VergeRiver {
       this.lampXs = [];
     }
 
+    // Remove stale native lights before recreating
+    for (const l of this.lampNativeLights) this.scene.lights.removeLight(l);
+    this.lampNativeLights = [];
+
     // Spot + bulb lights for each lamp (level 11+)
     this.lampSpots  = [];
     this.lampBulbs  = [];
@@ -116,6 +123,8 @@ export class VergeRiver {
         this.lampSpots.push(spot);
         this.lampBulbs.push(bulb);
         this.lampLights.push(...spot.beams, bulb);
+        // Native Phaser light so .setLighting(true) geometry gets warm tint
+        this.lampNativeLights.push(this.scene.lights.addLight(armX, lampHeadY, 50, 0xffcc66, 0));
       }
     }
 
@@ -496,9 +505,11 @@ export class VergeRiver {
     for (const bulb of this.lampBulbs) {
       (bulb as { intensity: number }).intensity = nightFactor * 300;
     }
+    for (const l of this.lampNativeLights) l.intensity = nightFactor * 0.8;
   }
 
   destroy(): void {
+    for (const l of this.lampNativeLights) this.scene.lights.removeLight(l);
     this.vergeGfx.destroy();
     this.cyclistGfx.destroy();
     this.shadowGfx.destroy();
