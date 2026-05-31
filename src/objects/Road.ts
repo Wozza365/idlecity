@@ -22,15 +22,19 @@ export class Road {
       // Earthy brown base with scattered clods and pebbles — no ruts
       gfx.fillStyle(0x6b4c2a, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      const dc = [0x9a7050, 0xb48860, 0x7a5530, 0xc89060, 0x4a3018, 0x8a6040];
-      for (let row = 0; row < 9; row++) {
-        const py = gy + 4 + row * 8;
-        for (let px = (row & 1) * 10; px < width; px += 20) {
-          const h = ((px * 73) ^ (row * 137)) % 32;
-          gfx.fillStyle(dc[h % dc.length], 1);
-          const size = 1 + (h >> 1) % 2;
-          if (h & 1) gfx.fillCircle(px, py, size);
-          else gfx.fillRect(px - 1, py, size + 1, size);
+      const dc = [0x9a7050, 0xb48860, 0x7a5530, 0xc89060, 0x4a3018, 0x8a6040, 0xd4a870];
+      for (let row = 0; row < 10; row++) {
+        const baseY = gy + 4 + row * 7;
+        let px = Math.imul(row, 127) % 23;
+        while (px < width) {
+          const h = (Math.imul(px, 374761393) ^ Math.imul(row, 668265261)) >>> 0;
+          const a = h & 0xff;
+          const b = (h >> 8) & 0xff;
+          gfx.fillStyle(dc[a % dc.length], 1);
+          const size = 1 + a % 3;
+          if (b & 1) gfx.fillCircle(px, baseY + (b % 5) - 2, size);
+          else gfx.fillRect(px - 1, baseY + (b % 5) - 2, size + 1, size);
+          px += 8 + (b >> 2) % 16;
         }
       }
       return;
