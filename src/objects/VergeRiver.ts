@@ -37,7 +37,6 @@ export class VergeRiver {
   private lampLights:       LightSource[]                                = [];
   private lampNativeLights: Phaser.GameObjects.Light[]                  = [];
 
-  private bollardSpots:        SoftSpotLight[]                              = [];
   private bollardBulbs:        Array<Extract<LightSource, { type?: 'point' }>> = [];
   private bollardLights:       LightSource[]                                = [];
   private bollardNativeLights: Phaser.GameObjects.Light[]                  = [];
@@ -136,28 +135,19 @@ export class VergeRiver {
       }
     }
 
-    // Bollard path lights (level 9+, Boulevard tier)
-    this.bollardSpots  = [];
+    // Bollard path lights (level 9+, Boulevard tier) — omni point lights
     this.bollardBulbs  = [];
     this.bollardLights = [];
     if (level >= 9) {
       const bollardHeadY = groundY + ROAD_H + 12;
       const bollardXs    = getPositions(width, 20, 40);
       for (const bx of bollardXs) {
-        const spot = new SoftSpotLight({
-          x: bx, y: bollardHeadY,
-          radius: 22, color: 0xffcc66, intensity: 0,
-          angle: Math.PI / 2,
-          coneAngle: Math.PI / 2.5,
-          noOcclusion: true,
-        });
-        const bulb: Extract<LightSource, { type?: 'point' }> = {
-          x: bx, y: bollardHeadY, radius: 1,
-          color: 0xfff8d0, intensity: 0, noOcclusion: true,
+        const point: Extract<LightSource, { type?: 'point' }> = {
+          x: bx, y: bollardHeadY, radius: 22,
+          color: 0xffcc66, intensity: 0, noOcclusion: true,
         };
-        this.bollardSpots.push(spot);
-        this.bollardBulbs.push(bulb);
-        this.bollardLights.push(...spot.beams, bulb);
+        this.bollardBulbs.push(point);
+        this.bollardLights.push(point);
         this.bollardNativeLights.push(this.scene.lights.addLight(bx, bollardHeadY, 18, 0xffcc66, 0));
       }
     }
@@ -561,8 +551,7 @@ export class VergeRiver {
     for (const bulb of this.lampBulbs)    (bulb as { intensity: number }).intensity = nightFactor * 300;
     for (const l    of this.lampNativeLights) l.intensity = nightFactor * 1.4;
 
-    for (const spot of this.bollardSpots) spot.setIntensity(nightFactor * 2.0);
-    for (const bulb of this.bollardBulbs) (bulb as { intensity: number }).intensity = nightFactor * 200;
+    for (const bulb of this.bollardBulbs) (bulb as { intensity: number }).intensity = nightFactor * 2.0;
     for (const l    of this.bollardNativeLights) l.intensity = nightFactor * 0.7;
   }
 
