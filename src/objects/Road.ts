@@ -19,27 +19,47 @@ export class Road {
       return;
     }
     if (level <= 2) {
-      gfx.fillStyle(0x6b4c2a, 1);
+      // Dark earth base
+      gfx.fillStyle(0x5e3c1c, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0x8a6040, 1);
-      for (let row = 0; row * 8 + 8 < ROAD_H; row++) {
-        const py = gy + 8 + row * 8;
-        const xStart = row % 2 === 0 ? 10 : 24;
-        for (let px = xStart; px < width; px += 28) {
-          gfx.fillCircle(px, py, 2);
+      // Centre ridge (untouched dirt between tyre paths)
+      gfx.fillStyle(0x7a5228, 1);
+      gfx.fillRect(0, gy + 27, width, 18);
+      // Tyre ruts
+      gfx.fillStyle(0x2e1c08, 1);
+      gfx.fillRect(0, gy + 15, width, 7);
+      gfx.fillRect(0, gy + 50, width, 7);
+      // Scattered stones and dirt clods
+      const dc = [0x9a7050, 0xb48860, 0x7a5530, 0xc89060, 0x4a3018];
+      for (let row = 0; row < 9; row++) {
+        const py = gy + 4 + row * 8;
+        for (let px = (row & 1) * 10; px < width; px += 20) {
+          const h = ((px * 73) ^ (row * 137)) % 32;
+          gfx.fillStyle(dc[h % dc.length], 1);
+          const size = 1 + (h >> 1) % 2;
+          if (h & 1) gfx.fillCircle(px, py, size);
+          else gfx.fillRect(px - 1, py, size + 1, size);
         }
       }
       return;
     }
     if (level <= 4) {
-      gfx.fillStyle(0x555555, 1);
+      // Warm grey base
+      gfx.fillStyle(0x7c7260, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0x6e6e6e, 1);
-      for (let row = 0; row * 9 + 5 < ROAD_H; row++) {
-        const py = gy + 5 + row * 9;
-        const xStart = row % 2 === 0 ? 5 : 14;
-        for (let px = xStart; px < width; px += 18) {
-          gfx.fillRect(px, py, 3, 2);
+      // Tyre-compacted tracks
+      gfx.fillStyle(0x585048, 1);
+      gfx.fillRect(0, gy + 12, width, 14);
+      gfx.fillRect(0, gy + 46, width, 14);
+      // Angular crushed-stone chips
+      const gc = [0xa89880, 0xc4b8a8, 0x666058, 0xd8ccbc, 0x484440, 0x908070];
+      for (let row = 0; row < 9; row++) {
+        const py = gy + 4 + row * 8;
+        for (let px = (row & 1) * 6; px < width; px += 12) {
+          const h = ((px * 41) ^ (row * 97)) % 48;
+          gfx.fillStyle(gc[h % gc.length], 1);
+          if (h % 5 === 0) gfx.fillCircle(px, py, 2);
+          else gfx.fillRect(px - (1 + h % 2), py, 2 + h % 3, 1 + (h >> 2) % 2);
         }
       }
       return;
