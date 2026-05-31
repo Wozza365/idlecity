@@ -551,6 +551,9 @@ export class VergeRiver {
 
     for (const bulb of this.bollardBulbs) (bulb as { intensity: number }).intensity = nightFactor * 2.0;
     for (const l    of this.bollardNativeLights) l.intensity = nightFactor * 0.7;
+
+    // flowerGfx skips the Light2D pipeline so manually darken it to match the verge
+    this.flowerGfx.setAlpha(1.0 - nightFactor * 0.55);
   }
 
   destroy(): void {
