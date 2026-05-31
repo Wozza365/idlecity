@@ -464,7 +464,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
         y: this.chimneyTopY,
         alpha: 0,
         dx: 0.02 + Math.random() * 0.015,
-        fadeRate: 0.0003 + Math.random() * 0.001,
+        fadeRate: 0.0001 + Math.random() * 0.000333,
         radius: 1 + Math.floor(Math.random() * 4),
         maxAlpha: 0,
         color: (() => { const c = 0x7a + Math.floor(Math.random() * 40); return (c << 16) | (c << 8) | c; })(),
