@@ -143,7 +143,7 @@ export class VergeRiver {
       const bollardXs    = getPositions(width, 20, 40);
       for (const bx of bollardXs) {
         const point: Extract<LightSource, { type?: 'point' }> = {
-          x: bx, y: bollardHeadY, radius: 22,
+          x: bx, y: bollardHeadY, radius: 20,
           color: 0xffcc66, intensity: 0, noOcclusion: true,
         };
         this.bollardBulbs.push(point);
@@ -241,7 +241,7 @@ export class VergeRiver {
   private drawBollards(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
     // Sit on the paved boulevard strip (vergeY+10, height 9)
     const pathBaseY = vergeY + 19;
-    const poleH     = 5;
+    const poleH     = 3;
     const capH      = 2;
     const poleTopY  = pathBaseY - poleH - capH;
 
