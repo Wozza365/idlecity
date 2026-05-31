@@ -18,3 +18,11 @@ export interface HasShadowOverlay {
 export function hasShadowOverlay(o: unknown): o is HasShadowOverlay {
   return o != null && typeof (o as HasShadowOverlay).setShadowAlpha === 'function';
 }
+
+export interface HasSmokeUpdate {
+  updateSmoke(t: number): void;
+}
+
+export function hasSmokeUpdate(o: unknown): o is HasSmokeUpdate {
+  return o != null && typeof (o as HasSmokeUpdate).updateSmoke === 'function';
+}

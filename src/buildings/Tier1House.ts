@@ -463,8 +463,9 @@ export class Tier1House extends Phaser.GameObjects.Container {
     }
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
+  }
 
-    // Chimney smoke
+  updateSmoke(t: number): void {
     const now = this.scene.time.now;
     if (now > this.nextSmoke) {
       this.smokeParticles.push({

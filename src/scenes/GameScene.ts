@@ -6,7 +6,7 @@ import {
   upgradeCost, perBuildingIncome,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
-import { hasShadowOverlay } from '../buildings/types';
+import { hasShadowOverlay, hasSmokeUpdate } from '../buildings/types';
 import { Sky } from '../objects/Sky';
 import { SunMoon } from '../objects/SunMoon';
 import { Stars } from '../objects/Stars';
@@ -142,6 +142,11 @@ export class GameScene extends Phaser.Scene {
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
+    const elev = Math.sin(this.sunAngle);
+    const t = Math.max(0, Math.min(1, (0.3 - elev) / 0.3));
+    for (const c of this.plotContainers) {
+      if (hasSmokeUpdate(c)) c.updateSmoke(t);
+    }
   }
 
   // ── Layout build / rebuild ─────────────────────────────────────────────────

@@ -420,8 +420,9 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     });
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
+  }
 
-    // Chimney smoke
+  updateSmoke(t: number): void {
     const now = this.scene.time.now;
     if (now > this.nextSmoke) {
       this.smokeParticles.push({
@@ -452,7 +453,6 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
         this.smokeGfx.fillCircle(Math.round(p.x), Math.round(p.y), p.radius);
       }
     }
-
   }
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
