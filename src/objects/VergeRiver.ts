@@ -106,14 +106,14 @@ export class VergeRiver {
     this.lampLights = [];
     if (level >= 11) {
       // Head sits just above the cycle lane
-      const lampHeadY = groundY + ROAD_H + VERGE_H - CYCLE_H - 14;
+      const lampHeadY = groundY + ROAD_H + VERGE_H - CYCLE_H - 17;
       for (const lx of this.lampXs) {
         const armX = lx + 8;
         const spot = new SoftSpotLight({
           x: armX, y: lampHeadY,
           radius: 90, color: 0xffcc66, intensity: 0,
           angle: Math.PI / 2,       // pointing straight down
-          coneAngle: Math.PI / 2.2, // ~82° cone
+          coneAngle: Math.PI / 4.4, // ~41° cone
           noOcclusion: true,
         });
         const bulb: Extract<LightSource, { type?: 'point' }> = {
@@ -124,7 +124,7 @@ export class VergeRiver {
         this.lampBulbs.push(bulb);
         this.lampLights.push(...spot.beams, bulb);
         // Native Phaser light so .setLighting(true) geometry gets warm tint
-        this.lampNativeLights.push(this.scene.lights.addLight(armX, lampHeadY, 50, 0xffcc66, 0));
+        this.lampNativeLights.push(this.scene.lights.addLight(armX, lampHeadY, 60, 0xffcc66, 0));
       }
     }
 
@@ -381,7 +381,7 @@ export class VergeRiver {
     const gfx = this.treeGfx;
     // Short cycle-lane bollard: base at cycle lane edge, head just above it
     const cycleTopY = vergeY + VERGE_H - CYCLE_H;
-    const poleH     = 16;
+    const poleH     = 19;
     const poleBaseY = cycleTopY;
     const poleTopY  = poleBaseY - poleH;
     const armLen    = 8;
@@ -505,7 +505,7 @@ export class VergeRiver {
     for (const bulb of this.lampBulbs) {
       (bulb as { intensity: number }).intensity = nightFactor * 300;
     }
-    for (const l of this.lampNativeLights) l.intensity = nightFactor * 0.8;
+    for (const l of this.lampNativeLights) l.intensity = nightFactor * 1.4;
   }
 
   destroy(): void {
