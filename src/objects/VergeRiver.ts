@@ -37,11 +37,16 @@ export class VergeRiver {
   private lampLights:       LightSource[]                                = [];
   private lampNativeLights: Phaser.GameObjects.Light[]                  = [];
 
+  private bollardSpots:        SoftSpotLight[]                              = [];
+  private bollardBulbs:        Array<Extract<LightSource, { type?: 'point' }>> = [];
+  private bollardLights:       LightSource[]                                = [];
+  private bollardNativeLights: Phaser.GameObjects.Light[]                  = [];
+
   private _level:   number = 0;
   private _width:   number = 0;
   private _groundY: number = 0;
 
-  get extraLights(): LightSource[] { return this.lampLights; }
+  get extraLights(): LightSource[] { return [...this.lampLights, ...this.bollardLights]; }
 
   constructor(scene: Phaser.Scene) {
     this.scene      = scene;
@@ -72,6 +77,7 @@ export class VergeRiver {
     for (let x = 0; x < width; x += 40) gfx.fillRect(x, riverY + 8, 24, 2);
 
     if (level >= 8)  this.drawCyclePath(gfx, width, vergeY);
+    if (level >= 9)  this.drawBollards(gfx, width, vergeY);
     if (level >= 13) this.drawPaving(gfx, width, vergeY);
     // Wildflowers only before flower beds take over (levels 3–4)
     if (level >= 3 && level <= 4) this.drawWildflowers(gfx, level, width, vergeY);
@@ -97,8 +103,10 @@ export class VergeRiver {
     }
 
     // Remove stale native lights before recreating
-    for (const l of this.lampNativeLights) this.scene.lights.removeLight(l);
-    this.lampNativeLights = [];
+    for (const l of this.lampNativeLights)    this.scene.lights.removeLight(l);
+    for (const l of this.bollardNativeLights) this.scene.lights.removeLight(l);
+    this.lampNativeLights    = [];
+    this.bollardNativeLights = [];
 
     // Spot + bulb lights for each lamp (level 11+)
     this.lampSpots  = [];
@@ -125,6 +133,32 @@ export class VergeRiver {
         this.lampLights.push(...spot.beams, bulb);
         // Native Phaser light so .setLighting(true) geometry gets warm tint
         this.lampNativeLights.push(this.scene.lights.addLight(armX, lampHeadY, 60, 0xffcc66, 0));
+      }
+    }
+
+    // Bollard path lights (level 9+, Boulevard tier)
+    this.bollardSpots  = [];
+    this.bollardBulbs  = [];
+    this.bollardLights = [];
+    if (level >= 9) {
+      const bollardHeadY = groundY + ROAD_H + VERGE_H - CYCLE_H - 6;
+      const bollardXs    = getPositions(width, 20, 40);
+      for (const bx of bollardXs) {
+        const spot = new SoftSpotLight({
+          x: bx, y: bollardHeadY,
+          radius: 22, color: 0xffcc66, intensity: 0,
+          angle: Math.PI / 2,
+          coneAngle: Math.PI / 2.5,
+          noOcclusion: true,
+        });
+        const bulb: Extract<LightSource, { type?: 'point' }> = {
+          x: bx, y: bollardHeadY, radius: 1,
+          color: 0xfff8d0, intensity: 0, noOcclusion: true,
+        };
+        this.bollardSpots.push(spot);
+        this.bollardBulbs.push(bulb);
+        this.bollardLights.push(...spot.beams, bulb);
+        this.bollardNativeLights.push(this.scene.lights.addLight(bx, bollardHeadY, 18, 0xffcc66, 0));
       }
     }
 
@@ -210,6 +244,27 @@ export class VergeRiver {
     gfx.fillStyle(0xffffff, 0.3);
     const mid = cy + Math.floor(CYCLE_H / 2) - 1;
     for (let x = 0; x < width; x += 24) gfx.fillRect(x, mid, 10, 2);
+  }
+
+  // ── Boulevard bollards (level 9+) ────────────────────────────────
+
+  private drawBollards(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
+    const cycleTopY  = vergeY + VERGE_H - CYCLE_H;
+    const poleH      = 5;
+    const capH       = 2;
+    const poleTopY   = cycleTopY - poleH - capH;
+
+    for (let bx = 20; bx < width; bx += 40) {
+      // Pole
+      gfx.fillStyle(0x111111, 1);
+      gfx.fillRect(bx - 1, poleTopY + capH, 2, poleH);
+      // Cap housing
+      gfx.fillStyle(0x1e1e1e, 1);
+      gfx.fillRect(bx - 2, poleTopY, 4, capH);
+      // Tiny warm lens dot
+      gfx.fillStyle(0xfff0b0, 0.7);
+      gfx.fillRect(bx, poleTopY, 1, 1);
+    }
   }
 
   // ── Wildflowers ───────────────────────────────────────────────────
@@ -499,17 +554,20 @@ export class VergeRiver {
   // ── Day/night lamp glow ───────────────────────────────────────────
 
   updateLighting(elevation: number): void {
-    if (this.lampSpots.length === 0) return;
     const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+
     for (const spot of this.lampSpots) spot.setIntensity(nightFactor * 3.5);
-    for (const bulb of this.lampBulbs) {
-      (bulb as { intensity: number }).intensity = nightFactor * 300;
-    }
-    for (const l of this.lampNativeLights) l.intensity = nightFactor * 1.4;
+    for (const bulb of this.lampBulbs)    (bulb as { intensity: number }).intensity = nightFactor * 300;
+    for (const l    of this.lampNativeLights) l.intensity = nightFactor * 1.4;
+
+    for (const spot of this.bollardSpots) spot.setIntensity(nightFactor * 2.0);
+    for (const bulb of this.bollardBulbs) (bulb as { intensity: number }).intensity = nightFactor * 200;
+    for (const l    of this.bollardNativeLights) l.intensity = nightFactor * 0.7;
   }
 
   destroy(): void {
-    for (const l of this.lampNativeLights) this.scene.lights.removeLight(l);
+    for (const l of this.lampNativeLights)    this.scene.lights.removeLight(l);
+    for (const l of this.bollardNativeLights) this.scene.lights.removeLight(l);
     this.vergeGfx.destroy();
     this.cyclistGfx.destroy();
     this.shadowGfx.destroy();
