@@ -34,7 +34,7 @@ export class Road {
           const size = 1 + a % 3;
           if (b & 1) gfx.fillCircle(px, baseY + (b % 5) - 2, size);
           else gfx.fillRect(px - 1, baseY + (b % 5) - 2, size + 1, size);
-          px += 8 + (b >> 2) % 16;
+          px += 14 + (b >> 2) % 16;
         }
       }
       return;
