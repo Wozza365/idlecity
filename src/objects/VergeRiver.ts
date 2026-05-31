@@ -376,9 +376,9 @@ export class VergeRiver {
     const poleBaseY = cycleTopY;
     const poleTopY  = poleBaseY - poleH;
     const armLen    = 8;
-    const poleColor = level >= 15 ? 0x6a5040 : 0x44566a;
-    const headColor = level >= 15 ? 0xffd060 : 0xd0e0ee;
-    const baseColor = level >= 15 ? 0x8a7060 : 0x607080;
+    const poleColor = level >= 15 ? 0x5c4a38 : 0x555555;
+    const headColor = level >= 15 ? 0x6a5a40 : 0x444444;
+    const baseColor = level >= 15 ? 0x7a6a50 : 0x3a3a3a;
 
     for (const lx of this.lampXs) {
       // Base plate
@@ -389,11 +389,14 @@ export class VergeRiver {
       gfx.fillRect(lx - 1, poleTopY, 2, poleH - 2);
       // Arm
       gfx.fillRect(lx, poleTopY + 1, armLen, 2);
-      // Lamp head
+      // Lamp head housing (mirrors for-sale sign lamp style)
+      const hx = lx + armLen - 3;
       gfx.fillStyle(headColor, 1);
-      gfx.fillEllipse(lx + armLen, poleTopY + 2, 11, 6);
-      gfx.fillStyle(0xffffff, 0.4);
-      gfx.fillEllipse(lx + armLen - 1, poleTopY + 1, 5, 3);
+      gfx.fillRect(hx, poleTopY, 7, 4);
+      gfx.fillStyle(0x333333, 1);
+      gfx.fillRect(hx - 1, poleTopY + 3, 9, 1);
+      gfx.fillStyle(0x666666, 1);
+      gfx.fillRect(hx + 1, poleTopY + 1, 5, 1);
     }
   }
 
