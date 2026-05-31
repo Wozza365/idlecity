@@ -70,6 +70,7 @@ export class PedestrianManager {
   private offscreenTimer: number;
   private doorTimer:  number;
   private elevation = 1.0;
+  private shadowAlpha = 0;
 
   constructor(scene: Phaser.Scene, groundY: number, plotWidth: number) {
     this.groundY    = groundY;
@@ -100,8 +101,10 @@ export class PedestrianManager {
     plots: PlotState[],
     containers: Phaser.GameObjects.Container[],
     sunAngle: number,
+    shadowAlpha = 0,
   ): void {
-    this.elevation = Math.sin(sunAngle);
+    this.elevation   = Math.sin(sunAngle);
+    this.shadowAlpha = shadowAlpha;
 
     const rightBound = this.getRightBound(plots);
     if (rightBound <= 0) return;
@@ -202,7 +205,7 @@ export class PedestrianManager {
   private syncGO(p: Pedestrian): void {
     const go         = this.pool[p.poolIdx];
     const top        = p.bottomY - p.h;
-    const brightness = this.nightBrightness();
+    const brightness = this.nightBrightness() * (1 - this.shadowAlpha * 0.85);
     const drawColor  = darkenColor(p.color, brightness);
     go.body
       .setPosition(p.x + p.w / 2, top + p.h / 2)
