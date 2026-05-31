@@ -19,18 +19,10 @@ export class Road {
       return;
     }
     if (level <= 2) {
-      // Dark earth base
-      gfx.fillStyle(0x5e3c1c, 1);
+      // Earthy brown base with scattered clods and pebbles — no ruts
+      gfx.fillStyle(0x6b4c2a, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      // Centre ridge (untouched dirt between tyre paths)
-      gfx.fillStyle(0x7a5228, 1);
-      gfx.fillRect(0, gy + 27, width, 18);
-      // Tyre ruts
-      gfx.fillStyle(0x2e1c08, 1);
-      gfx.fillRect(0, gy + 15, width, 7);
-      gfx.fillRect(0, gy + 50, width, 7);
-      // Scattered stones and dirt clods
-      const dc = [0x9a7050, 0xb48860, 0x7a5530, 0xc89060, 0x4a3018];
+      const dc = [0x9a7050, 0xb48860, 0x7a5530, 0xc89060, 0x4a3018, 0x8a6040];
       for (let row = 0; row < 9; row++) {
         const py = gy + 4 + row * 8;
         for (let px = (row & 1) * 10; px < width; px += 20) {
@@ -49,8 +41,8 @@ export class Road {
       gfx.fillRect(0, gy, width, ROAD_H);
       // Tyre-compacted tracks
       gfx.fillStyle(0x585048, 1);
-      gfx.fillRect(0, gy + 12, width, 14);
-      gfx.fillRect(0, gy + 46, width, 14);
+      gfx.fillRect(0, gy + 28, width, 14);
+      gfx.fillRect(0, gy + 58, width, 14);
       // Angular crushed-stone chips
       const gc = [0xa89880, 0xc4b8a8, 0x666058, 0xd8ccbc, 0x484440, 0x908070];
       for (let row = 0; row < 9; row++) {
