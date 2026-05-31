@@ -74,7 +74,6 @@ export class VergeRiver {
     if (level >= 3 && level <= 4) this.drawWildflowers(gfx, level, width, vergeY);
     if (level >= 5)  this.drawFlowerBeds(gfx, level, width, vergeY);
     if (level >= 6)  this.drawBenches(gfx, level, width, vergeY);
-    if (level >= 12) this.drawGardenBeds(gfx, width, vergeY);
 
     this.treeGfx.clear();
     if (level >= 4) {
@@ -105,13 +104,13 @@ export class VergeRiver {
         const armX = lx + 8;
         const spot = new SoftSpotLight({
           x: armX, y: lampHeadY,
-          radius: 90, color: 0xffd070, intensity: 0,
+          radius: 90, color: 0xffcc66, intensity: 0,
           angle: Math.PI / 2,       // pointing straight down
           coneAngle: Math.PI / 2.2, // ~82° cone
           noOcclusion: true,
         });
         const bulb: Extract<LightSource, { type?: 'point' }> = {
-          x: lx + 8, y: lampHeadY, radius: 5,
+          x: lx + 8, y: lampHeadY, radius: 2,
           color: 0xfffae0, intensity: 0, noOcclusion: true,
         };
         this.lampSpots.push(spot);
@@ -286,39 +285,27 @@ export class VergeRiver {
 
   private drawBenches(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
     const { spacing } = treeGeom(level);
-    for (let tx = spacing; tx < width - spacing * 0.4; tx += spacing * 2) {
+    for (let tx = spacing * 1.5; tx < width - spacing * 0.4; tx += spacing * 2) {
       const bx = Math.round(tx);
       const by = vergeY + 22;
 
-      // Seat (24 px wide, 4 px tall)
+      // Seat (30 px wide, 4 px tall)
       gfx.fillStyle(0xc8a46e, 1);
-      gfx.fillRect(bx - 12, by, 24, 4);
+      gfx.fillRect(bx - 15, by, 30, 4);
       // Seat slat lines
       gfx.fillStyle(0x8a6030, 0.35);
-      gfx.fillRect(bx - 4, by, 1, 4);
-      gfx.fillRect(bx + 3, by, 1, 4);
+      gfx.fillRect(bx - 5, by, 1, 4);
+      gfx.fillRect(bx + 4, by, 1, 4);
 
       // Back rest (same width, 3 px tall, 5 px above seat)
       gfx.fillStyle(0xb08848, 1);
-      gfx.fillRect(bx - 12, by - 6, 24, 3);
+      gfx.fillRect(bx - 15, by - 6, 30, 3);
 
       // Cast-iron legs (2 each side)
       gfx.fillStyle(0x4a4a4a, 1);
-      gfx.fillRect(bx - 10, by + 4, 3, 5);
-      gfx.fillRect(bx + 7,  by + 4, 3, 5);
+      gfx.fillRect(bx - 13, by + 4, 3, 5);
+      gfx.fillRect(bx + 10, by + 4, 3, 5);
     }
-  }
-
-  // ── Ornamental garden beds (level 12+) ────────────────────────────
-
-  private drawGardenBeds(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
-    gfx.fillStyle(0x6b4c2a, 0.5);
-    gfx.fillRect(0, vergeY + 2, width, 7);
-    gfx.fillStyle(0x8a6a40, 0.55);
-    gfx.fillRect(0, vergeY + 2, width, 1);
-    gfx.fillRect(0, vergeY + 8, width, 1);
-    gfx.fillStyle(0xb0a090, 0.5);
-    for (let x = 5; x < width; x += 18) gfx.fillRect(x, vergeY + 3, 9, 5);
   }
 
   // ── Decorative paving (level 13+) ─────────────────────────────────
@@ -475,7 +462,7 @@ export class VergeRiver {
     const gfx = this.shadowGfx;
     gfx.clear();
 
-    if (this.treeXs.length === 0 && this.lampXs.length === 0) return;
+    if (this.treeXs.length === 0) return;
 
     const elevation = Math.sin(sunAngle);
     if (elevation <= 0.04) return;
@@ -486,15 +473,13 @@ export class VergeRiver {
 
     gfx.fillStyle(0x000000, alpha);
 
-    const { trunkH, canopyR } = treeGeom(this._level);
+    const { canopyR } = treeGeom(this._level);
     for (const tx of this.treeXs) {
-      const trunkBaseY = vergeY + 8;
-      const hw         = canopyR * 0.7;
-      const shadowH    = Math.min(VERGE_H * 0.75, (trunkH + canopyR) * Math.pow(1 - Math.min(elevation, 1), 0.5));
-      const shadBot    = trunkBaseY + shadowH;
-      const lean       = leanRate * (shadowH + trunkH);
-      gfx.fillTriangle(tx - hw, trunkBaseY, tx + hw, trunkBaseY, tx + hw + lean, shadBot);
-      gfx.fillTriangle(tx - hw, trunkBaseY, tx + hw + lean, shadBot, tx - hw + lean, shadBot);
+      const trunkBaseY = vergeY + 10;
+      // Ellipse stretched slightly in the direction of the sun
+      const shadowW = canopyR * 1.8 + Math.abs(leanRate) * 4;
+      const offsetX = leanRate * 3;
+      gfx.fillEllipse(tx + offsetX, trunkBaseY, shadowW, canopyR * 0.55);
     }
 
   }
