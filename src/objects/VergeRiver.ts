@@ -329,7 +329,7 @@ export class VergeRiver {
           const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
           const useSecond = (h & 3) === 0;
           const src = useSecond ? pal2 : pal;
-          const colorIdx = (h >> 2) % 3;
+          const colorIdx = (h >>> 2) % 3;
           gfx.fillStyle(src[colorIdx], 0.95);
           gfx.fillCircle(fx, row.y, row.r);
           // Small bright centre highlight
