@@ -283,54 +283,62 @@ export class VergeRiver {
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
+    // Each entry is [primary, secondary, accent, highlight]
     const bedPalettes = [
-      [0xff8fa3, 0xff6090, 0xffe0e8],  // pinks
-      [0xffd700, 0xffaa00, 0xffeebb],  // yellows
-      [0xff7835, 0xff5500, 0xffccaa],  // oranges
-      [0xa088ff, 0x7755dd, 0xddccff],  // purples
-      [0x44e0b0, 0x22ccaa, 0xaaffee],  // teals
+      [0xff4477, 0xff88aa, 0xff2255, 0xffccdd],  // roses
+      [0xffcc00, 0xffaa22, 0xffee55, 0xff8800],  // sunflowers
+      [0xff6600, 0xff3300, 0xff9944, 0xffcc66],  // marigolds
+      [0x9955ff, 0x6622cc, 0xcc88ff, 0x4400aa],  // lavender
+      [0x22ddaa, 0x00bb88, 0x66ffcc, 0x009966],  // aqua
+      [0xff44cc, 0xdd1199, 0xff99ee, 0xaa0077],  // magenta
+      [0x66ddff, 0x33aaee, 0xaaeeff, 0x0077cc],  // cornflower
+      [0x88ee22, 0x44cc00, 0xccff66, 0x228800],  // lime
     ];
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
-    const backY  = vergeY + VERGE_H - bottomBand - 12;
-    const frontY = vergeY + VERGE_H - bottomBand - 4;
+    const bedTop = vergeY + VERGE_H - bottomBand - 18;
+    const bedH   = 16;
+
     let ci = 0;
     for (let tx = spacing / 2; tx < width; tx += spacing * 2) {
       const gx = Math.round(tx - spacing / 2 + 14);
       const gw = Math.round(spacing - 28);
       if (gw <= 0) continue;
       const pal = bedPalettes[ci % bedPalettes.length];
+      // Each bed mixes two adjacent palettes for variety
+      const pal2 = bedPalettes[(ci + 1) % bedPalettes.length];
 
-      // Soil bed strip
-      gfx.fillStyle(0x5a3a1a, 0.55);
-      gfx.fillRect(gx, backY - 2, gw, 20);
-      // Bed edging
-      gfx.fillStyle(0x8a6a40, 0.7);
-      gfx.fillRect(gx, backY + 17, gw, 1);
+      // Soil base
+      gfx.fillStyle(0x4a3010, 0.72);
+      gfx.fillRect(gx, bedTop, gw, bedH);
+      gfx.fillStyle(0x7a5828, 0.35);
+      gfx.fillRect(gx, bedTop, gw, 1);
 
-      // Back row — taller rounded blobs
-      gfx.fillStyle(pal[0], 0.9);
-      for (let bx = gx + 4; bx < gx + gw - 4; bx += 8) {
-        gfx.fillCircle(bx, backY + 3, 3);
-      }
-      // Back row highlight
-      gfx.fillStyle(pal[2], 0.5);
-      for (let bx = gx + 3; bx < gx + gw - 4; bx += 8) {
-        gfx.fillCircle(bx - 1, backY + 2, 1);
+      // Three rows packed densely across the full bed height
+      const rows = [
+        { y: bedTop + 3,  r: 3, step: 6,  offset: 0 },
+        { y: bedTop + 9,  r: 2, step: 5,  offset: 3 },
+        { y: bedTop + 14, r: 2, step: 6,  offset: 1 },
+      ];
+
+      for (const row of rows) {
+        for (let fx = gx + row.offset + 3; fx < gx + gw - 3; fx += row.step) {
+          // Deterministic colour — mix primary palette with pal2 for variety
+          const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
+          const useSecond = (h & 3) === 0;
+          const src = useSecond ? pal2 : pal;
+          const colorIdx = (h >> 2) % 3;
+          gfx.fillStyle(src[colorIdx], 0.92);
+          gfx.fillCircle(fx, row.y, row.r);
+          // Bright highlight dot
+          gfx.fillStyle(src[3], 0.45);
+          gfx.fillCircle(fx - 1, row.y - 1, Math.max(1, row.r - 1));
+        }
       }
 
-      // Front row — smaller flowers with stems
-      gfx.fillStyle(0x3a7a2a, 0.8);
-      for (let bx = gx + 6; bx < gx + gw - 4; bx += 10) {
-        gfx.fillRect(bx, frontY - 3, 1, 5);
-      }
-      gfx.fillStyle(pal[1], 0.88);
-      for (let bx = gx + 6; bx < gx + gw - 4; bx += 10) {
-        gfx.fillCircle(bx, frontY - 4, 2);
-        gfx.fillStyle(0xffffff, 0.35);
-        gfx.fillCircle(bx - 1, frontY - 5, 1);
-        gfx.fillStyle(pal[1], 0.88);
-      }
+      // Edging border
+      gfx.fillStyle(0x6a4818, 0.75);
+      gfx.fillRect(gx, bedTop + bedH - 1, gw, 1);
 
       ci++;
     }
