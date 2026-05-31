@@ -321,7 +321,7 @@ export class VergeRiver {
       for (const row of rows) {
         for (let fx = gx + row.offset + 3; fx < gx + gw - 3; fx += row.step) {
           const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
-          gfx.fillStyle(allColors[h % allColors.length], 0.95);
+          gfx.fillStyle(allColors[h % allColors.length], 0.85);
           gfx.fillCircle(fx, row.y, row.r);
           gfx.fillStyle(0xffffff, 0.4);
           gfx.fillCircle(fx - 1, row.y - 1, 1);
