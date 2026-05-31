@@ -283,16 +283,16 @@ export class VergeRiver {
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    // Each entry is [primary, secondary, accent, highlight] — all bright
+    // Each entry is [col_a, col_b, col_c] — fully saturated, no pastels/darks
     const bedPalettes = [
-      [0xff4488, 0xff88bb, 0xffbbdd, 0xffeef5],  // roses
-      [0xffdd00, 0xffcc44, 0xffee88, 0xfffff0],  // sunflowers
-      [0xff7722, 0xff9944, 0xffbb77, 0xffeedd],  // marigolds
-      [0xcc88ff, 0xdd99ff, 0xeebbff, 0xfff0ff],  // lavender
-      [0x22ffcc, 0x55ffdd, 0x99ffee, 0xeefffa],  // aqua
-      [0xff55ee, 0xff88ee, 0xffbbf5, 0xffeeff],  // magenta
-      [0x55ccff, 0x88ddff, 0xbbeeff, 0xeef8ff],  // cornflower
-      [0xaaff44, 0xccff77, 0xddffaa, 0xf5ffee],  // lime
+      [0xff1155, 0xff4488, 0xff77aa],  // roses
+      [0xffcc00, 0xffaa00, 0xffee22],  // sunflowers
+      [0xff5500, 0xff7700, 0xff9922],  // marigolds
+      [0xaa33ff, 0xcc66ff, 0xff44ff],  // purple/violet
+      [0x00ddbb, 0x00ffcc, 0x44ffdd],  // aqua/teal
+      [0xff00bb, 0xff33cc, 0xff66dd],  // magenta
+      [0x0099ff, 0x33bbff, 0x00ccff],  // sky blue
+      [0x77ee00, 0x99ff00, 0xbbff33],  // lime green
     ];
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
@@ -314,25 +314,24 @@ export class VergeRiver {
       gfx.fillStyle(0x7a5828, 0.35);
       gfx.fillRect(gx, bedTop, gw, 1);
 
-      // Three rows packed densely across the full bed height, all same size
+      // Three rows, circles touching (step=6=diameter) so no dark soil gaps
       const rows = [
-        { y: bedTop + 4,  r: 3, step: 7, offset: 0 },
-        { y: bedTop + 9,  r: 3, step: 7, offset: 3 },
-        { y: bedTop + 13, r: 3, step: 7, offset: 0 },
+        { y: bedTop + 4,  r: 3, step: 6, offset: 0 },
+        { y: bedTop + 9,  r: 3, step: 6, offset: 3 },
+        { y: bedTop + 13, r: 3, step: 6, offset: 0 },
       ];
 
       for (const row of rows) {
         for (let fx = gx + row.offset + 3; fx < gx + gw - 3; fx += row.step) {
-          // Deterministic colour — mix primary palette with pal2 for variety
           const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
           const useSecond = (h & 3) === 0;
           const src = useSecond ? pal2 : pal;
           const colorIdx = (h >> 2) % 3;
-          gfx.fillStyle(src[colorIdx], 0.92);
+          gfx.fillStyle(src[colorIdx], 0.95);
           gfx.fillCircle(fx, row.y, row.r);
-          // Bright highlight dot
-          gfx.fillStyle(src[3], 0.45);
-          gfx.fillCircle(fx - 1, row.y - 1, Math.max(1, row.r - 1));
+          // Small bright centre highlight
+          gfx.fillStyle(0xffffff, 0.4);
+          gfx.fillCircle(fx - 1, row.y - 1, 1);
         }
       }
 
