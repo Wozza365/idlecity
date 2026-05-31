@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
-  PLOT_COUNT, MAX_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H, ROAD_H, VERGE_H, RIVER_H,
+  PLOT_COUNT, MAX_LEVEL, MAX_VERGE_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H, ROAD_H, VERGE_H, RIVER_H,
   UNLOCK_COSTS,
-  upgradeCost, perBuildingIncome,
+  upgradeCost, perBuildingIncome, vergeUpgradeCost,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
 import { hasShadowOverlay, hasSmokeUpdate } from '../buildings/types';
@@ -142,6 +142,8 @@ export class GameScene extends Phaser.Scene {
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
+    this.vergeRiver.updateCyclists(delta);
+    this.vergeRiver.updateShadows(this.sunAngle);
     const elev = Math.sin(this.sunAngle);
     const t = Math.max(0, Math.min(1, (0.3 - elev) / 0.3));
     for (const c of this.plotContainers) {
@@ -163,7 +165,7 @@ export class GameScene extends Phaser.Scene {
       .setLighting(false);
 
     this.road.render(this.state.road.level, width, this.groundY);
-    this.vergeRiver.render(width, this.groundY);
+    this.vergeRiver.render(this.state.verge.level, width, this.groundY);
 
     this.lightingSystem?.destroy();
     this.lightingSystem = new LightingSystem(this, this.groundY);
@@ -177,6 +179,7 @@ export class GameScene extends Phaser.Scene {
     this.carManager = new CarManager(this);
     this.carManager.rebuild(this.state.road.level, this.groundY);
     this.carManager.attachLights(this.lightingSystem);
+    for (const l of this.vergeRiver.extraLights) this.lightingSystem.addLight(l);
 
     this.pedestrianManager?.destroy();
     this.pedestrianManager = new PedestrianManager(this, this.groundY, this.plotWidth);
@@ -206,9 +209,11 @@ export class GameScene extends Phaser.Scene {
     this.roadUI = new RoadUI(
       this,
       this.state.road,
+      this.state.verge,
       this.panelTop + STATS_BAR_H,
       width,
-      () => this.onRoadUpgrade()
+      () => this.onRoadUpgrade(),
+      () => this.onVergeUpgrade(),
     );
     this.add.existing(this.roadUI.container);
 
@@ -315,9 +320,39 @@ export class GameScene extends Phaser.Scene {
     this.roadUI = new RoadUI(
       this,
       this.state.road,
+      this.state.verge,
       this.panelTop + STATS_BAR_H,
       this.scale.width,
-      () => this.onRoadUpgrade()
+      () => this.onRoadUpgrade(),
+      () => this.onVergeUpgrade(),
+    );
+    this.add.existing(this.roadUI.container);
+    this.statsBar.update(this.state.gold, this.taxRate);
+    this.refreshButtons();
+  }
+
+  private onVergeUpgrade(): void {
+    const cost = vergeUpgradeCost(this.state.verge.level);
+    if (this.state.gold < cost) return;
+    if (this.state.verge.level >= MAX_VERGE_LEVEL) return;
+
+    this.state.gold -= cost;
+    this.state.verge.level++;
+
+    // Remove old verge lights, re-render, re-add new lights
+    for (const l of this.vergeRiver.extraLights) this.lightingSystem?.removeLight(l);
+    this.vergeRiver.render(this.state.verge.level, this.scale.width, this.groundY);
+    for (const l of this.vergeRiver.extraLights) this.lightingSystem?.addLight(l);
+
+    this.roadUI.destroy();
+    this.roadUI = new RoadUI(
+      this,
+      this.state.road,
+      this.state.verge,
+      this.panelTop + STATS_BAR_H,
+      this.scale.width,
+      () => this.onRoadUpgrade(),
+      () => this.onVergeUpgrade(),
     );
     this.add.existing(this.roadUI.container);
     this.statsBar.update(this.state.gold, this.taxRate);
@@ -379,6 +414,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.carManager?.updateLighting(elev);
+    this.vergeRiver.updateLighting(elev);
     this.devPanel?.updateClock(this.gameTimeString());
     this.devPanel?.updateFps(this.game.loop.actualFps);
     this.lightingSystem?.update(this.sunAngle);

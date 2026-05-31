@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { type RoadState } from '../game/GameState';
-import { ROAD_BAR_H, fmt, UI_FONT, MONO_FONT } from '../constants';
+import { type RoadState, type VergeState } from '../game/GameState';
+import { ROAD_BAR_H, MAX_VERGE_LEVEL, fmt, UI_FONT, MONO_FONT, vergeTierName, vergeUpgradeCost } from '../constants';
 
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
@@ -12,20 +12,23 @@ interface ActionRef {
 
 export class RoadUI {
   readonly container: Phaser.GameObjects.Container;
-  private roadActionRef: ActionRef | null = null;
+  private roadActionRef:  ActionRef | null = null;
+  private vergeActionRef: ActionRef | null = null;
 
   constructor(
     scene: Phaser.Scene,
     road: RoadState,
+    verge: VergeState,
     rowTop: number,
     width: number,
-    onUpgrade: () => void,
+    onRoadUpgrade: () => void,
+    onVergeUpgrade: () => void,
   ) {
     const container = scene.add.container(0, 0).setDepth(11);
     const sectionW  = width / 3;
 
-    this.buildRoadSection(scene, container, sectionW * 0.5, rowTop, sectionW, road, onUpgrade);
-    this.buildPlaceholderSection(scene, container, sectionW * 1.5, rowTop, sectionW, 'VERGE');
+    this.buildRoadSection(scene, container, sectionW * 0.5, rowTop, sectionW, road, onRoadUpgrade);
+    this.buildVergeSection(scene, container, sectionW * 1.5, rowTop, sectionW, verge, onVergeUpgrade);
     this.buildPlaceholderSection(scene, container, sectionW * 2.5, rowTop, sectionW, 'WATER');
 
     // Subtle vertical dividers between sections
@@ -117,6 +120,85 @@ export class RoadUI {
     this.roadActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
   }
 
+  private buildVergeSection(
+    scene: Phaser.Scene,
+    container: Phaser.GameObjects.Container,
+    cx: number,
+    rowTop: number,
+    sectionW: number,
+    verge: VergeState,
+    onUpgrade: () => void,
+  ): void {
+    const atMax = verge.level >= MAX_VERGE_LEVEL;
+    const cost  = vergeUpgradeCost(verge.level);
+    const btnW  = Math.min(sectionW - 24, 200);
+    const btnH  = 34;
+    const btnY  = rowTop + 24;
+
+    container.add(
+      scene.add
+        .text(cx, rowTop + 13, vergeTierName(verge.level), { fontSize: '11px', color: '#88cc88', fontFamily: UI_FONT })
+        .setOrigin(0.5)
+    );
+
+    const btnGfx = scene.add.graphics();
+
+    if (atMax) {
+      btnGfx.fillStyle(0x111811, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+      container.add(btnGfx);
+      container.add(
+        scene.add
+          .text(cx, btnY + btnH / 2, 'MAX', { fontSize: '10px', color: '#334433', fontFamily: UI_FONT })
+          .setOrigin(0.5)
+      );
+      return;
+    }
+
+    const drawNormal = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0d2010, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+      btnGfx.fillStyle(0x2a7a2a, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
+    const drawHover = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x183820, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+      btnGfx.fillStyle(0x3aaa3a, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
+    const drawDisabled = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0e1410, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+    };
+
+    drawNormal();
+    container.add(btnGfx);
+
+    const btn = scene.add
+      .rectangle(cx, btnY + btnH / 2, btnW, btnH, 0x000000, 0)
+      .setInteractive({ useHandCursor: false });
+    container.add(btn);
+
+    container.add(
+      scene.add
+        .text(cx, btnY + btnH / 2, `▲  Lv ${verge.level + 1}   ${fmt(cost)}`, {
+          fontSize: '11px', color: '#88f0a0', fontFamily: MONO_FONT,
+        })
+        .setOrigin(0.5)
+    );
+
+    let hovered = false;
+    btn.on('pointerover', () => { hovered = true;  drawHover(); });
+    btn.on('pointerout',  () => { hovered = false; drawNormal(); });
+    btn.on('pointerdown', onUpgrade);
+
+    this.vergeActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
+  }
+
   private buildPlaceholderSection(
     scene: Phaser.Scene,
     container: Phaser.GameObjects.Container,
@@ -161,14 +243,16 @@ export class RoadUI {
   }
 
   refresh(gold: number): void {
-    if (!this.roadActionRef) return;
-    const canAfford = gold >= this.roadActionRef.getCost();
-    if (canAfford) {
-      this.roadActionRef.btn.setInteractive({ useHandCursor: true });
-      if (!this.roadActionRef.isHovered()) this.roadActionRef.drawNormal();
-    } else {
-      this.roadActionRef.btn.disableInteractive();
-      this.roadActionRef.drawDisabled();
+    for (const ref of [this.roadActionRef, this.vergeActionRef]) {
+      if (!ref) continue;
+      const canAfford = gold >= ref.getCost();
+      if (canAfford) {
+        ref.btn.setInteractive({ useHandCursor: true });
+        if (!ref.isHovered()) ref.drawNormal();
+      } else {
+        ref.btn.disableInteractive();
+        ref.drawDisabled();
+      }
     }
   }
 

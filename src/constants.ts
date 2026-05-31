@@ -9,7 +9,8 @@ export const STATS_BAR_H = 68;
 export const ROAD_BAR_H = 62;
 export const ROAD_H = 72;
 export const ROAD_DIVIDER_H = 4;
-export const VERGE_H = 24;
+export const VERGE_H = 60;
+export const MAX_VERGE_LEVEL = 15;
 export const RIVER_H = 48;
 export const YARD_H = 20;
 
@@ -55,6 +56,22 @@ export function perBuildingIncome(level: number): number {
   if (level <= 35) return _at15 + (level - 15) * _t2Inc;
   if (level <= 65) return _at35 + (level - 35) * _t3Inc;
   return _at65 + (level - 65) * _t4Inc;
+}
+
+export function vergeUpgradeCost(level: number): number {
+  if (level === 0) return 500;
+  return level * level * 200 + 400;
+}
+
+export function vergeTierName(level: number): string {
+  if (level === 0) return 'Bare Dirt';
+  if (level <= 2)  return 'Grass Strip';
+  if (level <= 4)  return 'Garden';
+  if (level <= 6)  return 'Park Verge';
+  if (level <= 8)  return 'Cycle Lane';
+  if (level <= 11) return 'Boulevard';
+  if (level <= 14) return 'Grand Blvd';
+  return 'Premium';
 }
 
 export function lerpColor(a: number, b: number, t: number): number {
