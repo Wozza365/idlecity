@@ -35,9 +35,12 @@ export class Road {
       gfx.fillStyle(0x555555, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
       gfx.fillStyle(0x6e6e6e, 1);
-      for (let px = 5; px < width; px += 18) {
-        gfx.fillRect(px, gy + 5, 3, 2);
-        gfx.fillRect(px + 9, gy + 14, 3, 2);
+      for (let row = 0; row * 9 + 5 < ROAD_H; row++) {
+        const py = gy + 5 + row * 9;
+        const xStart = row % 2 === 0 ? 5 : 14;
+        for (let px = xStart; px < width; px += 18) {
+          gfx.fillRect(px, py, 3, 2);
+        }
       }
       return;
     }
