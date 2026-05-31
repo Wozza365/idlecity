@@ -143,7 +143,7 @@ export class VergeRiver {
       const bollardXs    = getPositions(width, 20, 40);
       for (const bx of bollardXs) {
         const point: Extract<LightSource, { type?: 'point' }> = {
-          x: bx, y: bollardHeadY, radius: 20,
+          x: bx, y: bollardHeadY, radius: 18,
           color: 0xffcc66, intensity: 0, noOcclusion: true,
         };
         this.bollardBulbs.push(point);
