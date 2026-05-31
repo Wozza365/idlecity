@@ -20,7 +20,7 @@ const DOOR_SPAWN_RATE_FRAC  = 0.20;
 const DOOR_SPAWN_POS_JITTER = 3;
 const DESPAWN_ARRIVAL_DIST  = 6;
 const DESPAWN_BASE_PER_SEC  = 0.025;
-const POOL_SIZE             = 60;
+const MAX_PEDS              = 60;
 
 function smoothstep(t: number): number {
   const c = Math.max(0, Math.min(1, t));
@@ -51,39 +51,29 @@ interface Pedestrian {
   alpha: number;
   phase: PedPhase;
   turnAtX: number | null;
-  poolIdx: number;
-}
-
-interface PedGO {
-  body:   Phaser.GameObjects.Rectangle;
-  shadow: Phaser.GameObjects.Rectangle;
 }
 
 interface DoorEntry { x: number; y: number; level: number; }
 
 export class PedestrianManager {
-  private pool:       PedGO[]     = [];
-  private freeSlots:  number[]    = [];
   private pedestrians: Pedestrian[] = [];
   private groundY:    number;
   private plotWidth:  number;
   private offscreenTimer: number;
   private doorTimer:  number;
   private elevation = 1.0;
-  private shadowAlpha = 0;
-  private shadowedRanges: Array<{ x0: number; x1: number }> = [];
+
+  // Both Graphics so depth-sort composites correctly with shadow overlays (also Graphics).
+  // Rectangle objects in Phaser 4 render in a separate pipeline pass that ignores depth
+  // ordering relative to Graphics, which is why Rectangle pedestrians were never darkened.
+  private bodyGfx:      Phaser.GameObjects.Graphics;
+  private pedShadowGfx: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, groundY: number, plotWidth: number) {
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
-
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const body   = scene.add.rectangle(0, 0, 1, 1, 0xffffff).setDepth(9.1).setVisible(false);
-      const shadow = scene.add.rectangle(0, 0, 1, 1, 0x000000).setDepth(9.09).setVisible(false);
-      this.pool.push({ body, shadow });
-      this.freeSlots.push(i);
-    }
-
+    this.bodyGfx      = scene.add.graphics().setDepth(9.1);
+    this.pedShadowGfx = scene.add.graphics().setDepth(9.09);
     this.offscreenTimer = 1000 + Math.random() * 2000;
     this.doorTimer      = 3000 + Math.random() * 2000;
   }
@@ -91,7 +81,6 @@ export class PedestrianManager {
   rebuild(groundY: number, plotWidth: number): void {
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
-    for (const p of this.pedestrians) this.releaseSlot(p.poolIdx);
     this.pedestrians    = [];
     this.offscreenTimer = 800  + Math.random() * 1500;
     this.doorTimer      = 2000 + Math.random() * 2000;
@@ -102,13 +91,11 @@ export class PedestrianManager {
     plots: PlotState[],
     containers: Phaser.GameObjects.Container[],
     sunAngle: number,
-    shadowAlpha = 0,
   ): void {
-    this.elevation   = Math.sin(sunAngle);
-    this.shadowAlpha = shadowAlpha;
-    this.shadowedRanges = plots
-      .map((p, i) => p.unlocked ? { x0: i * this.plotWidth, x1: (i + 1) * this.plotWidth } : null)
-      .filter((r): r is { x0: number; x1: number } => r !== null);
+    this.elevation = Math.sin(sunAngle);
+
+    this.bodyGfx.clear();
+    this.pedShadowGfx.clear();
 
     const rightBound = this.getRightBound(plots);
     if (rightBound <= 0) return;
@@ -141,7 +128,7 @@ export class PedestrianManager {
         p.dir = toRight ? 1 : -1;
         p.x  += p.speed * p.dir * dt;
         if (p.x + p.w < -40 || p.x > rightBound + 40) {
-          this.removePed(i);
+          this.pedestrians.splice(i, 1);
           continue;
         }
         if (Math.abs(p.x + p.w / 2 - ph.doorX) < DESPAWN_ARRIVAL_DIST) {
@@ -158,7 +145,7 @@ export class PedestrianManager {
         p.bottomY = ph.startY + dist * smoothstep(ph.t);
         p.alpha   = 1 - smoothstep(ph.t);
         if (ph.t >= 1) {
-          this.removePed(i);
+          this.pedestrians.splice(i, 1);
           continue;
         }
         this.syncGO(p);
@@ -176,7 +163,7 @@ export class PedestrianManager {
         p.turnAtX = null;
       }
       if (p.x + p.w > rightBound) { p.x = rightBound - p.w; p.dir = -1; p.turnAtX = null; }
-      if (p.x + p.w < -40) { this.removePed(i); continue; }
+      if (p.x + p.w < -40) { this.pedestrians.splice(i, 1); continue; }
 
       if (doors.length > 0 && Math.random() < DESPAWN_BASE_PER_SEC * dt) {
         const door = this.pickDespawnDoor(p, doors);
@@ -207,35 +194,15 @@ export class PedestrianManager {
   }
 
   private syncGO(p: Pedestrian): void {
-    const go         = this.pool[p.poolIdx];
     const top        = p.bottomY - p.h;
-    const cx = p.x + p.w / 2;
-    const underBuilding = this.shadowedRanges.some(r => cx >= r.x0 && cx < r.x1);
-    const brightness = this.nightBrightness() * (underBuilding ? 1 - this.shadowAlpha * 0.85 : 1);
+    const brightness = this.nightBrightness();
     const drawColor  = darkenColor(p.color, brightness);
-    go.body
-      .setPosition(p.x + p.w / 2, top + p.h / 2)
-      .setFillStyle(drawColor, p.alpha)
-      .setVisible(true);
-    go.shadow
-      .setPosition(p.x + p.w / 2, p.bottomY + 2)
-      .setFillStyle(0x000000, 0.22 * p.alpha)
-      .setVisible(p.alpha > 0.01);
-  }
 
-  private removePed(i: number): void {
-    this.releaseSlot(this.pedestrians[i].poolIdx);
-    this.pedestrians.splice(i, 1);
-  }
+    this.pedShadowGfx.fillStyle(0x000000, 0.22 * p.alpha);
+    this.pedShadowGfx.fillRect(Math.round(p.x), Math.round(p.bottomY) + 2, p.w + 3, 3);
 
-  private acquireSlot(): number | null {
-    return this.freeSlots.length > 0 ? this.freeSlots.pop()! : null;
-  }
-
-  private releaseSlot(idx: number): void {
-    this.pool[idx].body.setVisible(false);
-    this.pool[idx].shadow.setVisible(false);
-    this.freeSlots.push(idx);
+    this.bodyGfx.fillStyle(drawColor, p.alpha);
+    this.bodyGfx.fillRect(Math.round(p.x), Math.round(top), p.w, Math.round(p.h));
   }
 
   private getAllDoors(plots: PlotState[], containers: Phaser.GameObjects.Container[]): DoorEntry[] {
@@ -252,11 +219,10 @@ export class PedestrianManager {
   }
 
   private spawnFromDoor(doors: DoorEntry[]): void {
-    const slot = this.acquireSlot();
-    if (slot === null) return;
+    if (this.pedestrians.length >= MAX_PEDS) return;
 
     const totalWeight = doors.reduce((s, d) => s + d.level, 0);
-    if (totalWeight === 0) { this.freeSlots.push(slot); return; }
+    if (totalWeight === 0) return;
     let pick = Math.random() * totalWeight;
     let door = doors[0];
     for (const d of doors) { pick -= d.level; if (pick <= 0) { door = d; break; } }
@@ -266,10 +232,6 @@ export class PedestrianManager {
     const footTop = this.groundY - YARD_H;
     const targetY = footTop + Math.random() * YARD_H;
     const jitter  = (Math.random() * 2 - 1) * DOOR_SPAWN_POS_JITTER;
-
-    const go = this.pool[slot];
-    go.body.setSize(w, h);
-    go.shadow.setSize(w + 3, 3);
 
     this.pedestrians.push({
       x:       door.x + jitter - w / 2,
@@ -282,22 +244,16 @@ export class PedestrianManager {
       alpha:   0,
       phase:   { k: 'enter', startY: door.y, targetY, t: 0 },
       turnAtX: null,
-      poolIdx: slot,
     });
   }
 
   private spawnOffscreen(): void {
-    const slot = this.acquireSlot();
-    if (slot === null) return;
+    if (this.pedestrians.length >= MAX_PEDS) return;
 
     const w       = PED_MIN_W + Math.floor(Math.random() * (PED_MAX_W - PED_MIN_W + 1));
     const h       = PED_MIN_H + Math.random() * (PED_MAX_H - PED_MIN_H);
     const footTop = this.groundY - YARD_H;
     const bottomY = footTop + Math.random() * YARD_H;
-
-    const go = this.pool[slot];
-    go.body.setSize(w, h);
-    go.shadow.setSize(w + 3, 3);
 
     this.pedestrians.push({
       x:       -(w + 2),
@@ -310,7 +266,6 @@ export class PedestrianManager {
       alpha:   1,
       phase:   { k: 'walk' },
       turnAtX: null,
-      poolIdx: slot,
     });
   }
 
@@ -350,12 +305,8 @@ export class PedestrianManager {
   }
 
   destroy(): void {
-    for (const go of this.pool) {
-      go.body.destroy();
-      go.shadow.destroy();
-    }
-    this.pool      = [];
-    this.freeSlots = [];
+    this.bodyGfx.destroy();
+    this.pedShadowGfx.destroy();
     this.pedestrians = [];
   }
 }
