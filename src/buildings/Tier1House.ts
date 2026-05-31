@@ -426,7 +426,15 @@ export class Tier1House extends Phaser.GameObjects.Container {
     sg.fillStyle(0x000022, 1);
     sg.fillRect(bx, top, bw, buildGY - top);                                      // body
     sg.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);           // roof
-    sg.fillRect(chx - 2, chimneyTopY, cw + 4, top - chimneyTopY);                 // chimney
+    // Chimney above roof slope only — avoid overlapping the roof fill so alpha
+    // compositing stays uniform (overlapping fills cause double-darkening in WebGL).
+    const rEaveX       = bx + bw + ov;
+    const chLeft       = chx - 2;
+    const chRight      = chx + cw + 2;
+    const slopeAtLeft  = top - roofH * (rEaveX - chLeft)  / (rEaveX - mid);
+    const slopeAtRight = top - roofH * (rEaveX - chRight) / (rEaveX - mid);
+    sg.fillTriangle(chLeft, slopeAtLeft,  chRight, slopeAtRight, chRight, chimneyTopY);
+    sg.fillTriangle(chLeft, slopeAtLeft,  chRight, chimneyTopY,  chLeft,  chimneyTopY);
     sg.setDepth(9.15);
     sg.setAlpha(0);
     this.shadowGfx = sg;
@@ -470,7 +478,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
         color: (() => { const c = 0x7a + Math.floor(Math.random() * 40); return (c << 16) | (c << 8) | c; })(),
         growing: true,
       });
-      this.nextSmoke = now + 40 + Math.random() * 40;
+      this.nextSmoke = now + 120 + Math.random() * 120;
     }
     for (const p of this.smokeParticles) {
       p.y -= 0.03; p.x += p.dx;
