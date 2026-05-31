@@ -395,24 +395,10 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    const chLeft2    = chx - 2;
-    const chRight2   = chx + cw + 2;
-    const rEaveX2    = bx + bw + ov;
-    const roofSlopeY = (px: number) => top - ((px - rEaveX2) / (mid - rEaveX2)) * roofH;
-    sg.beginPath();
-    sg.moveTo(bx, buildGY);
-    sg.lineTo(bx + bw, buildGY);
-    sg.lineTo(bx + bw, top - 1);
-    sg.lineTo(rEaveX2, top - 1);
-    sg.lineTo(chRight2, roofSlopeY(chRight2));
-    sg.lineTo(chRight2, chimneyTopY);
-    sg.lineTo(chLeft2, chimneyTopY);
-    sg.lineTo(chLeft2, roofSlopeY(chLeft2));
-    sg.lineTo(mid, top - roofH);
-    sg.lineTo(bx - ov, top - 1);
-    sg.lineTo(bx, top - 1);
-    sg.closePath();
-    sg.fillPath();
+    sg.fillRect(bx, top, bw, buildGY - top);                                      // body
+    sg.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);           // roof
+    sg.fillRect(chx - 2, chimneyTopY, cw + 4, top - chimneyTopY);                 // chimney
+    sg.fillRect(x, buildGY, w, YARD_H);                                            // yard
     sg.setDepth(9.15);
     sg.setAlpha(0);
     this.shadowGfx = sg;

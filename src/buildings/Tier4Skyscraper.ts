@@ -258,7 +258,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(x, top, w, h);  // full building silhouette
+    sg.fillRect(x, top, w, groundY - top);  // building + yard
     if (level >= 87) {
       const antX = x + Math.round(w / 2);
       sg.fillRect(antX - 1, top - ANTENNA_H, 3, ANTENNA_H);

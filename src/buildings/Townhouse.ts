@@ -395,6 +395,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     sg.lineTo(bx - 3, top + 5);         // step out to coping + shadow strip width
     sg.closePath();
     sg.fillPath();
+    sg.fillRect(x, buildGY, w, YARD_H);   // yard
     if (level >= 30) {
       const fpX = bx + Math.round(bw / 2);
       sg.fillRect(fpX - 1, top - 30, 2, 21);           // flagpole (top-30 to top-9)

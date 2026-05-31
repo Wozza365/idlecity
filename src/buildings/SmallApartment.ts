@@ -275,7 +275,13 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(x, top, w, h);  // full building silhouette
+    sg.fillRect(x, top, w, groundY - top);  // building + yard
+    if (level >= 45) {
+      const twX = x + Math.round(w * 0.68);
+      const twW = 16, twH = 18;
+      sg.fillRect(twX, top - twH, twW, twH);  // water tower body
+      sg.fillTriangle(twX - 2, top - twH, twX + twW + 2, top - twH, twX + Math.round(twW / 2), top - twH - 6);
+    }
     if (level >= 53) {
       const antX = x + Math.round(w * 0.3);
       sg.fillRect(antX, top - 20, 2, 20);

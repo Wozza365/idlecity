@@ -422,29 +422,12 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     if (initialParticles?.length) this.smokeParticles = [...initialParticles];
 
-    // ── Shadow overlay ────────────────────────────────────────────────────────
-    // Single polygon path traces the exact outer silhouette — no overlapping
-    // fills, so alpha compositing stays uniform across the whole shape.
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    const chLeft    = chx - 2;
-    const chRight   = chx + cw + 2;
-    const rEaveX    = bx + bw + ov;
-    const roofSlopeY = (px: number) => top - ((px - rEaveX) / (mid - rEaveX)) * roofH;
-    sg.beginPath();
-    sg.moveTo(bx, buildGY);
-    sg.lineTo(bx + bw, buildGY);
-    sg.lineTo(bx + bw, top - 1);
-    sg.lineTo(rEaveX, top - 1);
-    sg.lineTo(chRight, roofSlopeY(chRight));
-    sg.lineTo(chRight, chimneyTopY);
-    sg.lineTo(chLeft, chimneyTopY);
-    sg.lineTo(chLeft, roofSlopeY(chLeft));
-    sg.lineTo(mid, top - roofH);
-    sg.lineTo(bx - ov, top - 1);
-    sg.lineTo(bx, top - 1);
-    sg.closePath();
-    sg.fillPath();
+    sg.fillRect(bx, top, bw, buildGY - top);                                      // body
+    sg.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);           // roof
+    sg.fillRect(chx - 2, chimneyTopY, cw + 4, top - chimneyTopY);                 // chimney
+    sg.fillRect(x, buildGY, w, YARD_H);                                            // yard
     sg.setDepth(9.15);
     sg.setAlpha(0);
     this.shadowGfx = sg;
