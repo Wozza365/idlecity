@@ -283,16 +283,16 @@ export class VergeRiver {
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    // Each entry is [primary, secondary, accent, highlight]
+    // Each entry is [primary, secondary, accent, highlight] — all bright
     const bedPalettes = [
-      [0xff4477, 0xff88aa, 0xff2255, 0xffccdd],  // roses
-      [0xffcc00, 0xffaa22, 0xffee55, 0xff8800],  // sunflowers
-      [0xff6600, 0xff3300, 0xff9944, 0xffcc66],  // marigolds
-      [0x9955ff, 0x6622cc, 0xcc88ff, 0x4400aa],  // lavender
-      [0x22ddaa, 0x00bb88, 0x66ffcc, 0x009966],  // aqua
-      [0xff44cc, 0xdd1199, 0xff99ee, 0xaa0077],  // magenta
-      [0x66ddff, 0x33aaee, 0xaaeeff, 0x0077cc],  // cornflower
-      [0x88ee22, 0x44cc00, 0xccff66, 0x228800],  // lime
+      [0xff4488, 0xff88bb, 0xffbbdd, 0xffeef5],  // roses
+      [0xffdd00, 0xffcc44, 0xffee88, 0xfffff0],  // sunflowers
+      [0xff7722, 0xff9944, 0xffbb77, 0xffeedd],  // marigolds
+      [0xcc88ff, 0xdd99ff, 0xeebbff, 0xfff0ff],  // lavender
+      [0x22ffcc, 0x55ffdd, 0x99ffee, 0xeefffa],  // aqua
+      [0xff55ee, 0xff88ee, 0xffbbf5, 0xffeeff],  // magenta
+      [0x55ccff, 0x88ddff, 0xbbeeff, 0xeef8ff],  // cornflower
+      [0xaaff44, 0xccff77, 0xddffaa, 0xf5ffee],  // lime
     ];
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
@@ -314,11 +314,11 @@ export class VergeRiver {
       gfx.fillStyle(0x7a5828, 0.35);
       gfx.fillRect(gx, bedTop, gw, 1);
 
-      // Three rows packed densely across the full bed height
+      // Three rows packed densely across the full bed height, all same size
       const rows = [
-        { y: bedTop + 3,  r: 3, step: 6,  offset: 0 },
-        { y: bedTop + 9,  r: 2, step: 5,  offset: 3 },
-        { y: bedTop + 14, r: 2, step: 6,  offset: 1 },
+        { y: bedTop + 4,  r: 3, step: 7, offset: 0 },
+        { y: bedTop + 9,  r: 3, step: 7, offset: 3 },
+        { y: bedTop + 13, r: 3, step: 7, offset: 0 },
       ];
 
       for (const row of rows) {
