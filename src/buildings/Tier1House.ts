@@ -427,7 +427,6 @@ export class Tier1House extends Phaser.GameObjects.Container {
     sg.fillRect(bx, top, bw, buildGY - top);                                      // body
     sg.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);           // roof
     sg.fillRect(chx - 2, chimneyTopY, cw + 4, top - chimneyTopY);                 // chimney
-    sg.fillRect(x, buildGY, w, YARD_H);                                            // yard
     sg.setDepth(9.15);
     sg.setAlpha(0);
     this.shadowGfx = sg;

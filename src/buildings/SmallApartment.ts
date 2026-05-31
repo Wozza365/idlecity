@@ -275,7 +275,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(x, top, w, groundY - top);  // building + yard
+    sg.fillRect(x, top, w, h);  // building body only — yard drawn by SunMoon at depth 9.5
     if (level >= 45) {
       const twX = x + Math.round(w * 0.68);
       const twW = 16, twH = 18;

@@ -246,7 +246,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(x, top, w, groundY - top);  // building + yard
+    sg.fillRect(x, top, w, h);  // building body only — yard drawn by SunMoon at depth 9.5
     if (level >= 69) {
       const antX = x + Math.round(w * 0.6);
       sg.fillRect(antX, top - 22, 2, 22);

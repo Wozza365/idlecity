@@ -255,7 +255,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(x, top, w, groundY - top);  // building + yard
+    sg.fillRect(x, top, w, h);  // building body only — yard drawn by SunMoon at depth 9.5
     if (level >= 79) {
       const antX = x + Math.round(w * 0.4);
       sg.fillRect(antX, top - 28, 2, 28);
