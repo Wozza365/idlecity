@@ -24,6 +24,7 @@ interface Cyclist { x: number; speed: number; dir: 1 | -1; color: number; }
 export class VergeRiver {
   private readonly scene: Phaser.Scene;
   private vergeGfx:   Phaser.GameObjects.Graphics;
+  private flowerGfx:  Phaser.GameObjects.Graphics;
   private cyclistGfx: Phaser.GameObjects.Graphics;
   private shadowGfx:  Phaser.GameObjects.Graphics;
   private treeGfx:    Phaser.GameObjects.Graphics;
@@ -50,6 +51,7 @@ export class VergeRiver {
   constructor(scene: Phaser.Scene) {
     this.scene      = scene;
     this.vergeGfx   = scene.add.graphics().setDepth(6).setLighting(true);
+    this.flowerGfx  = scene.add.graphics().setDepth(6.1); // no lighting — preserves true flower colours
     this.cyclistGfx = scene.add.graphics().setDepth(6.5).setLighting(true);
     this.shadowGfx  = scene.add.graphics().setDepth(7.1);
     this.treeGfx    = scene.add.graphics().setDepth(8.5).setLighting(true);
@@ -65,6 +67,7 @@ export class VergeRiver {
 
     const gfx = this.vergeGfx;
     gfx.clear();
+    this.flowerGfx.clear();
     this.drawBase(gfx, level, width, vergeY);
 
     // River
@@ -80,7 +83,7 @@ export class VergeRiver {
     if (level >= 13) this.drawPaving(gfx, width, vergeY);
     // Wildflowers only before flower beds take over (levels 3–4)
     if (level >= 3 && level <= 4) this.drawWildflowers(gfx, level, width, vergeY);
-    if (level >= 5)  this.drawFlowerBeds(gfx, level, width, vergeY);
+    if (level >= 5)  this.drawFlowerBeds(this.flowerGfx, level, width, vergeY);
     if (level >= 6)  this.drawBenches(gfx, level, width, vergeY);
 
     this.treeGfx.clear();
@@ -566,6 +569,7 @@ export class VergeRiver {
     for (const l of this.lampNativeLights)    this.scene.lights.removeLight(l);
     for (const l of this.bollardNativeLights) this.scene.lights.removeLight(l);
     this.vergeGfx.destroy();
+    this.flowerGfx.destroy();
     this.cyclistGfx.destroy();
     this.shadowGfx.destroy();
     this.treeGfx.destroy();
