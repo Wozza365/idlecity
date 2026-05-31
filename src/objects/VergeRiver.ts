@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { ROAD_H, VERGE_H, RIVER_H } from '../constants';
+import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 
-// Cycle path occupies the bottom CYCLE_H pixels of the verge
 const CYCLE_H = 14;
 
 function treeGeom(level: number) {
@@ -30,7 +30,10 @@ export class VergeRiver {
   private treeXs:    number[]      = [];
   private lampXs:    number[]      = [];
   private cyclists:  Cyclist[]     = [];
-  private lampLights: LightSource[] = [];
+
+  private lampSpots:  SoftSpotLight[]                              = [];
+  private lampBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
+  private lampLights: LightSource[]                                = [];
 
   private _level:   number = 0;
   private _width:   number = 0;
@@ -53,12 +56,11 @@ export class VergeRiver {
     const vergeY = groundY + ROAD_H;
     const riverY = vergeY + VERGE_H;
 
-    // ── Base verge ───────────────────────────────────────────────
     const gfx = this.vergeGfx;
     gfx.clear();
     this.drawBase(gfx, level, width, vergeY);
 
-    // ── River ────────────────────────────────────────────────────
+    // River
     gfx.fillStyle(0x1e5a9e, 1);
     gfx.fillRect(0, riverY, width, RIVER_H);
     gfx.fillStyle(0x2a6ab5, 1);
@@ -66,7 +68,6 @@ export class VergeRiver {
     gfx.fillStyle(0x4488cc, 0.3);
     for (let x = 0; x < width; x += 40) gfx.fillRect(x, riverY + 8, 24, 2);
 
-    // ── Ordered feature layers ───────────────────────────────────
     if (level >= 8)  this.drawCyclePath(gfx, width, vergeY);
     if (level >= 13) this.drawPaving(gfx, width, vergeY);
     if (level >= 3)  this.drawWildflowers(gfx, level, width, vergeY);
@@ -74,7 +75,6 @@ export class VergeRiver {
     if (level >= 6)  this.drawBenches(gfx, level, width, vergeY);
     if (level >= 12) this.drawGardenBeds(gfx, width, vergeY);
 
-    // ── Trees ────────────────────────────────────────────────────
     this.treeGfx.clear();
     if (level >= 4) {
       const { spacing } = treeGeom(level);
@@ -84,28 +84,40 @@ export class VergeRiver {
       this.treeXs = [];
     }
 
-    // ── Lamp posts ───────────────────────────────────────────────
+    // Lamps sit between trees: start at one full spacing instead of half
     if (level >= 10) {
-      this.lampXs = getPositions(width, 40, 80);
+      const { spacing } = treeGeom(level);
+      this.lampXs = getPositions(width, spacing, spacing);
       this.drawLamps(level, vergeY);
     } else {
       this.lampXs = [];
     }
 
-    // ── Street light sources (level 11+) ─────────────────────────
+    // Spot + bulb lights for each lamp (level 11+)
+    this.lampSpots  = [];
+    this.lampBulbs  = [];
     this.lampLights = [];
     if (level >= 11) {
-      const lampHeadY = groundY + ROAD_H - 30;
+      const lampHeadY = groundY + ROAD_H - 28;
       for (const lx of this.lampXs) {
-        const light: LightSource = {
-          type: 'point', x: lx, y: lampHeadY,
-          radius: 220, color: 0xffcc66, intensity: 0,
+        const armX = lx + 10;
+        const spot = new SoftSpotLight({
+          x: armX, y: lampHeadY,
+          radius: 110, color: 0xffd070, intensity: 0,
+          angle: Math.PI / 2,       // pointing straight down
+          coneAngle: Math.PI / 2.4, // ~75° cone
+          noOcclusion: true,
+        });
+        const bulb: Extract<LightSource, { type?: 'point' }> = {
+          x: armX, y: lampHeadY, radius: 5,
+          color: 0xfffae0, intensity: 0, noOcclusion: true,
         };
-        this.lampLights.push(light);
+        this.lampSpots.push(spot);
+        this.lampBulbs.push(bulb);
+        this.lampLights.push(...spot.beams, bulb);
       }
     }
 
-    // ── Cyclists ─────────────────────────────────────────────────
     if (level >= 9) {
       if (this.cyclists.length === 0) this.spawnCyclists(level, width);
     } else {
@@ -114,36 +126,68 @@ export class VergeRiver {
     }
   }
 
-  // ── Base verge ──────────────────────────────────────────────────
+  // ── Base ──────────────────────────────────────────────────────────
 
   private drawBase(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
     if (level === 0) {
-      gfx.fillStyle(0x8b7050, 1);
+      // Earthy base — mirrors road dirt style, spanning full verge height
+      gfx.fillStyle(0x7a5a35, 1);
       gfx.fillRect(0, vergeY, width, VERGE_H);
-      // Dirt texture
-      gfx.fillStyle(0x7a5f3e, 0.45);
-      for (let x = 0; x < width; x += 22) gfx.fillRect(x, vergeY + 5, 10, 4);
-      for (let x = 11; x < width; x += 22) gfx.fillRect(x, vergeY + 18, 8, 3);
-      for (let x = 5; x < width; x += 30) gfx.fillRect(x, vergeY + 30, 12, 3);
+      const dc = [0x9a7050, 0xb08060, 0x7a5530, 0xc89060, 0x4a3018, 0x8a6040, 0xd0a870];
+      const rowCount = Math.ceil(VERGE_H / 7);
+      for (let row = 0; row < rowCount; row++) {
+        const baseY = vergeY + 3 + row * 7;
+        let px = Math.imul(row, 127) % 23;
+        while (px < width) {
+          const h = (Math.imul(px, 374761393) ^ Math.imul(row, 668265261)) >>> 0;
+          const a = h & 0xff;
+          const b = (h >> 8) & 0xff;
+          gfx.fillStyle(dc[a % dc.length], 1);
+          const size = 1 + a % 3;
+          if (b & 1) gfx.fillCircle(px, baseY + (b % 5) - 2, size);
+          else gfx.fillRect(px - 1, baseY + (b % 5) - 2, size + 1, size);
+          px += 14 + (b >> 2) % 16;
+        }
+      }
     } else if (level === 1) {
-      gfx.fillStyle(0x8b7050, 1);
+      // Patchy grass: soil base with organic grass patches spanning full height
+      gfx.fillStyle(0x7a5a35, 1);
       gfx.fillRect(0, vergeY, width, VERGE_H);
+      // Large irregular grass patches at varying Y positions
       gfx.fillStyle(0x4a8c3a, 1);
-      for (let x = 8; x < width; x += 28) {
-        gfx.fillRect(x, vergeY + 6, 14, 10);
-        if (x + 14 < width) gfx.fillRect(x + 14, vergeY + 22, 10, 8);
+      const patchCount = Math.floor(width / 14);
+      for (let i = 0; i < patchCount; i++) {
+        const px = ((i * 41 + 17) % Math.max(1, Math.floor(width) - 16)) + 8;
+        const py = vergeY + 3 + ((i * 23 + 7) % (VERGE_H - 10));
+        const pw = 8 + (i * 11) % 10;
+        const ph = 5 + (i * 7) % 7;
+        gfx.fillRect(px, py, pw, ph);
+      }
+      // Darker secondary patches for depth
+      gfx.fillStyle(0x3a7a2a, 1);
+      const darkCount = Math.floor(width / 22);
+      for (let i = 0; i < darkCount; i++) {
+        const px = ((i * 67 + 31) % Math.max(1, Math.floor(width) - 14)) + 7;
+        const py = vergeY + 5 + ((i * 37 + 11) % (VERGE_H - 12));
+        gfx.fillRect(px, py, 5 + (i * 9) % 7, 3);
+      }
+      // Sparse soil-showing cracks between patches
+      gfx.fillStyle(0x5a4025, 0.45);
+      for (let i = 0; i < Math.floor(width / 40); i++) {
+        const px = ((i * 89 + 13) % Math.max(1, Math.floor(width) - 8)) + 4;
+        const py = vergeY + 6 + ((i * 53) % (VERGE_H - 14));
+        gfx.fillRect(px, py, 1 + (i % 3), 3 + (i % 5));
       }
     } else {
       const grassColor = level >= 14 ? 0x3d7a2e : 0x4a8c3a;
       gfx.fillStyle(grassColor, 1);
       gfx.fillRect(0, vergeY, width, VERGE_H);
-      // Subtle shade at road edge
       gfx.fillStyle(0x000000, 0.06);
       gfx.fillRect(0, vergeY, width, 3);
     }
   }
 
-  // ── Cycle path ──────────────────────────────────────────────────
+  // ── Cycle path ────────────────────────────────────────────────────
 
   private drawCyclePath(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
     const cy = vergeY + VERGE_H - CYCLE_H;
@@ -153,87 +197,131 @@ export class VergeRiver {
     gfx.fillRect(0, cy, width, 1);
     gfx.fillStyle(0x7a1810, 0.9);
     gfx.fillRect(0, cy + CYCLE_H - 1, width, 1);
-    // Centre dashes
     gfx.fillStyle(0xffffff, 0.3);
     const mid = cy + Math.floor(CYCLE_H / 2) - 1;
     for (let x = 0; x < width; x += 24) gfx.fillRect(x, mid, 10, 2);
   }
 
-  // ── Wildflowers ──────────────────────────────────────────────────
+  // ── Wildflowers ───────────────────────────────────────────────────
 
   private drawWildflowers(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    const colors = [0xff6b8a, 0xffee44, 0xff9144, 0xc080ff, 0x80deea, 0xffbb44];
-    const bottomBand = level >= 8 ? VERGE_H - CYCLE_H : VERGE_H;
-    const count = Math.floor(width / 16);
+    const petalColors = [0xff6b8a, 0xffee44, 0xff9144, 0xcc88ff, 0x80deea, 0xffcc44, 0xff88bb, 0xaaee66];
+    const bottomBand  = level >= 8 ? VERGE_H - CYCLE_H : VERGE_H;
+    const count       = Math.floor(width / 14);
     for (let i = 0; i < count; i++) {
-      const fx = ((i * 41 + 17) % Math.max(1, Math.floor(width) - 12)) + 6;
-      const fy = vergeY + 10 + ((i * 19 + 7) % Math.max(1, bottomBand - 24));
-      gfx.fillStyle(colors[i % colors.length], 0.88);
-      gfx.fillCircle(fx, fy, 2);
-      gfx.fillStyle(0xffffff, 0.25);
-      gfx.fillCircle(fx - 1, fy - 1, 1);
+      const fx = ((i * 41 + 17) % Math.max(1, Math.floor(width) - 10)) + 5;
+      const fy = vergeY + 12 + ((i * 19 + 7) % Math.max(1, bottomBand - 26));
+      // Stem
+      gfx.fillStyle(0x3a7a2a, 0.7);
+      gfx.fillRect(fx, fy + 2, 1, 5);
+      // Outer petals ring
+      const petal = petalColors[i % petalColors.length];
+      gfx.fillStyle(petal, 0.85);
+      gfx.fillCircle(fx, fy, 3);
+      // Centre dot
+      gfx.fillStyle(0xffee88, 0.9);
+      gfx.fillCircle(fx, fy, 1);
     }
   }
 
-  // ── Flower beds ──────────────────────────────────────────────────
+  // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    const bedColors = [0xff8fa3, 0xffd700, 0xff7835, 0xa088ff, 0x44e0b0];
+    const bedPalettes = [
+      [0xff8fa3, 0xff6090, 0xffe0e8],  // pinks
+      [0xffd700, 0xffaa00, 0xffeebb],  // yellows
+      [0xff7835, 0xff5500, 0xffccaa],  // oranges
+      [0xa088ff, 0x7755dd, 0xddccff],  // purples
+      [0x44e0b0, 0x22ccaa, 0xaaffee],  // teals
+    ];
     const { spacing } = treeGeom(level);
-    const bedY = vergeY + VERGE_H - (level >= 8 ? CYCLE_H + 12 : 14);
+    const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
+    const backY  = vergeY + VERGE_H - bottomBand - 12;
+    const frontY = vergeY + VERGE_H - bottomBand - 4;
     let ci = 0;
     for (let tx = spacing / 2; tx < width; tx += spacing) {
       const gx = Math.round(tx - spacing / 2 + 10);
       const gw = Math.round(spacing - 20);
       if (gw <= 0) continue;
-      gfx.fillStyle(bedColors[ci % bedColors.length], 0.82);
-      gfx.fillRect(gx, bedY, gw, 8);
-      gfx.fillStyle(0xffffff, 0.2);
-      for (let bx = gx + 5; bx < gx + gw - 4; bx += 10) gfx.fillCircle(bx, bedY + 4, 2);
+      const pal = bedPalettes[ci % bedPalettes.length];
+
+      // Soil bed strip
+      gfx.fillStyle(0x5a3a1a, 0.55);
+      gfx.fillRect(gx, backY - 2, gw, 20);
+      // Bed edging
+      gfx.fillStyle(0x8a6a40, 0.7);
+      gfx.fillRect(gx, backY + 17, gw, 1);
+
+      // Back row — taller rounded blobs
+      gfx.fillStyle(pal[0], 0.9);
+      for (let bx = gx + 4; bx < gx + gw - 4; bx += 8) {
+        gfx.fillCircle(bx, backY + 3, 3);
+      }
+      // Back row highlight
+      gfx.fillStyle(pal[2], 0.5);
+      for (let bx = gx + 3; bx < gx + gw - 4; bx += 8) {
+        gfx.fillCircle(bx - 1, backY + 2, 1);
+      }
+
+      // Front row — smaller flowers with stems
+      gfx.fillStyle(0x3a7a2a, 0.8);
+      for (let bx = gx + 6; bx < gx + gw - 4; bx += 10) {
+        gfx.fillRect(bx, frontY - 3, 1, 5);
+      }
+      gfx.fillStyle(pal[1], 0.88);
+      for (let bx = gx + 6; bx < gx + gw - 4; bx += 10) {
+        gfx.fillCircle(bx, frontY - 4, 2);
+        gfx.fillStyle(0xffffff, 0.35);
+        gfx.fillCircle(bx - 1, frontY - 5, 1);
+        gfx.fillStyle(pal[1], 0.88);
+      }
+
       ci++;
     }
   }
 
-  // ── Park benches ─────────────────────────────────────────────────
+  // ── Park benches ──────────────────────────────────────────────────
 
   private drawBenches(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
     const { spacing } = treeGeom(level);
     for (let tx = spacing; tx < width - spacing * 0.4; tx += spacing) {
       const bx = Math.round(tx);
-      const by = vergeY + 20;
-      // Seat slats
+      const by = vergeY + 22;
+
+      // Seat (24 px wide, 4 px tall)
       gfx.fillStyle(0xc8a46e, 1);
-      gfx.fillRect(bx - 9, by, 18, 3);
-      gfx.fillRect(bx - 9, by - 4, 18, 2);
-      // Back rest
-      gfx.fillStyle(0xa8844e, 1);
-      gfx.fillRect(bx - 9, by - 9, 18, 3);
-      // Cast iron legs
+      gfx.fillRect(bx - 12, by, 24, 4);
+      // Seat slat lines
+      gfx.fillStyle(0x8a6030, 0.35);
+      gfx.fillRect(bx - 4, by, 1, 4);
+      gfx.fillRect(bx + 3, by, 1, 4);
+
+      // Back rest (same width, 3 px tall, 5 px above seat)
+      gfx.fillStyle(0xb08848, 1);
+      gfx.fillRect(bx - 12, by - 6, 24, 3);
+
+      // Cast-iron legs (2 each side)
       gfx.fillStyle(0x4a4a4a, 1);
-      gfx.fillRect(bx - 7, by + 3, 3, 7);
-      gfx.fillRect(bx + 4, by + 3, 3, 7);
+      gfx.fillRect(bx - 10, by + 4, 3, 5);
+      gfx.fillRect(bx + 7,  by + 4, 3, 5);
     }
   }
 
-  // ── Ornamental garden beds (level 12+) ───────────────────────────
+  // ── Ornamental garden beds (level 12+) ────────────────────────────
 
   private drawGardenBeds(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
-    const edgeColor = 0x8a6a40;
-    const soilColor = 0x6b4c2a;
-    gfx.fillStyle(soilColor, 0.5);
-    gfx.fillRect(0, vergeY + 2, width, 6);
-    gfx.fillStyle(edgeColor, 0.6);
+    gfx.fillStyle(0x6b4c2a, 0.5);
+    gfx.fillRect(0, vergeY + 2, width, 7);
+    gfx.fillStyle(0x8a6a40, 0.55);
     gfx.fillRect(0, vergeY + 2, width, 1);
-    gfx.fillRect(0, vergeY + 7, width, 1);
-    // Decorative stones
-    gfx.fillStyle(0xb0a090, 0.55);
-    for (let x = 6; x < width; x += 18) gfx.fillRect(x, vergeY + 3, 8, 4);
+    gfx.fillRect(0, vergeY + 8, width, 1);
+    gfx.fillStyle(0xb0a090, 0.5);
+    for (let x = 5; x < width; x += 18) gfx.fillRect(x, vergeY + 3, 9, 5);
   }
 
-  // ── Decorative paving (level 13+) ────────────────────────────────
+  // ── Decorative paving (level 13+) ─────────────────────────────────
 
   private drawPaving(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
-    // Narrow stone walkway along road edge
     const pathY = vergeY + 10;
     const pathH = 9;
     gfx.fillStyle(0xbcb0a0, 0.55);
@@ -245,7 +333,7 @@ export class VergeRiver {
     gfx.fillRect(0, pathY + pathH - 1, width, 1);
   }
 
-  // ── Street trees (depth 8.5, above cars) ─────────────────────────
+  // ── Street trees (depth 8.5) ──────────────────────────────────────
 
   private drawTrees(level: number, vergeY: number): void {
     const gfx = this.treeGfx;
@@ -254,25 +342,21 @@ export class VergeRiver {
     const trunkTopY  = trunkBaseY - trunkH;
     const canopyY    = trunkTopY;
 
-    const trunkColor   = 0x5c3a1e;
-    const shadowRing   = level >= 14 ? 0x1a3d1a : 0x1e4a1a;
-    const canopyDark   = level >= 14 ? 0x2d6a4f : 0x336622;
-    const canopyMid    = level >= 14 ? 0x3d8a6f : 0x4a8c32;
-    const canopyLight  = level >= 14 ? 0x58b08a : 0x66cc44;
+    const trunkColor  = 0x5c3a1e;
+    const shadowRing  = level >= 14 ? 0x1a3d1a : 0x1e4a1a;
+    const canopyDark  = level >= 14 ? 0x2d6a4f : 0x336622;
+    const canopyMid   = level >= 14 ? 0x3d8a6f : 0x4a8c32;
+    const canopyLight = level >= 14 ? 0x58b08a : 0x66cc44;
 
     for (const tx of this.treeXs) {
-      // Trunk
       gfx.fillStyle(trunkColor, 1);
       gfx.fillRect(tx - 2, trunkTopY, 4, trunkH);
-      // Root flare
       gfx.fillStyle(0x3a2410, 1);
       gfx.fillRect(tx - 3, trunkBaseY - 4, 6, 4);
 
-      // Canopy drop shadow
       gfx.fillStyle(0x000000, 0.18);
       gfx.fillCircle(tx + 3, canopyY + 3, canopyR);
 
-      // Canopy layers
       gfx.fillStyle(shadowRing, 1);
       gfx.fillCircle(tx, canopyY, canopyR);
       gfx.fillStyle(canopyDark, 1);
@@ -284,7 +368,7 @@ export class VergeRiver {
     }
   }
 
-  // ── Street lamp posts (depth 8.5) ────────────────────────────────
+  // ── Lamp posts (depth 8.5) ────────────────────────────────────────
 
   private drawLamps(level: number, vergeY: number): void {
     const gfx = this.treeGfx;
@@ -296,24 +380,19 @@ export class VergeRiver {
     const baseColor = level >= 15 ? 0x8a7060 : 0x607080;
 
     for (const lx of this.lampXs) {
-      // Base plate
       gfx.fillStyle(baseColor, 1);
       gfx.fillRect(lx - 3, poleBaseY - 3, 6, 3);
-      // Pole
       gfx.fillStyle(poleColor, 1);
       gfx.fillRect(lx - 1, poleTopY, 2, poleH - 3);
-      // Arm extending right
       gfx.fillRect(lx, poleTopY + 2, 10, 2);
-      // Lamp housing
       gfx.fillStyle(headColor, 1);
       gfx.fillEllipse(lx + 10, poleTopY + 3, 13, 7);
-      // Lens highlight
       gfx.fillStyle(0xffffff, 0.4);
       gfx.fillEllipse(lx + 9, poleTopY + 2, 6, 3);
     }
   }
 
-  // ── Cyclists ─────────────────────────────────────────────────────
+  // ── Cyclists ──────────────────────────────────────────────────────
 
   private spawnCyclists(level: number, width: number): void {
     const count = Math.min(2 + Math.floor(level / 4), 6);
@@ -353,23 +432,18 @@ export class VergeRiver {
       const bh = 9;
       const bodyTop = pathMidY - bh;
 
-      // Ground shadow
       gfx.fillStyle(0x000000, 0.2);
       gfx.fillEllipse(cx, pathMidY + 2, 10, 4);
-      // Wheels
       gfx.fillStyle(0x1a1a2e, 1);
       gfx.fillCircle(cx - 4, pathMidY, 4);
       gfx.fillCircle(cx + 4, pathMidY, 4);
       gfx.fillStyle(0x808080, 0.5);
       gfx.fillCircle(cx - 4, pathMidY, 2);
       gfx.fillCircle(cx + 4, pathMidY, 2);
-      // Frame bar
       gfx.fillStyle(0x888888, 1);
       gfx.fillRect(cx - 4, pathMidY - 1, 8, 2);
-      // Body (jersey)
       gfx.fillStyle(c.color, 1);
       gfx.fillRect(cx - 2, bodyTop, 5, bh);
-      // Helmet
       gfx.fillStyle(0x303040, 1);
       gfx.fillCircle(cx, bodyTop - 3, 4);
       gfx.fillStyle(c.color, 0.65);
@@ -377,7 +451,7 @@ export class VergeRiver {
     }
   }
 
-  // ── Shadows (drawn on road surface at depth 7.1) ──────────────────
+  // ── Shadows (depth 7.1) ───────────────────────────────────────────
 
   updateShadows(sunAngle: number): void {
     const gfx = this.shadowGfx;
@@ -395,19 +469,16 @@ export class VergeRiver {
     gfx.fillStyle(0x000000, alpha);
 
     const { trunkH, canopyR } = treeGeom(this._level);
-
-    // Tree canopy shadows
     for (const tx of this.treeXs) {
       const trunkBaseY = vergeY + 8;
-      const hw = canopyR * 0.7;
-      const shadowH = Math.min(VERGE_H * 0.75, (trunkH + canopyR) * Math.pow(1 - Math.min(elevation, 1), 0.5));
-      const shadBot = trunkBaseY + shadowH;
-      const lean = leanRate * (shadowH + trunkH);
+      const hw         = canopyR * 0.7;
+      const shadowH    = Math.min(VERGE_H * 0.75, (trunkH + canopyR) * Math.pow(1 - Math.min(elevation, 1), 0.5));
+      const shadBot    = trunkBaseY + shadowH;
+      const lean       = leanRate * (shadowH + trunkH);
       gfx.fillTriangle(tx - hw, trunkBaseY, tx + hw, trunkBaseY, tx + hw + lean, shadBot);
       gfx.fillTriangle(tx - hw, trunkBaseY, tx + hw + lean, shadBot, tx - hw + lean, shadBot);
     }
 
-    // Lamp post shadows
     if (this._level >= 10) {
       for (const lx of this.lampXs) {
         const poleBaseY = vergeY + 8;
@@ -424,10 +495,11 @@ export class VergeRiver {
   // ── Day/night lamp glow ───────────────────────────────────────────
 
   updateLighting(elevation: number): void {
-    if (this.lampLights.length === 0) return;
-    const nightFactor = Math.max(0, Math.min(1, -elevation * 4 + 0.3));
-    for (const l of this.lampLights) {
-      (l as { intensity: number }).intensity = nightFactor * 1.6;
+    if (this.lampSpots.length === 0) return;
+    const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+    for (const spot of this.lampSpots) spot.setIntensity(nightFactor * 3.5);
+    for (const bulb of this.lampBulbs) {
+      (bulb as { intensity: number }).intensity = nightFactor * 300;
     }
   }
 
