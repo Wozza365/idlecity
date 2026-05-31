@@ -286,30 +286,25 @@ export class VergeRiver {
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    // Alternating warm/cool so every bed gets an equal mix — no warm-run dominance
-    const bedPalettes = [
-      [0xff1155, 0xff4488, 0xff77aa],  // roses       (warm)
-      [0x00ccff, 0x33bbff, 0x0099ff],  // sky blue    (cool)
-      [0xffcc00, 0xffaa00, 0xffee22],  // sunflowers  (warm)
-      [0x00ffcc, 0x00ddbb, 0x44ffdd],  // teal        (cool)
-      [0xff5500, 0xff7700, 0xff9922],  // marigolds   (warm)
-      [0x88ff00, 0xaaff33, 0x66ee00],  // lime green  (cool)
-      [0xff00bb, 0xff33cc, 0xff66dd],  // magenta     (warm)
-      [0xaa33ff, 0xcc66ff, 0x8811ee],  // purple      (cool)
+    const allColors = [
+      0xff1155, 0xff4488, 0xff77aa,  // roses
+      0x00ccff, 0x33bbff, 0x0099ff,  // sky blue
+      0xffcc00, 0xffaa00, 0xffee22,  // sunflowers
+      0x00ffcc, 0x00ddbb, 0x44ffdd,  // teal
+      0xff5500, 0xff7700, 0xff9922,  // marigolds
+      0x88ff00, 0xaaff33, 0x66ee00,  // lime green
+      0xff00bb, 0xff33cc, 0xff66dd,  // magenta
+      0xaa33ff, 0xcc66ff, 0x8811ee,  // purple
     ];
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
     const bedTop = vergeY + VERGE_H - bottomBand - 18;
     const bedH   = 16;
 
-    let ci = 0;
     for (let tx = spacing / 2; tx < width; tx += spacing * 2) {
       const gx = Math.round(tx - spacing / 2 + 14);
       const gw = Math.round(spacing - 28);
       if (gw <= 0) continue;
-      const pal = bedPalettes[ci % bedPalettes.length];
-      // Each bed mixes two adjacent palettes for variety
-      const pal2 = bedPalettes[(ci + 1) % bedPalettes.length];
 
       // Soil base
       gfx.fillStyle(0x4a3010, 0.72);
@@ -317,7 +312,6 @@ export class VergeRiver {
       gfx.fillStyle(0x7a5828, 0.35);
       gfx.fillRect(gx, bedTop, gw, 1);
 
-      // Three rows, circles touching (step=6=diameter) so no dark soil gaps
       const rows = [
         { y: bedTop + 4,  r: 3, step: 6, offset: 0 },
         { y: bedTop + 9,  r: 3, step: 6, offset: 3 },
@@ -327,12 +321,8 @@ export class VergeRiver {
       for (const row of rows) {
         for (let fx = gx + row.offset + 3; fx < gx + gw - 3; fx += row.step) {
           const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
-          const useSecond = (h & 1) === 0; // 50/50 warm/cool mix per flower
-          const src = useSecond ? pal2 : pal;
-          const colorIdx = (h >>> 2) % 3;
-          gfx.fillStyle(src[colorIdx], 0.95);
+          gfx.fillStyle(allColors[h % allColors.length], 0.95);
           gfx.fillCircle(fx, row.y, row.r);
-          // Small bright centre highlight
           gfx.fillStyle(0xffffff, 0.4);
           gfx.fillCircle(fx - 1, row.y - 1, 1);
         }
@@ -341,8 +331,6 @@ export class VergeRiver {
       // Edging border
       gfx.fillStyle(0x6a4818, 0.75);
       gfx.fillRect(gx, bedTop + bedH - 1, gw, 1);
-
-      ci++;
     }
   }
 
