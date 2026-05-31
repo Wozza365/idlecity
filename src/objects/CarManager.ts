@@ -48,8 +48,8 @@ function getLanes(level: number, groundY: number): LaneConfig[] {
 
   const laneH = ROAD_H / 2;
   return [
-    { y: groundY + laneH * 0.75,         direction:  1, speedMultiplier: 1.0 },
-    { y: groundY + laneH + laneH * 0.75, direction: -1, speedMultiplier: 1.0 },
+    { y: groundY + laneH * 0.75 - 8,         direction:  1, speedMultiplier: 1.0 },
+    { y: groundY + laneH + laneH * 0.75 - 8, direction: -1, speedMultiplier: 1.0 },
   ];
 }
 

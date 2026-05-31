@@ -45,8 +45,8 @@ export class Road {
       gfx.fillRect(0, gy, width, ROAD_H);
       // Tyre-compacted tracks
       gfx.fillStyle(0x585048, 1);
-      gfx.fillRect(0, gy + 20, width, 14);
-      gfx.fillRect(0, gy + 54, width, 14);
+      gfx.fillRect(0, gy + 12, width, 14);
+      gfx.fillRect(0, gy + 46, width, 14);
       // Angular crushed-stone chips
       const gc = [0xa89880, 0xc4b8a8, 0x666058, 0xd8ccbc, 0x484440, 0x908070];
       for (let row = 0; row < 9; row++) {
