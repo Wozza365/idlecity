@@ -402,23 +402,24 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     sg.beginPath();
     sg.moveTo(bx, buildGY);
     sg.lineTo(bx + bw, buildGY);
-    sg.lineTo(bx + bw, top);
-    sg.lineTo(rEaveX2, top);
+    sg.lineTo(bx + bw, top - 1);
+    sg.lineTo(rEaveX2, top - 1);
     sg.lineTo(chRight2, roofSlopeY(chRight2));
     sg.lineTo(chRight2, chimneyTopY);
     sg.lineTo(chLeft2, chimneyTopY);
     sg.lineTo(chLeft2, roofSlopeY(chLeft2));
     sg.lineTo(mid, top - roofH);
-    sg.lineTo(bx - ov, top);
-    sg.lineTo(bx, top);
+    sg.lineTo(bx - ov, top - 1);
+    sg.lineTo(bx, top - 1);
     sg.closePath();
     sg.fillPath();
+    sg.setDepth(9.15);
     sg.setAlpha(0);
-    this.add(sg);
     this.shadowGfx = sg;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      this.shadowGfx.destroy();
     });
   }
 

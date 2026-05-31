@@ -383,16 +383,16 @@ export class Townhouse extends Phaser.GameObjects.Container {
     sg.beginPath();
     sg.moveTo(bx - 3, top);             // coping top-left
     sg.lineTo(bx + bw + 3, top);        // coping top-right
-    sg.lineTo(bx + bw + 3, top + 4);    // coping right (4px tall)
-    sg.lineTo(bx + bw + 2, top + 4);    // step in to stepped overhang
+    sg.lineTo(bx + bw + 3, top + 5);    // coping + shadow strip (5px: top to top+5)
+    sg.lineTo(bx + bw + 2, top + 5);    // step in to stepped overhang
     sg.lineTo(bx + bw + 2, top + 8);    // stepped right (ends at top+8)
     sg.lineTo(bx + bw, top + 8);        // step in to body width
     sg.lineTo(bx + bw, buildGY);        // right body wall to ground
     sg.lineTo(bx, buildGY);             // building bottom
     sg.lineTo(bx, top + 8);             // left body wall up to stepped
     sg.lineTo(bx - 2, top + 8);         // step out to stepped overhang
-    sg.lineTo(bx - 2, top + 4);         // stepped left
-    sg.lineTo(bx - 3, top + 4);         // step out to coping width
+    sg.lineTo(bx - 2, top + 5);         // stepped left
+    sg.lineTo(bx - 3, top + 5);         // step out to coping + shadow strip width
     sg.closePath();
     sg.fillPath();
     if (level >= 30) {
@@ -404,13 +404,14 @@ export class Townhouse extends Phaser.GameObjects.Container {
         sg.fillRect(bpx, top - 6, 2, 4);               // individual balusters (no gap fill)
       }
     }
+    sg.setDepth(9.15);
     sg.setAlpha(0);
-    this.add(sg);
     this.shadowGfx = sg;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
       if (this.flagLight) scene.lights.removeLight(this.flagLight);
+      this.shadowGfx.destroy();
     });
   }
 

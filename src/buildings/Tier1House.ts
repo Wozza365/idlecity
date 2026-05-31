@@ -434,25 +434,26 @@ export class Tier1House extends Phaser.GameObjects.Container {
     sg.beginPath();
     sg.moveTo(bx, buildGY);
     sg.lineTo(bx + bw, buildGY);
-    sg.lineTo(bx + bw, top);
-    sg.lineTo(rEaveX, top);
+    sg.lineTo(bx + bw, top - 1);
+    sg.lineTo(rEaveX, top - 1);
     sg.lineTo(chRight, roofSlopeY(chRight));
     sg.lineTo(chRight, chimneyTopY);
     sg.lineTo(chLeft, chimneyTopY);
     sg.lineTo(chLeft, roofSlopeY(chLeft));
     sg.lineTo(mid, top - roofH);
-    sg.lineTo(bx - ov, top);
-    sg.lineTo(bx, top);
+    sg.lineTo(bx - ov, top - 1);
+    sg.lineTo(bx, top - 1);
     sg.closePath();
     sg.fillPath();
+    sg.setDepth(9.15);
     sg.setAlpha(0);
-    this.add(sg);
     this.shadowGfx = sg;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) {
         scene.lights.removeLight(light);
       }
+      this.shadowGfx.destroy();
     });
   }
 

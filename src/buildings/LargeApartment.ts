@@ -252,12 +252,13 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       sg.fillRect(antX, top - 22, 2, 22);
       sg.fillRect(antX - 5, top - 17, 12, 1);
     }
+    sg.setDepth(9.15);
     sg.setAlpha(0);
-    this.add(sg);
     this.shadowGfx = sg;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      this.shadowGfx.destroy();
     });
   }
 

@@ -262,12 +262,13 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
       sg.fillRect(antX - 5, top - 22, 12, 1);
       sg.fillRect(antX - 3, top - 14, 8, 1);
     }
+    sg.setDepth(9.15);
     sg.setAlpha(0);
-    this.add(sg);
     this.shadowGfx = sg;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      this.shadowGfx.destroy();
     });
   }
 

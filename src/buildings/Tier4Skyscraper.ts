@@ -277,12 +277,13 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
       sg.fillRect(baX - 5, top - 16, 10, 2);
       sg.fillRect(baX - 2, top - 22, 4, 2);
     }
+    sg.setDepth(9.15);
     sg.setAlpha(0);
-    this.add(sg);
     this.shadowGfx = sg;
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      this.shadowGfx.destroy();
     });
   }
 
