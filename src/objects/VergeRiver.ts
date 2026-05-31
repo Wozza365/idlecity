@@ -141,7 +141,7 @@ export class VergeRiver {
     this.bollardBulbs  = [];
     this.bollardLights = [];
     if (level >= 9) {
-      const bollardHeadY = groundY + ROAD_H + VERGE_H - CYCLE_H - 6;
+      const bollardHeadY = groundY + ROAD_H + 12;
       const bollardXs    = getPositions(width, 20, 40);
       for (const bx of bollardXs) {
         const spot = new SoftSpotLight({
@@ -249,10 +249,11 @@ export class VergeRiver {
   // ── Boulevard bollards (level 9+) ────────────────────────────────
 
   private drawBollards(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
-    const cycleTopY  = vergeY + VERGE_H - CYCLE_H;
-    const poleH      = 5;
-    const capH       = 2;
-    const poleTopY   = cycleTopY - poleH - capH;
+    // Sit on the paved boulevard strip (vergeY+10, height 9)
+    const pathBaseY = vergeY + 19;
+    const poleH     = 5;
+    const capH      = 2;
+    const poleTopY  = pathBaseY - poleH - capH;
 
     for (let bx = 20; bx < width; bx += 40) {
       // Pole
