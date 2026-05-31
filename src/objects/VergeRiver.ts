@@ -111,9 +111,9 @@ export class VergeRiver {
         const armX = lx + 8;
         const spot = new SoftSpotLight({
           x: armX, y: lampHeadY,
-          radius: 68, color: 0xffcc66, intensity: 0,
+          radius: 51, color: 0xffcc66, intensity: 0,
           angle: Math.PI / 2,       // pointing straight down
-          coneAngle: Math.PI / 3.67, // ~49° cone
+          coneAngle: Math.PI / 3.06, // ~59° cone
           noOcclusion: true,
         });
         const bulb: Extract<LightSource, { type?: 'point' }> = {
