@@ -24,6 +24,7 @@ import { PedestrianManager } from '../objects/PedestrianManager';
 import { WaterArea } from '../objects/WaterArea';
 import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
+import { loadHtAssets } from '../objects/HighTidesAssets';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -91,6 +92,7 @@ export class GameScene extends Phaser.Scene {
       const url = getCarUrl(key);
       if (url) this.load.image(key, url);
     }
+    loadHtAssets(this);
   }
 
   create(): void {
