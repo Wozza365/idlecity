@@ -102,7 +102,8 @@ export class WaterArea {
   private _cafeBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
   private _pierSpot:   SoftSpotLight | null = null;
   private _pierBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
-  private _bonfireLight: Extract<LightSource, { type?: 'point' }> | null = null;
+  private _bonfireLight:  Extract<LightSource, { type?: 'point' }> | null = null;
+  private _bonfireLight2: Extract<LightSource, { type?: 'point' }> | null = null;
   private _lighthouseSpot: SoftSpotLight | null = null;
   private _lighthouseBulb: Extract<LightSource, { type?: 'point' }> | null = null;
   private _buoyBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
@@ -116,7 +117,8 @@ export class WaterArea {
     if (this._cafeBulb)   out.push(this._cafeBulb);
     if (this._pierSpot)   out.push(...this._pierSpot.beams);
     if (this._pierBulb)   out.push(this._pierBulb);
-    if (this._bonfireLight) out.push(this._bonfireLight);
+    if (this._bonfireLight)  out.push(this._bonfireLight);
+    if (this._bonfireLight2) out.push(this._bonfireLight2);
     if (this._lighthouseSpot) out.push(...this._lighthouseSpot.beams);
     if (this._lighthouseBulb) out.push(this._lighthouseBulb);
     for (const b of this._buoyBulbs) out.push(b);
@@ -551,11 +553,20 @@ export class WaterArea {
       this._pierBulb = null;
     }
 
-    // ── Bonfire point light (level 9+, no spot — omnidirectional glow) ──
-    this._bonfireLight = lv >= 9 ? {
-      x: this._bonfireX, y: this._bonfireY - 8,
-      radius: 30, color: 0xFF7700, intensity: 0, noOcclusion: true,
-    } : null;
+    // ── Bonfire — two small overlapping warm lights (breaks the uniform-circle feel) ──
+    if (lv >= 9) {
+      this._bonfireLight = {
+        x: this._bonfireX - 3, y: this._bonfireY - 10,
+        radius: 18, color: 0xFF6600, intensity: 0, noOcclusion: true,
+      };
+      this._bonfireLight2 = {
+        x: this._bonfireX + 4, y: this._bonfireY - 6,
+        radius: 14, color: 0xFFAA00, intensity: 0, noOcclusion: true,
+      };
+    } else {
+      this._bonfireLight  = null;
+      this._bonfireLight2 = null;
+    }
 
     // ── Lighthouse sweeping SoftSpotLight (level 8+) ──
     if (lv >= 8) {
@@ -744,11 +755,16 @@ export class WaterArea {
       }
     }
 
-    // Bonfire light flicker
-    if (this._bonfireLight && this._nightFactor > 0.05) {
-      const flicker = 0.65 + 0.35 * Math.sin(this._bonfireTime * 8.3)
-                    + 0.12 * Math.sin(this._bonfireTime * 17.1);
-      (this._bonfireLight as { intensity: number }).intensity = this._nightFactor * 90 * flicker;
+    // Bonfire light flicker — two lights at slightly different rates
+    if (this._nightFactor > 0.05) {
+      const t  = this._bonfireTime;
+      const f1 = 0.65 + 0.30 * Math.sin(t * 4.1) + 0.15 * Math.sin(t * 9.7);
+      const f2 = 0.70 + 0.25 * Math.sin(t * 3.3 + 0.8) + 0.12 * Math.sin(t * 7.4 + 1.2);
+      const nf = this._nightFactor;
+      if (this._bonfireLight)
+        (this._bonfireLight  as { intensity: number }).intensity = nf * 80 * f1;
+      if (this._bonfireLight2)
+        (this._bonfireLight2 as { intensity: number }).intensity = nf * 60 * f2;
     }
 
     this.updateBeachPeople(delta, elevation);
@@ -763,35 +779,58 @@ export class WaterArea {
 
     const { _width: w, _waterY: wy } = this;
 
-    // Animated wave crests — scrolling horizontal sparkle lines
+    // Animated water surface — undulating sine-wave highlights
+    // Only drawn over open water (x >= _beachEndX, y > shore height for beach columns)
     {
-      const t   = this._waveTime;
-      const nf  = this._nightFactor;
-      const dayA = Math.max(0, 1 - nf * 1.2);
-      // Scroll speed: wave lines drift right slowly
-      const scroll = (t * 14) % 60;
-      for (let row = 0; row < 5; row++) {
-        const rowY  = wy + 22 + row * 14 + Math.round(Math.sin(t * 0.9 + row * 0.7) * 2);
-        const alpha = (0.10 + 0.06 * Math.sin(t * 1.3 + row * 1.1)) * dayA;
-        for (let col = 0; col < w; col += 52) {
-          const x = (col + Math.round(scroll * (0.8 + row * 0.15))) % w;
-          const wl = 14 + (row % 3) * 6;
-          gfx.fillStyle(0xFFFFFF, alpha);
-          gfx.fillRect(x, rowY, wl, 1);
-          // Bright glint at crest
-          gfx.fillStyle(0xFFFFFF, alpha * 2.0);
-          gfx.fillRect(x, rowY, 3, 1);
+      const t     = this._waveTime;
+      const nf    = this._nightFactor;
+      const bx    = this._beachEndX;
+      const dayA  = Math.max(0, 1 - nf * 1.1);
+
+      // 4 wave bands at different depths, each a gentle sine curve
+      const WAVES = [
+        { baseY: wy + 18, amp: 2.5, freq: 0.055, speed: 0.55, len: 18, gap: 54, alpha: 0.10 },
+        { baseY: wy + 36, amp: 2.0, freq: 0.040, speed: 0.40, len: 22, gap: 66, alpha: 0.08 },
+        { baseY: wy + 56, amp: 1.5, freq: 0.065, speed: 0.65, len: 14, gap: 48, alpha: 0.07 },
+        { baseY: wy + 76, amp: 1.0, freq: 0.035, speed: 0.30, len: 20, gap: 60, alpha: 0.06 },
+      ];
+
+      for (const wv of WAVES) {
+        const a = (wv.alpha + 0.03 * Math.sin(t * 0.7)) * dayA;
+        if (a < 0.005) continue;
+        for (let x = bx + 4; x < w - 4; x += wv.gap) {
+          // Sine curve gives each dash its own Y offset
+          const y = Math.round(wv.baseY + wv.amp * Math.sin(wv.freq * x + t * wv.speed));
+          if (y < wy || y >= wy + WATER_H) continue;
+          gfx.fillStyle(0xFFFFFF, a);
+          gfx.fillRect(x, y, wv.len, 1);
+          // Brighter leading edge
+          gfx.fillStyle(0xFFFFFF, a * 1.8);
+          gfx.fillRect(x, y, 4, 1);
         }
       }
-      // Night moonlight shimmer — thin lines, cool white
-      if (nf > 0.3) {
-        const moonA = (nf - 0.3) * 0.12;
-        for (let col = 0; col < w; col += 70) {
-          const x = (col + Math.round(scroll * 0.5)) % w;
-          gfx.fillStyle(0xCCEEFF, moonA);
-          gfx.fillRect(x, wy + 18, 20, 1);
-          gfx.fillRect(x + 8, wy + 38, 12, 1);
-          gfx.fillRect(x + 4, wy + 60, 16, 1);
+
+      // Foam at beach waterline (where sand meets water)
+      if (dayA > 0.05) {
+        for (let x = 4; x < bx - 4; x += 5) {
+          const foamA = (0.18 + 0.14 * Math.sin(t * 2.2 + x * 0.18)) * dayA;
+          const foamY = wy + BEACH_SHORE_H - 3
+                      + Math.round(Math.sin(t * 1.8 + x * 0.09) * 2);
+          gfx.fillStyle(0xFFFFFF, foamA);
+          gfx.fillRect(x, foamY, 4, 1);
+        }
+      }
+
+      // Moonlight shimmer — single moving glint streak
+      if (nf > 0.25) {
+        const moonA  = (nf - 0.25) * 0.18;
+        const moonX  = Math.round(w * (0.35 + 0.2 * Math.sin(t * 0.18)));
+        const moonW  = Math.round(w * 0.12);
+        for (let row = 0; row < 3; row++) {
+          const my = wy + 20 + row * 22;
+          const mx = moonX + row * 8;
+          gfx.fillStyle(0xCCEEFF, moonA * (1 - row * 0.25));
+          gfx.fillRect(mx, my, moonW - row * 10, 1);
         }
       }
     }
@@ -910,30 +949,30 @@ export class WaterArea {
     const spread = Math.PI / 14;
     const ox = lx, oy = ty - 5;
 
-    // Soft penumbra: 3 overlapping triangles of decreasing width and alpha
-    for (let i = 0; i < 3; i++) {
-      const s = spread * (1 + i * 0.55);
-      const a = nf * (0.05 - i * 0.015);
-      const l = len * (1 - i * 0.1);
-      gfx.fillStyle(0xFFFF88, a);
-      gfx.fillTriangle(
-        ox, oy,
-        ox + Math.cos(angle - s) * l, oy + Math.sin(angle - s) * l,
-        ox + Math.cos(angle + s) * l, oy + Math.sin(angle + s) * l,
-      );
-    }
-    // Bright core beam
-    gfx.fillStyle(0xFFFF88, nf * 0.28);
+    // Soft outer halo (slightly wider, very faint)
+    gfx.fillStyle(0xFFFF88, nf * 0.05);
     gfx.fillTriangle(
       ox, oy,
-      ox + Math.cos(angle - spread * 0.4) * len * 0.6, oy + Math.sin(angle - spread * 0.4) * len * 0.6,
-      ox + Math.cos(angle + spread * 0.4) * len * 0.6, oy + Math.sin(angle + spread * 0.4) * len * 0.6,
+      ox + Math.cos(angle - spread * 1.6) * len * 0.75, oy + Math.sin(angle - spread * 1.6) * len * 0.75,
+      ox + Math.cos(angle + spread * 1.6) * len * 0.75, oy + Math.sin(angle + spread * 1.6) * len * 0.75,
     );
-    // Lens glow
-    gfx.fillStyle(0xFFFFAA, nf * 0.6);
+    // Main beam
+    gfx.fillStyle(0xFFFF88, nf * 0.16);
+    gfx.fillTriangle(
+      ox, oy,
+      ox + Math.cos(angle - spread) * len, oy + Math.sin(angle - spread) * len,
+      ox + Math.cos(angle + spread) * len, oy + Math.sin(angle + spread) * len,
+    );
+    // Bright core
+    gfx.fillStyle(0xFFFFCC, nf * 0.28);
+    gfx.fillTriangle(
+      ox, oy,
+      ox + Math.cos(angle - spread * 0.35) * len * 0.55, oy + Math.sin(angle - spread * 0.35) * len * 0.55,
+      ox + Math.cos(angle + spread * 0.35) * len * 0.55, oy + Math.sin(angle + spread * 0.35) * len * 0.55,
+    );
+    // Lens
+    gfx.fillStyle(0xFFFF44, nf * 0.55);
     gfx.fillCircle(ox, oy, 4);
-    gfx.fillStyle(0xFFFFFF, nf * 0.8);
-    gfx.fillCircle(ox, oy, 2);
   }
 
   // ── Lighting updates ──────────────────────────────────────────────────────
@@ -957,8 +996,9 @@ export class WaterArea {
     if (this._pierBulb) (this._pierBulb as { intensity: number }).intensity = nf * 180;
 
     // Bonfire (flicker handled in update)
-    if (this._bonfireLight && nf < 0.05) {
-      (this._bonfireLight as { intensity: number }).intensity = 0;
+    if (nf < 0.05) {
+      if (this._bonfireLight)  (this._bonfireLight  as { intensity: number }).intensity = 0;
+      if (this._bonfireLight2) (this._bonfireLight2 as { intensity: number }).intensity = 0;
     }
 
     // Lighthouse
