@@ -2,9 +2,6 @@ import Phaser from 'phaser';
 import { ROAD_H, VERGE_H, WATER_H } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
-import { HT_CHAR_KEYS } from './HighTidesAssets';
-
-const CHAR_SCALE = 0.33; // display scale for 48×48 character frames → ~16px on screen
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 
@@ -41,8 +38,6 @@ interface BeachPerson {
   alpha: number;
   xMin: number;
   xMax: number;
-  sprite: Phaser.GameObjects.Sprite | null;
-  charKey: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -174,7 +169,7 @@ export class WaterArea {
     else { this._buoys = []; }
     if (level >= 8) this.drawLighthouse();
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
-    else { this.destroyBeachSprites(); this.destroyFoamSprites(); }
+    else { this.destroyFoamSprites(); }
 
     this.rebuildLights();
   }
@@ -603,26 +598,7 @@ export class WaterArea {
 
   // ── Beach people AI ───────────────────────────────────────────────────────
 
-  private setupBeachAnimations(): void {
-    for (const key of HT_CHAR_KEYS) {
-      if (!this.scene.textures.exists(key)) continue;
-      if (!this.scene.anims.exists(`${key}-walk-right`)) {
-        this.scene.anims.create({
-          key: `${key}-walk-right`,
-          frames: this.scene.anims.generateFrameNumbers(key, { start: 8, end: 11 }),
-          frameRate: 5,
-          repeat: -1,
-        });
-      }
-      if (!this.scene.anims.exists(`${key}-walk-left`)) {
-        this.scene.anims.create({
-          key: `${key}-walk-left`,
-          frames: this.scene.anims.generateFrameNumbers(key, { start: 4, end: 7 }),
-          frameRate: 5,
-          repeat: -1,
-        });
-      }
-    }
+  private setupFoamAnimation(): void {
     if (this.scene.textures.exists('ht-water-particles') && !this.scene.anims.exists('ht-foam')) {
       this.scene.anims.create({
         key: 'ht-foam',
@@ -633,12 +609,6 @@ export class WaterArea {
     }
   }
 
-  private destroyBeachSprites(): void {
-    for (const p of this._people) {
-      if (p.sprite) p.sprite.destroy();
-    }
-  }
-
   private destroyFoamSprites(): void {
     for (const s of this._foamSprites) s.destroy();
     this._foamSprites = [];
@@ -646,6 +616,7 @@ export class WaterArea {
 
   private initFoamSprites(): void {
     this.destroyFoamSprites();
+    this.setupFoamAnimation();
     if (!this.scene.textures.exists('ht-water-particles')) return;
 
     const bx = this._beachEndX;
@@ -660,19 +631,15 @@ export class WaterArea {
         .setDepth(5.84)
         .setOrigin(0.5, 0.7)
         .setAlpha(0.55);
-      this.scene.anims.exists('ht-foam') && sprite.play({ key: 'ht-foam', startFrame: (i * 3) % 7 });
+      if (this.scene.anims.exists('ht-foam')) sprite.play({ key: 'ht-foam', startFrame: (i * 3) % 7 });
       this._foamSprites.push(sprite);
     }
   }
 
   private initBeachPeople(): void {
-    this.destroyBeachSprites();
     const { _level: lv, _beachEndX: bx, _waterY: wy } = this;
     const count = Math.min(3 + Math.floor(lv * 0.55), 8);
     this._people = [];
-
-    const hasSprites = HT_CHAR_KEYS.every(k => this.scene.textures.exists(k));
-    this.setupBeachAnimations();
 
     const xMin = 8;
     const xMax = bx - 14;
@@ -683,19 +650,6 @@ export class WaterArea {
       const x       = xMin + ((i * 67 + 13) % Math.max(1, xMax - xMin));
       const bottomY = yMin + ((i * 41 + 7)  % Math.max(1, yMax - yMin));
       const isSit   = i % 3 === 0;
-      const charKey = HT_CHAR_KEYS[i % HT_CHAR_KEYS.length];
-
-      let sprite: Phaser.GameObjects.Sprite | null = null;
-      if (hasSprites) {
-        sprite = this.scene.add.sprite(x, bottomY, charKey, 0)
-          .setScale(CHAR_SCALE)
-          .setDepth(5.662 + (bottomY - wy) * 0.0001)
-          .setOrigin(0.5, 1);
-        this.scene.textures.get(charKey).source.forEach(
-          src => src.setFilter(Phaser.Textures.FilterMode.NEAREST),
-        );
-      }
-
       this._people.push({
         x,
         bottomY,
@@ -710,26 +664,21 @@ export class WaterArea {
         alpha:      1,
         xMin,
         xMax,
-        sprite,
-        charKey,
       });
     }
   }
 
   private updateBeachPeople(delta: number, elevation: number): void {
-    const pgfx = this.beachPeopleGfx;
-    const sgfx = this.beachShadowGfx;
-
     if (this._level < 2 || this._people.length === 0) {
-      pgfx.clear();
-      sgfx.clear();
-      for (const p of this._people) if (p.sprite) p.sprite.setVisible(false);
+      this.beachPeopleGfx.clear();
+      this.beachShadowGfx.clear();
       return;
     }
 
     const targetAlpha = Math.max(0, Math.min(1, (elevation + 0.1) / 0.4));
-    const brightness  = Math.max(0.25, Math.min(1, (elevation + 0.2) / 0.4));
-    const dt          = delta / 1000;
+    const dt = delta / 1000;
+
+    const brightness = Math.max(0.25, Math.min(1, (elevation + 0.2) / 0.4));
 
     for (const p of this._people) {
       p.alpha += (targetAlpha - p.alpha) * Math.min(1, dt * 1.5);
@@ -753,46 +702,27 @@ export class WaterArea {
       }
     }
 
+    const pgfx = this.beachPeopleGfx;
+    const sgfx = this.beachShadowGfx;
     pgfx.clear();
     sgfx.clear();
 
     for (const p of this._people) {
-      if (p.alpha < 0.01) {
-        if (p.sprite) p.sprite.setVisible(false);
-        continue;
+      if (p.alpha < 0.01) continue;
+      const drawColor = dimColor(p.color, brightness);
+      const top = Math.round(p.bottomY - p.h);
+      const x   = Math.round(p.x);
+
+      if (p.phase === 'sit') {
+        pgfx.fillStyle(p.towelColor, p.alpha * 0.9);
+        pgfx.fillRect(x - 4, Math.round(p.bottomY) - 3, p.w + 6, 4);
       }
-      const x  = Math.round(p.x);
-      const by = Math.round(p.bottomY);
 
-      // Shadow
-      sgfx.fillStyle(0x000000, 0.18 * p.alpha);
-      sgfx.fillEllipse(x, by + 2, 8, 3);
+      sgfx.fillStyle(0x000000, 0.2 * p.alpha);
+      sgfx.fillRect(x, Math.round(p.bottomY) + 1, p.w + 3, 3);
 
-      if (p.sprite) {
-        p.sprite.setVisible(true).setAlpha(p.alpha);
-        p.sprite.setPosition(x, by);
-
-        if (p.phase === 'walk') {
-          const animKey = p.dir > 0 ? `${p.charKey}-walk-right` : `${p.charKey}-walk-left`;
-          if (p.sprite.anims.currentAnim?.key !== animKey) p.sprite.play(animKey, true);
-        } else {
-          if (p.sprite.anims.isPlaying) p.sprite.stop();
-          p.sprite.setFrame(0);
-          // Towel behind the sprite
-          pgfx.fillStyle(p.towelColor, p.alpha * 0.85);
-          pgfx.fillRect(x - 6, by - 3, p.w + 10, 4);
-        }
-      } else {
-        // Fallback rectangle rendering when textures unavailable
-        const drawColor = dimColor(p.color, brightness);
-        const top = Math.round(p.bottomY - p.h);
-        if (p.phase === 'sit') {
-          pgfx.fillStyle(p.towelColor, p.alpha * 0.9);
-          pgfx.fillRect(x - 4, by - 3, p.w + 6, 4);
-        }
-        pgfx.fillStyle(drawColor, p.alpha);
-        pgfx.fillRect(x, top, p.w, Math.round(p.h));
-      }
+      pgfx.fillStyle(drawColor, p.alpha);
+      pgfx.fillRect(x, top, p.w, Math.round(p.h));
     }
 
     // Fade foam sprites with daylight
@@ -1129,7 +1059,6 @@ export class WaterArea {
   destroy(): void {
     for (const nl of this._nativeLights) this.scene.lights.removeLight(nl);
     this._nativeLights = [];
-    this.destroyBeachSprites();
     this.destroyFoamSprites();
     this.waterGfx.destroy();
     this.shadowGfx.destroy();
