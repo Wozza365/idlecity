@@ -58,9 +58,13 @@ export function drawBoatShape(
   def: BoatDef,
   nightFactor: number,
 ): void {
-  const { w, h, hullColor, accentColor, hasMast, hasHouse, key } = def;
+  const { w, h, accentColor, hasMast, hasHouse, key } = def;
   const hw = Math.floor(w / 2);
   const hh = Math.floor(h / 2);
+
+  // Darken hull at night
+  const dimmed = blendColor(def.hullColor, 0x111122, nightFactor * 0.55);
+  const hullColor = dimmed;
 
   // Hull base — all boats share a basic pointed-bow hull shape
   gfx.fillStyle(hullColor, 1);
@@ -228,19 +232,16 @@ export function drawBoatShape(
     }
   }
 
-  // Navigation lights at night
+  // Navigation lights at night — small 1px dots, subtle
   if (nightFactor > 0.05) {
-    const alpha = nightFactor * 0.95;
-    // Port (top = red)
+    const alpha = nightFactor * 0.7;
     gfx.fillStyle(0xFF2222, alpha);
-    gfx.fillCircle(-hw + 4, -hh + 2, 2);
-    // Starboard (bottom = green)
+    gfx.fillRect(-hw + 3, -hh + 1, 2, 2);
     gfx.fillStyle(0x22FF44, alpha);
-    gfx.fillCircle(-hw + 4, hh - 2, 2);
-    // Masthead or stern white for larger boats
+    gfx.fillRect(-hw + 3, hh - 3, 2, 2);
     if (hasMast || hasHouse || w >= 36) {
-      gfx.fillStyle(0xFFFFFF, alpha * 0.7);
-      gfx.fillCircle(hw - 4, 0, 2);
+      gfx.fillStyle(0xFFFFFF, alpha * 0.6);
+      gfx.fillRect(hw - 5, -1, 2, 2);
     }
   }
 }

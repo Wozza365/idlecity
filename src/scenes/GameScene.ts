@@ -151,10 +151,11 @@ export class GameScene extends Phaser.Scene {
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
     this.vergeRiver.updateCyclists(delta);
     this.vergeRiver.updateShadows(this.sunAngle);
-    this.waterArea?.update(delta);
-    this.boatManager?.update(delta);
-    const elev = Math.sin(this.sunAngle);
-    const t = Math.max(0, Math.min(1, (0.3 - elev) / 0.3));
+    const elevation = Math.sin(this.sunAngle);
+    this.waterArea?.update(delta, elevation);
+    this.waterArea?.updateShadows(this.sunAngle);
+    this.boatManager?.update(delta, elevation);
+    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
     for (const c of this.plotContainers) {
       if (hasSmokeUpdate(c)) c.updateSmoke(t);
       if (hasFlagUpdate(c)) c.updateFlag();

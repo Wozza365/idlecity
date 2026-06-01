@@ -60,17 +60,17 @@ export class Boat {
     // Port (top/city-side) = red
     this.portLight = {
       x, y: y - def.h / 2 + 2,
-      radius: 12, color: 0xff2222, intensity: 0, noOcclusion: true,
+      radius: 6, color: 0xff2222, intensity: 0, noOcclusion: true,
     };
     // Starboard (bottom/sea-side) = green
     this.starboardLight = {
       x, y: y + def.h / 2 - 2,
-      radius: 12, color: 0x22ff55, intensity: 0, noOcclusion: true,
+      radius: 6, color: 0x22ff55, intensity: 0, noOcclusion: true,
     };
     // Stern white light for larger vessels
     this.sternLight = def.w >= 36 ? {
       x: x - def.w / 2, y,
-      radius: 18, color: 0xffffff, intensity: 0, noOcclusion: true,
+      radius: 9, color: 0xffffff, intensity: 0, noOcclusion: true,
     } : null;
 
     this.redraw();
@@ -135,9 +135,9 @@ export class Boat {
     this.nightFactor = Math.max(0, Math.min(1, (0.05 - elevation) / 0.25));
     this.redraw();
 
-    this.portLight.intensity      = this.nightFactor * 55;
-    this.starboardLight.intensity = this.nightFactor * 55;
-    if (this.sternLight) this.sternLight.intensity = this.nightFactor * 35;
+    this.portLight.intensity      = this.nightFactor * 25;
+    this.starboardLight.intensity = this.nightFactor * 25;
+    if (this.sternLight) this.sternLight.intensity = this.nightFactor * 18;
   }
 
   destroy(): void {

@@ -5,8 +5,8 @@ import { Boat } from './Boat';
 import { pickRandomBoat } from './BoatAssets';
 
 // Spawn interval bounds (ms) — decreases with level
-const BASE_INTERVAL_MS = 28_000;
-const MIN_INTERVAL_MS  = 3_200;
+const BASE_INTERVAL_MS = 55_000;
+const MIN_INTERVAL_MS  = 10_000;
 const DOCK_DURATION_MS = 7_000;
 const DOCK_VARY_MS     = 5_000;
 
@@ -64,7 +64,7 @@ export class BoatManager {
     if (this.lightSystem === system) this.lightSystem = null;
   }
 
-  update(delta: number): void {
+  update(delta: number, elevation: number = 0): void {
     if (this.waterLevel === 0) return;
 
     // Move existing boats; remove off-screen ones
@@ -84,10 +84,12 @@ export class BoatManager {
       this.boats.splice(toRemove[i], 1);
     }
 
-    // Spawn new boats
+    // Spawn new boats — fewer at night
     this.spawnTimer -= delta;
     if (this.spawnTimer <= 0 && this.boats.length < maxBoats(this.waterLevel)) {
-      this.spawnTimer = spawnInterval(this.waterLevel) * (0.7 + Math.random() * 0.6);
+      // Night multiplier: at full night boats are 3× less frequent
+      const nightMult = 1 + 2 * Math.max(0, (0.05 - elevation) / 0.25);
+      this.spawnTimer = spawnInterval(this.waterLevel) * nightMult * (0.7 + Math.random() * 0.6);
       this.spawnBoat();
     }
   }
@@ -98,9 +100,8 @@ export class BoatManager {
 
   private spawnBoat(): void {
     const def = pickRandomBoat();
-    const yMin = this.waterY + WATER_H * 0.32;
-    const yMax = this.waterY + WATER_H * 0.82;
-    const y    = yMin + Math.random() * (yMax - yMin);
+    // Single lane across the deep water at roughly 75–90% down the water strip
+    const y = this.waterY + WATER_H * (0.75 + Math.random() * 0.12);
 
     let dockX: number | null = null;
     if (def.canDock && this.dockSlots.length > 0) {
