@@ -419,8 +419,11 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
   updateWindowLights(elevation: number): void {
     const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
-    if (t < 0.01) return;
     const time = this.scene.time.now / 1000;
+
+    if (this.flagGfx) this.drawFlag(this.flagGfx, time);
+
+    if (t < 0.01) return;
 
     this.windowLights.forEach((light, i) => {
       const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
@@ -431,7 +434,6 @@ export class Townhouse extends Phaser.GameObjects.Container {
       const pulse = 1 + Math.sin(time * 1.8) * 0.08;
       this.lampConeGfx.setAlpha(t * 0.45 * pulse);
     }
-    if (this.flagGfx) this.drawFlag(this.flagGfx, time);
     if (this.flagLight) this.flagLight.intensity = t * 0.6;
   }
 
