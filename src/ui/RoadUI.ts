@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
-import { type RoadState, type VergeState } from '../game/GameState';
-import { ROAD_BAR_H, MAX_VERGE_LEVEL, fmt, UI_FONT, MONO_FONT, vergeTierName, vergeUpgradeCost } from '../constants';
+import { type RoadState, type VergeState, type WaterState } from '../game/GameState';
+import {
+  ROAD_BAR_H, MAX_VERGE_LEVEL, MAX_WATER_LEVEL,
+  fmt, UI_FONT, MONO_FONT,
+  vergeTierName, vergeUpgradeCost,
+  waterTierName, waterUpgradeCost,
+} from '../constants';
 
 interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
@@ -14,22 +19,25 @@ export class RoadUI {
   readonly container: Phaser.GameObjects.Container;
   private roadActionRef:  ActionRef | null = null;
   private vergeActionRef: ActionRef | null = null;
+  private waterActionRef: ActionRef | null = null;
 
   constructor(
     scene: Phaser.Scene,
     road: RoadState,
     verge: VergeState,
+    water: WaterState,
     rowTop: number,
     width: number,
     onRoadUpgrade: () => void,
     onVergeUpgrade: () => void,
+    onWaterUpgrade: () => void,
   ) {
     const container = scene.add.container(0, 0).setDepth(11);
     const sectionW  = width / 3;
 
     this.buildRoadSection(scene, container, sectionW * 0.5, rowTop, sectionW, road, onRoadUpgrade);
     this.buildVergeSection(scene, container, sectionW * 1.5, rowTop, sectionW, verge, onVergeUpgrade);
-    this.buildPlaceholderSection(scene, container, sectionW * 2.5, rowTop, sectionW, 'WATER');
+    this.buildWaterSection(scene, container, sectionW * 2.5, rowTop, sectionW, water, onWaterUpgrade);
 
     // Subtle vertical dividers between sections
     const divGfx = scene.add.graphics();
@@ -199,34 +207,83 @@ export class RoadUI {
     this.vergeActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
   }
 
-  private buildPlaceholderSection(
+  private buildWaterSection(
     scene: Phaser.Scene,
     container: Phaser.GameObjects.Container,
     cx: number,
     rowTop: number,
     sectionW: number,
-    label: string,
+    water: WaterState,
+    onUpgrade: () => void,
   ): void {
-    const btnW = Math.min(sectionW - 24, 200);
-    const btnH = 34;
-    const btnY = rowTop + 24;
+    const atMax = water.level >= MAX_WATER_LEVEL;
+    const cost  = waterUpgradeCost(water.level);
+    const btnW  = Math.min(sectionW - 24, 200);
+    const btnH  = 34;
+    const btnY  = rowTop + 24;
 
     container.add(
       scene.add
-        .text(cx, rowTop + 13, label, { fontSize: '10px', color: '#3a4a3a', fontFamily: UI_FONT })
+        .text(cx, rowTop + 13, waterTierName(water.level), { fontSize: '11px', color: '#88ccee', fontFamily: UI_FONT })
         .setOrigin(0.5)
     );
 
     const btnGfx = scene.add.graphics();
-    btnGfx.fillStyle(0x0e140e, 1);
-    btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+
+    if (atMax) {
+      btnGfx.fillStyle(0x111820, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+      container.add(btnGfx);
+      container.add(
+        scene.add
+          .text(cx, btnY + btnH / 2, 'MAX', { fontSize: '10px', color: '#334455', fontFamily: UI_FONT })
+          .setOrigin(0.5)
+      );
+      return;
+    }
+
+    const drawNormal = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0a1f30, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+      btnGfx.fillStyle(0x2a7aaa, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
+    const drawHover = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x163850, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+      btnGfx.fillStyle(0x3aaace, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
+    const drawDisabled = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0e1820, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
+    };
+
+    drawNormal();
     container.add(btnGfx);
+
+    const btn = scene.add
+      .rectangle(cx, btnY + btnH / 2, btnW, btnH, 0x000000, 0)
+      .setInteractive({ useHandCursor: false });
+    container.add(btn);
 
     container.add(
       scene.add
-        .text(cx, btnY + btnH / 2, 'Coming Soon', { fontSize: '10px', color: '#2a3a2a', fontFamily: UI_FONT })
+        .text(cx, btnY + btnH / 2, `▲  Lv ${water.level + 1}   ${fmt(cost)}`, {
+          fontSize: '11px', color: '#88d8f8', fontFamily: MONO_FONT,
+        })
         .setOrigin(0.5)
     );
+
+    let hovered = false;
+    btn.on('pointerover', () => { hovered = true;  drawHover(); });
+    btn.on('pointerout',  () => { hovered = false; drawNormal(); });
+    btn.on('pointerdown', onUpgrade);
+
+    this.waterActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
   }
 
   private roadUpgradeCost(level: number): number {
@@ -243,7 +300,7 @@ export class RoadUI {
   }
 
   refresh(gold: number): void {
-    for (const ref of [this.roadActionRef, this.vergeActionRef]) {
+    for (const ref of [this.roadActionRef, this.vergeActionRef, this.waterActionRef]) {
       if (!ref) continue;
       const canAfford = gold >= ref.getCost();
       if (canAfford) {

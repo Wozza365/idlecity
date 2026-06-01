@@ -16,12 +16,17 @@ export interface VergeState {
   level: number; // 0 = bare dirt, 1–15
 }
 
+export interface WaterState {
+  level: number; // 0 = inactive, 1–12
+}
+
 /** All persistent game data lives here. */
 export interface GameState {
   gold: number;
   plots: PlotState[];
   road: RoadState;
   verge: VergeState;
+  water: WaterState;
 }
 
 // ── Default state ──────────────────────────────────────────────────────────────
@@ -36,6 +41,7 @@ export function defaultState(plotCount: number): GameState {
     })),
     road: { level: 0 },
     verge: { level: 0 },
+    water: { level: 0 },
   };
 }
 
@@ -67,6 +73,7 @@ export function loadGame(plotCount: number): GameState {
     ) {
       if (!parsed.road)  parsed.road  = { level: 0 };
       if (!parsed.verge) parsed.verge = { level: 0 };
+      if (!parsed.water) parsed.water = { level: 0 };
       return parsed as GameState;
     }
   } catch {

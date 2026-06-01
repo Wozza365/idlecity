@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H, VERGE_H, RIVER_H } from '../constants';
+import { ROAD_H, VERGE_H } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 
@@ -72,20 +72,11 @@ export class VergeRiver {
     this._groundY = groundY;
 
     const vergeY = groundY + ROAD_H;
-    const riverY = vergeY + VERGE_H;
 
     const gfx = this.vergeGfx;
     gfx.clear();
     this.flowerGfx.clear();
     this.drawBase(gfx, level, width, vergeY);
-
-    // River
-    gfx.fillStyle(0x1e5a9e, 1);
-    gfx.fillRect(0, riverY, width, RIVER_H);
-    gfx.fillStyle(0x2a6ab5, 1);
-    gfx.fillRect(0, riverY + 3, width, RIVER_H - 3);
-    gfx.fillStyle(0x4488cc, 0.3);
-    for (let x = 0; x < width; x += 40) gfx.fillRect(x, riverY + 8, 24, 2);
 
     if (level >= 8)  this.drawCyclePath(gfx, width, vergeY);
     if (level >= 9)  this.drawBollards(gfx, width, vergeY);

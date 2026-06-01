@@ -12,6 +12,8 @@ export const ROAD_DIVIDER_H = 4;
 export const VERGE_H = 60;
 export const MAX_VERGE_LEVEL = 15;
 export const RIVER_H = 48;
+export const WATER_H = 100;
+export const MAX_WATER_LEVEL = 12;
 export const YARD_H = 20;
 
 export const UNLOCK_COSTS: readonly number[] = [0, 50_000, 250_000, 1_500_000, 10_000_000];
@@ -56,6 +58,21 @@ export function perBuildingIncome(level: number): number {
   if (level <= 35) return _at15 + (level - 15) * _t2Inc;
   if (level <= 65) return _at35 + (level - 35) * _t3Inc;
   return _at65 + (level - 65) * _t4Inc;
+}
+
+export function waterUpgradeCost(level: number): number {
+  if (level === 0) return 1_000;
+  return level * level * 350 + 600;
+}
+
+export function waterTierName(level: number): string {
+  if (level === 0) return 'Open Water';
+  if (level <= 2)  return 'Coastal';
+  if (level <= 4)  return 'Sandy Cove';
+  if (level <= 6)  return 'Harbour';
+  if (level <= 8)  return 'Marina';
+  if (level <= 10) return 'Resort';
+  return 'Grand Marina';
 }
 
 export function vergeUpgradeCost(level: number): number {

@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
-  PLOT_COUNT, MAX_LEVEL, MAX_VERGE_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H, ROAD_H, VERGE_H, RIVER_H,
+  PLOT_COUNT, MAX_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H,
+  ROAD_H, VERGE_H, WATER_H,
   UNLOCK_COSTS,
-  upgradeCost, perBuildingIncome, vergeUpgradeCost,
+  upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
 import { hasShadowOverlay, hasSmokeUpdate, hasFlagUpdate } from '../buildings/types';
@@ -20,6 +21,8 @@ import { DevPanel, DEV_PANEL_H, DEV_PANEL_OFFSET } from '../ui/DevPanel';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
 import { CarManager } from '../objects/CarManager';
 import { PedestrianManager } from '../objects/PedestrianManager';
+import { WaterArea } from '../objects/WaterArea';
+import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
@@ -59,6 +62,8 @@ export class GameScene extends Phaser.Scene {
   private lightingSystem: LightingSystem | null = null;
   private carManager: CarManager | null = null;
   private pedestrianManager: PedestrianManager | null = null;
+  private waterArea: WaterArea | null = null;
+  private boatManager: BoatManager | null = null;
 
   // Single master clock — all day/night visuals derive from this + timeOffsetMs
   private masterClock!: Phaser.Tweens.Tween;
@@ -74,7 +79,7 @@ export class GameScene extends Phaser.Scene {
   // ── Dynamic layout getters ─────────────────────────────────────────────────
 
   private get plotWidth(): number { return this.scale.width / PLOT_COUNT; }
-  private get groundY(): number { return this.scale.height - UI_HEIGHT - ROAD_H - VERGE_H - RIVER_H; }
+  private get groundY(): number { return this.scale.height - UI_HEIGHT - ROAD_H - VERGE_H - WATER_H; }
   private get panelTop(): number { return this.scale.height - UI_HEIGHT; }
   private get colTop(): number { return this.panelTop + STATS_BAR_H + ROAD_BAR_H; }
   private get sectionW(): number { return this.scale.width / PLOT_COUNT; }
@@ -98,6 +103,8 @@ export class GameScene extends Phaser.Scene {
     this.sky        = new Sky(this);
     this.road       = new Road(this);
     this.vergeRiver = new VergeRiver(this);
+    this.waterArea  = new WaterArea(this);
+    this.boatManager = new BoatManager(this);
     this.sunMoon    = new SunMoon(this, this.groundY);
     this.stars      = new Stars(this, this.groundY);
 
@@ -144,6 +151,8 @@ export class GameScene extends Phaser.Scene {
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
     this.vergeRiver.updateCyclists(delta);
     this.vergeRiver.updateShadows(this.sunAngle);
+    this.waterArea?.update(delta);
+    this.boatManager?.update(delta);
     const elev = Math.sin(this.sunAngle);
     const t = Math.max(0, Math.min(1, (0.3 - elev) / 0.3));
     for (const c of this.plotContainers) {
@@ -167,6 +176,7 @@ export class GameScene extends Phaser.Scene {
 
     this.road.render(this.state.road.level, width, this.groundY);
     this.vergeRiver.render(this.state.verge.level, width, this.groundY);
+    this.waterArea!.render(this.state.water.level, width, this.groundY);
 
     this.lightingSystem?.destroy();
     this.lightingSystem = new LightingSystem(this, this.groundY, DEV_PANEL_OFFSET + DEV_PANEL_H);
@@ -175,13 +185,17 @@ export class GameScene extends Phaser.Scene {
       this.plotContainers[i] = this.renderPlot(i);
     }
 
-
     this.carManager?.destroy();
     this.carManager = new CarManager(this);
     this.carManager.rebuild(this.state.road.level, this.groundY);
     this.carManager.attachLights(this.lightingSystem);
     for (const l of this.vergeRiver.extraLights) this.lightingSystem.addLight(l);
+    for (const l of this.waterArea!.extraLights)  this.lightingSystem.addLight(l);
     this.lightingSystem.setTreeOccluders(this.vergeRiver.getTreeOccluders());
+
+    this.boatManager!.rebuild(this.state.water.level, this.groundY);
+    this.boatManager!.setDockSlots(this.waterArea!.getDockSlots());
+    this.boatManager!.attachLights(this.lightingSystem);
 
     this.pedestrianManager?.destroy();
     this.pedestrianManager = new PedestrianManager(this, this.groundY, this.plotWidth);
@@ -212,10 +226,12 @@ export class GameScene extends Phaser.Scene {
       this,
       this.state.road,
       this.state.verge,
+      this.state.water,
       this.panelTop + STATS_BAR_H,
       width,
       () => this.onRoadUpgrade(),
       () => this.onVergeUpgrade(),
+      () => this.onWaterUpgrade(),
     );
     this.add.existing(this.roadUI.container);
 
@@ -327,10 +343,12 @@ export class GameScene extends Phaser.Scene {
       this,
       this.state.road,
       this.state.verge,
+      this.state.water,
       this.panelTop + STATS_BAR_H,
       this.scale.width,
       () => this.onRoadUpgrade(),
       () => this.onVergeUpgrade(),
+      () => this.onWaterUpgrade(),
     );
     this.add.existing(this.roadUI.container);
     this.statsBar.update(this.state.gold, this.taxRate);
@@ -345,7 +363,6 @@ export class GameScene extends Phaser.Scene {
     this.state.gold -= cost;
     this.state.verge.level++;
 
-    // Remove old verge lights, re-render, re-add new lights
     for (const l of this.vergeRiver.extraLights) this.lightingSystem?.removeLight(l);
     this.vergeRiver.render(this.state.verge.level, this.scale.width, this.groundY);
     for (const l of this.vergeRiver.extraLights) this.lightingSystem?.addLight(l);
@@ -356,10 +373,45 @@ export class GameScene extends Phaser.Scene {
       this,
       this.state.road,
       this.state.verge,
+      this.state.water,
       this.panelTop + STATS_BAR_H,
       this.scale.width,
       () => this.onRoadUpgrade(),
       () => this.onVergeUpgrade(),
+      () => this.onWaterUpgrade(),
+    );
+    this.add.existing(this.roadUI.container);
+    this.statsBar.update(this.state.gold, this.taxRate);
+    this.refreshButtons();
+  }
+
+  private onWaterUpgrade(): void {
+    const cost = waterUpgradeCost(this.state.water.level);
+    if (this.state.gold < cost) return;
+    if (this.state.water.level >= MAX_WATER_LEVEL) return;
+
+    this.state.gold -= cost;
+    this.state.water.level++;
+
+    for (const l of this.waterArea!.extraLights) this.lightingSystem?.removeLight(l);
+    this.waterArea!.render(this.state.water.level, this.scale.width, this.groundY);
+    for (const l of this.waterArea!.extraLights) this.lightingSystem?.addLight(l);
+
+    this.boatManager!.rebuild(this.state.water.level, this.groundY);
+    this.boatManager!.setDockSlots(this.waterArea!.getDockSlots());
+    this.boatManager!.attachLights(this.lightingSystem!);
+
+    this.roadUI.destroy();
+    this.roadUI = new RoadUI(
+      this,
+      this.state.road,
+      this.state.verge,
+      this.state.water,
+      this.panelTop + STATS_BAR_H,
+      this.scale.width,
+      () => this.onRoadUpgrade(),
+      () => this.onVergeUpgrade(),
+      () => this.onWaterUpgrade(),
     );
     this.add.existing(this.roadUI.container);
     this.statsBar.update(this.state.gold, this.taxRate);
@@ -421,7 +473,9 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.carManager?.updateLighting(elev);
+    this.boatManager?.updateLighting(elev);
     this.vergeRiver.updateLighting(elev);
+    this.waterArea?.updateLighting(elev);
     this.devPanel?.updateClock(this.gameTimeString());
     this.devPanel?.updateFps(this.game.loop.actualFps);
     this.lightingSystem?.update(this.sunAngle);
@@ -439,8 +493,9 @@ export class GameScene extends Phaser.Scene {
 
   private skipToHighLevel(): void {
     const SKIP_LEVELS = [75, 60, 45, 30, 15];
-    this.state.road.level = 10;
+    this.state.road.level  = 10;
     this.state.verge.level = MAX_VERGE_LEVEL;
+    this.state.water.level = MAX_WATER_LEVEL;
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.state.plots[i].unlocked = true;
       this.state.plots[i].level = SKIP_LEVELS[i] ?? 1;

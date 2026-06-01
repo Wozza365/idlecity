@@ -1,0 +1,142 @@
+import Phaser from 'phaser';
+import { ROAD_H, VERGE_H, WATER_H } from '../constants';
+import { type LightSource } from '../lighting/LightingSystem';
+import { Boat } from './Boat';
+import { pickRandomBoat } from './BoatAssets';
+
+// Spawn interval bounds (ms) — decreases with level
+const BASE_INTERVAL_MS = 28_000;
+const MIN_INTERVAL_MS  = 3_200;
+const DOCK_DURATION_MS = 7_000;
+const DOCK_VARY_MS     = 5_000;
+
+interface LightSystem {
+  addLight(l: LightSource): void;
+  removeLight(l: LightSource): void;
+}
+
+function spawnInterval(level: number): number {
+  return Math.max(MIN_INTERVAL_MS, BASE_INTERVAL_MS / (1 + level * 0.55));
+}
+
+function maxBoats(level: number): number {
+  return Math.min(2 + Math.floor(level * 0.85), 12);
+}
+
+export class BoatManager {
+  private readonly scene: Phaser.Scene;
+  private boats: Boat[] = [];
+  private spawnTimer = 0;
+  private waterLevel = 0;
+  private sceneWidth = 0;
+  private waterY = 0;
+  private dockSlots: number[] = [];
+  private occupiedSlots = new Set<number>();
+  private lightSystem: LightSystem | null = null;
+
+  constructor(scene: Phaser.Scene) {
+    this.scene = scene;
+  }
+
+  rebuild(waterLevel: number, groundY: number): void {
+    this.destroyBoats();
+    this.waterLevel = waterLevel;
+    this.sceneWidth = (this.scene.scale as Phaser.Scale.ScaleManager).width;
+    this.waterY     = groundY + ROAD_H + VERGE_H;
+    this.spawnTimer = spawnInterval(waterLevel) * 0.3;
+  }
+
+  setDockSlots(slots: number[]): void {
+    this.dockSlots = [...slots];
+  }
+
+  attachLights(system: LightSystem): void {
+    this.lightSystem = system;
+    for (const boat of this.boats) {
+      for (const l of boat.lights) system.addLight(l);
+    }
+  }
+
+  detachLights(system: LightSystem): void {
+    for (const boat of this.boats) {
+      for (const l of boat.lights) system.removeLight(l);
+    }
+    if (this.lightSystem === system) this.lightSystem = null;
+  }
+
+  update(delta: number): void {
+    if (this.waterLevel === 0) return;
+
+    // Move existing boats; remove off-screen ones
+    const toRemove: number[] = [];
+    for (let i = 0; i < this.boats.length; i++) {
+      const done = this.boats[i].update(delta);
+      if (done) toRemove.push(i);
+    }
+    for (let i = toRemove.length - 1; i >= 0; i--) {
+      const boat = this.boats[toRemove[i]];
+      if (this.lightSystem) {
+        for (const l of boat.lights) this.lightSystem.removeLight(l);
+      }
+      const slotX = boat.assignedDockX;
+      if (slotX !== null) this.occupiedSlots.delete(slotX);
+      boat.destroy();
+      this.boats.splice(toRemove[i], 1);
+    }
+
+    // Spawn new boats
+    this.spawnTimer -= delta;
+    if (this.spawnTimer <= 0 && this.boats.length < maxBoats(this.waterLevel)) {
+      this.spawnTimer = spawnInterval(this.waterLevel) * (0.7 + Math.random() * 0.6);
+      this.spawnBoat();
+    }
+  }
+
+  updateLighting(elevation: number): void {
+    for (const boat of this.boats) boat.updateLighting(elevation);
+  }
+
+  private spawnBoat(): void {
+    const def = pickRandomBoat();
+    const yMin = this.waterY + WATER_H * 0.32;
+    const yMax = this.waterY + WATER_H * 0.82;
+    const y    = yMin + Math.random() * (yMax - yMin);
+
+    let dockX: number | null = null;
+    if (def.canDock && this.dockSlots.length > 0) {
+      const freeDock = this.dockSlots.find(s => !this.occupiedSlots.has(s));
+      if (freeDock !== undefined && Math.random() < 0.45) {
+        dockX = freeDock;
+        this.occupiedSlots.add(freeDock);
+      }
+    }
+
+    const dockDuration = DOCK_DURATION_MS + Math.random() * DOCK_VARY_MS;
+    const boat = new Boat(this.scene, {
+      def, x: -def.w / 2 - 10, y,
+      sceneWidth: this.sceneWidth,
+      dockX, dockDuration,
+    });
+
+    if (this.lightSystem) {
+      for (const l of boat.lights) this.lightSystem.addLight(l);
+    }
+
+    this.boats.push(boat);
+  }
+
+  private destroyBoats(): void {
+    for (const b of this.boats) {
+      if (this.lightSystem) {
+        for (const l of b.lights) this.lightSystem.removeLight(l);
+      }
+      b.destroy();
+    }
+    this.boats = [];
+    this.occupiedSlots.clear();
+  }
+
+  destroy(): void {
+    this.destroyBoats();
+  }
+}
