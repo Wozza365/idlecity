@@ -16,7 +16,7 @@ import { StatsBar } from '../ui/StatsBar';
 import { PanelChrome } from '../ui/PanelChrome';
 import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
-import { DevPanel, DEV_PANEL_H } from '../ui/DevPanel';
+import { DevPanel, DEV_PANEL_H, DEV_PANEL_OFFSET } from '../ui/DevPanel';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
 import { CarManager } from '../objects/CarManager';
 import { PedestrianManager } from '../objects/PedestrianManager';
@@ -168,7 +168,7 @@ export class GameScene extends Phaser.Scene {
     this.vergeRiver.render(this.state.verge.level, width, this.groundY);
 
     this.lightingSystem?.destroy();
-    this.lightingSystem = new LightingSystem(this, this.groundY, DEV_PANEL_H);
+    this.lightingSystem = new LightingSystem(this, this.groundY, DEV_PANEL_OFFSET + DEV_PANEL_H);
 
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { UI_FONT } from '../constants';
 
-export const DEV_PANEL_H = 84;
+export const DEV_PANEL_OFFSET = 14; // gap between canvas top and panel background
+export const DEV_PANEL_H = 84;      // height of the panel background itself
 
 export class DevPanel {
   readonly container: Phaser.GameObjects.Container;
@@ -17,7 +18,7 @@ export class DevPanel {
     onMidnight: () => void,
     onSkip: () => void,
   ) {
-    const container = scene.add.container(0, 0).setDepth(90);
+    const container = scene.add.container(0, DEV_PANEL_OFFSET).setDepth(90);
 
     const row1Y = 16;
     const row2Y = 42;
