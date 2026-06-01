@@ -181,6 +181,7 @@ export class GameScene extends Phaser.Scene {
     this.carManager.rebuild(this.state.road.level, this.groundY);
     this.carManager.attachLights(this.lightingSystem);
     for (const l of this.vergeRiver.extraLights) this.lightingSystem.addLight(l);
+    this.lightingSystem.setTreeOccluders(this.vergeRiver.getTreeOccluders());
 
     this.pedestrianManager?.destroy();
     this.pedestrianManager = new PedestrianManager(this, this.groundY, this.plotWidth);
@@ -348,6 +349,7 @@ export class GameScene extends Phaser.Scene {
     for (const l of this.vergeRiver.extraLights) this.lightingSystem?.removeLight(l);
     this.vergeRiver.render(this.state.verge.level, this.scale.width, this.groundY);
     for (const l of this.vergeRiver.extraLights) this.lightingSystem?.addLight(l);
+    this.lightingSystem?.setTreeOccluders(this.vergeRiver.getTreeOccluders());
 
     this.roadUI.destroy();
     this.roadUI = new RoadUI(

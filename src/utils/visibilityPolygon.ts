@@ -38,6 +38,15 @@ export function segmentsFromPolygon(pts: Point[]): Segment[] {
   return segs;
 }
 
+export function segmentsFromCircle(cx: number, cy: number, r: number, n = 12): Segment[] {
+  const pts: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+  }
+  return segmentsFromPolygon(pts);
+}
+
 // Ray: O + t*D (unit direction), Segment: A + u*(B-A).
 // Returns t (pixel distance to intersection) or null if no valid hit.
 function raySegmentIntersect(

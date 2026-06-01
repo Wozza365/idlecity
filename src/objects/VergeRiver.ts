@@ -49,6 +49,14 @@ export class VergeRiver {
 
   get extraLights(): LightSource[] { return [...this.lampLights, ...this.bollardLights]; }
 
+  getTreeOccluders(): Array<{ x: number; y: number; r: number }> {
+    if (this._level < 4 || this.treeXs.length === 0) return [];
+    const { trunkH, canopyR } = treeGeom(this._level);
+    const vergeY = this._groundY + ROAD_H;
+    const canopyY = vergeY + 8 - trunkH;
+    return this.treeXs.map(tx => ({ x: tx, y: canopyY, r: canopyR }));
+  }
+
   constructor(scene: Phaser.Scene) {
     this.scene      = scene;
     this.vergeGfx   = scene.add.graphics().setDepth(6).setLighting(true);

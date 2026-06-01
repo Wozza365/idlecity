@@ -6,6 +6,7 @@ import {
   buildScreenBoundary,
   segmentsFromRect,
   segmentsFromPolygon,
+  segmentsFromCircle,
   computeVisibilityPolygon,
   computeSpotVisibilityPolygon,
 } from '../utils/visibilityPolygon';
@@ -75,6 +76,7 @@ export class LightingSystem {
   private readonly composite: LightingComposite;
   private _cachedSegments: Segment[] | null = null;
   private _segmentsDirty = true;
+  private _treeOccluders: Array<{ x: number; y: number; r: number }> = [];
 
   constructor(scene: Phaser.Scene, _groundY: number, topUIPx: number = 0) {
     this.scene = scene;
@@ -107,6 +109,11 @@ export class LightingSystem {
   }
 
   markSegmentsDirty(): void {
+    this._segmentsDirty = true;
+  }
+
+  setTreeOccluders(occluders: Array<{ x: number; y: number; r: number }>): void {
+    this._treeOccluders = occluders;
     this._segmentsDirty = true;
   }
 
@@ -171,6 +178,10 @@ export class LightingSystem {
           segs.push(...segmentsFromRect(bounds.x, bounds.y, bounds.width, bounds.height));
         }
       }
+    }
+
+    for (const tree of this._treeOccluders) {
+      segs.push(...segmentsFromCircle(tree.x, tree.y, tree.r));
     }
 
     return segs;
