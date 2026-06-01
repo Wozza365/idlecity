@@ -16,7 +16,7 @@ import { StatsBar } from '../ui/StatsBar';
 import { PanelChrome } from '../ui/PanelChrome';
 import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
-import { DevPanel } from '../ui/DevPanel';
+import { DevPanel, DEV_PANEL_H } from '../ui/DevPanel';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
 import { CarManager } from '../objects/CarManager';
 import { PedestrianManager } from '../objects/PedestrianManager';
@@ -168,7 +168,7 @@ export class GameScene extends Phaser.Scene {
     this.vergeRiver.render(this.state.verge.level, width, this.groundY);
 
     this.lightingSystem?.destroy();
-    this.lightingSystem = new LightingSystem(this, this.groundY);
+    this.lightingSystem = new LightingSystem(this, this.groundY, DEV_PANEL_H);
 
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotContainers[i] = this.renderPlot(i);
@@ -223,7 +223,9 @@ export class GameScene extends Phaser.Scene {
       width,
       () => this.onAddGold(),
       () => this.advanceTime(),
-      () => this.resetGame()
+      () => this.resetGame(),
+      () => this.setMidnight(),
+      () => this.skipToHighLevel(),
     );
     this.add.existing(this.devPanel.container);
 
@@ -424,6 +426,23 @@ export class GameScene extends Phaser.Scene {
 
   private advanceTime(): void {
     this.timeOffsetMs = (this.timeOffsetMs + 240_000 / 24) % 240_000;
+  }
+
+  private setMidnight(): void {
+    const MIDNIGHT_ELAPSED = 120_000;
+    const current = this.masterClock?.getValue() ?? 0;
+    this.timeOffsetMs = ((MIDNIGHT_ELAPSED - current) % 240_000 + 240_000) % 240_000;
+  }
+
+  private skipToHighLevel(): void {
+    const SKIP_LEVELS = [75, 60, 45, 30, 15];
+    this.state.road.level = 10;
+    this.state.verge.level = MAX_VERGE_LEVEL;
+    for (let i = 0; i < PLOT_COUNT; i++) {
+      this.state.plots[i].unlocked = true;
+      this.state.plots[i].level = SKIP_LEVELS[i] ?? 1;
+    }
+    this.buildLayout();
   }
 
   // ── Tax system ─────────────────────────────────────────────────────────────

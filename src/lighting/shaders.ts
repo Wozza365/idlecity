@@ -150,12 +150,13 @@ uniform sampler2D uShadowSampler;
 uniform vec3      uAmbientColor;
 uniform float     uAmbientIntensity;
 uniform float     uGameFraction;
+uniform float     uTopFraction;
 
 varying vec2 outTexCoord;
 
 void main() {
     vec4 scene = texture2D(uMainSampler, outTexCoord);
-    if (outTexCoord.y < (1.0 - uGameFraction)) {
+    if (outTexCoord.y < (1.0 - uGameFraction) || outTexCoord.y > (1.0 - uTopFraction)) {
         gl_FragColor = scene;
         return;
     }

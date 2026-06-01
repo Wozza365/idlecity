@@ -27,7 +27,7 @@ export class LightingComposite {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly renderNodes: any;
 
-  constructor(scene: Phaser.Scene, shadowMap: ShadowMap, gameFraction: number) {
+  constructor(scene: Phaser.Scene, shadowMap: ShadowMap, gameFraction: number, topFraction: number = 0) {
     this.camera = scene.cameras.main;
     const renderer = scene.renderer as AnyObj;
     this.renderNodes = renderer.renderNodes;
@@ -70,6 +70,7 @@ export class LightingComposite {
       pm.setUniform('uAmbientColor', [controller.ambientR, controller.ambientG, controller.ambientB]);
       pm.setUniform('uAmbientIntensity', controller.ambientIntensity);
       pm.setUniform('uGameFraction', controller.gameFraction);
+      pm.setUniform('uTopFraction', controller.topFraction);
     };
 
     this.renderNodes.addNode(NODE_NAME, node);
@@ -81,6 +82,7 @@ export class LightingComposite {
     (this.controller as AnyObj).ambientB = 0.85;
     (this.controller as AnyObj).ambientIntensity = 1.0;
     (this.controller as AnyObj).gameFraction = gameFraction;
+    (this.controller as AnyObj).topFraction = topFraction;
 
     // Attach to camera's external filter list.
     this.camera.filters!.external.add(this.controller);

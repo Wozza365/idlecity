@@ -76,7 +76,7 @@ export class LightingSystem {
   private _cachedSegments: Segment[] | null = null;
   private _segmentsDirty = true;
 
-  constructor(scene: Phaser.Scene, _groundY: number) {
+  constructor(scene: Phaser.Scene, _groundY: number, topUIPx: number = 0) {
     this.scene = scene;
     const { width, height } = scene.scale;
     const gameH = height - UI_HEIGHT;
@@ -89,7 +89,8 @@ export class LightingSystem {
     this.composite = new LightingComposite(
       scene,
       this.shadowRenderer.shadowMap,
-      gameH / height,  // fraction of screen that is game area (not UI)
+      gameH / height,      // fraction of screen that is game area (not bottom UI)
+      topUIPx / height,    // fraction occupied by the top dev panel
     );
 
     // Kick off with full-day ambient so first frame is correct.
