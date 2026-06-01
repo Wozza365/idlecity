@@ -422,6 +422,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     const time = this.scene.time.now / 1000;
 
     if (this.flagGfx) this.drawFlag(this.flagGfx, time);
+    if (this.flagLight) this.flagLight.intensity = t * 0.6;
 
     if (t < 0.01) return;
 
@@ -434,7 +435,6 @@ export class Townhouse extends Phaser.GameObjects.Container {
       const pulse = 1 + Math.sin(time * 1.8) * 0.08;
       this.lampConeGfx.setAlpha(t * 0.45 * pulse);
     }
-    if (this.flagLight) this.flagLight.intensity = t * 0.6;
   }
 
   private drawFlag(gfx: Phaser.GameObjects.Graphics, time: number): void {
