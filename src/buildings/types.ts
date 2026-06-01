@@ -26,3 +26,11 @@ export interface HasSmokeUpdate {
 export function hasSmokeUpdate(o: unknown): o is HasSmokeUpdate {
   return o != null && typeof (o as HasSmokeUpdate).updateSmoke === 'function';
 }
+
+export interface HasFlagUpdate {
+  updateFlag(): void;
+}
+
+export function hasFlagUpdate(o: unknown): o is HasFlagUpdate {
+  return o != null && typeof (o as HasFlagUpdate).updateFlag === 'function';
+}

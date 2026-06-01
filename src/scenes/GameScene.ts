@@ -6,7 +6,7 @@ import {
   upgradeCost, perBuildingIncome, vergeUpgradeCost,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
-import { hasShadowOverlay, hasSmokeUpdate } from '../buildings/types';
+import { hasShadowOverlay, hasSmokeUpdate, hasFlagUpdate } from '../buildings/types';
 import { Sky } from '../objects/Sky';
 import { SunMoon } from '../objects/SunMoon';
 import { Stars } from '../objects/Stars';
@@ -148,6 +148,7 @@ export class GameScene extends Phaser.Scene {
     const t = Math.max(0, Math.min(1, (0.3 - elev) / 0.3));
     for (const c of this.plotContainers) {
       if (hasSmokeUpdate(c)) c.updateSmoke(t);
+      if (hasFlagUpdate(c)) c.updateFlag();
     }
   }
 
