@@ -103,6 +103,13 @@ export class BoatManager {
     // Single lane across the deep water at roughly 75–90% down the water strip
     const y = this.waterY + WATER_H * (0.75 + Math.random() * 0.12);
 
+    // Don't spawn if another boat is too close to the left edge
+    const MIN_SEPARATION = 100 + def.w;
+    if (this.boats.some(b => b.posX < MIN_SEPARATION)) {
+      this.spawnTimer = 3000 + Math.random() * 2000;
+      return;
+    }
+
     let dockX: number | null = null;
     if (def.canDock && this.dockSlots.length > 0) {
       const freeDock = this.dockSlots.find(s => !this.occupiedSlots.has(s));

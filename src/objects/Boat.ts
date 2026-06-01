@@ -43,6 +43,7 @@ export class Boat {
   }
 
   get assignedDockX(): number | null { return this.dockX; }
+  get posX(): number { return this.x; }
 
   constructor(scene: Phaser.Scene, config: BoatConfig) {
     const { def, x, y, sceneWidth, dockX, dockDuration } = config;

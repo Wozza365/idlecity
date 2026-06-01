@@ -128,10 +128,10 @@ export class WaterArea {
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.waterGfx       = scene.add.graphics().setDepth(5.5).setLighting(true);
-    this.shadowGfx      = scene.add.graphics().setDepth(5.65);
+    this.shadowGfx      = scene.add.graphics().setDepth(5.55);
     this.structGfx      = scene.add.graphics().setDepth(5.7).setLighting(true);
-    this.beachShadowGfx = scene.add.graphics().setDepth(5.76);
-    this.beachPeopleGfx = scene.add.graphics().setDepth(5.78).setLighting(true);
+    this.beachShadowGfx = scene.add.graphics().setDepth(5.62);
+    this.beachPeopleGfx = scene.add.graphics().setDepth(5.66).setLighting(true);
     this.fxGfx          = scene.add.graphics().setDepth(5.85);
   }
 
@@ -143,10 +143,10 @@ export class WaterArea {
 
     // Layout geometry
     this._beachEndX  = Math.floor(width * 0.36);
-    this._transEndX  = Math.floor(width * 0.58); // end of beach→rock transition
+    this._transEndX  = Math.floor(width * 0.60); // end of beach→rock transition
     this._pierX      = Math.floor(width * 0.23);
-    this._dockX1     = Math.floor(width * 0.42);
-    this._dockX2     = Math.floor(width * 0.62);
+    this._dockX1     = this._beachEndX;           // dock replaces transition zone
+    this._dockX2     = this._transEndX;
     this._cafeX      = 16;
     this._bonfireX   = Math.floor(width * 0.17);
     this._bonfireY   = this._waterY + 32;
@@ -188,9 +188,22 @@ export class WaterArea {
       gfx.fillStyle(SAND_COLOR, 1);
       gfx.fillRect(0, wy, bx, BEACH_SHORE_H);
 
-      // Wet sand at base of beach (darker, slightly transparent)
-      gfx.fillStyle(SAND_WET, 1);
-      gfx.fillRect(0, wy + BEACH_SHORE_H - 7, bx, 7);
+      // Wet sand — gently curved bottom edge using thin horizontal strips
+      for (let col = 0; col < bx; col += 2) {
+        const t  = col / bx;
+        // Gentle sinusoidal variation: center dips slightly further into water
+        const dip = Math.round(Math.sin(t * Math.PI) * 4);
+        const wh  = 7 + dip;
+        gfx.fillStyle(SAND_WET, 1);
+        gfx.fillRect(col, wy + BEACH_SHORE_H - wh, 2, wh);
+      }
+      // White foam strip at water's edge
+      gfx.fillStyle(0xFFFFFF, 0.22);
+      for (let col = 0; col < bx; col += 2) {
+        const t  = col / bx;
+        const dip = Math.round(Math.sin(t * Math.PI) * 4);
+        gfx.fillRect(col, wy + BEACH_SHORE_H - (7 + dip), 2, 2);
+      }
 
       // Sand pebble texture
       gfx.fillStyle(0xE8D0A0, 0.45);
@@ -200,21 +213,22 @@ export class WaterArea {
         gfx.fillRect(px, py, 1 + (i % 2), 1 + (i % 2));
       }
 
-      // ── Stepped beach→rock transition (pixel-art style) ──
+      // ── Smooth beach→rock transition (per-pixel width, smoothstep curve) ──
       const transW = tx - bx;
-      const STEPS  = 6;
+      const STEPS  = Math.max(1, Math.floor(transW / 3)); // ~3px each strip
       for (let s = 0; s < STEPS; s++) {
         const t0 = s / STEPS;
         const t1 = (s + 1) / STEPS;
+        const tSmooth = t0 * t0 * (3 - 2 * t0); // smoothstep
         const sx = bx + Math.floor(t0 * transW);
-        const sw = Math.ceil(t1 * transW) - Math.floor(t0 * transW);
-        const sh = Math.round(BEACH_SHORE_H * (1 - t0) + ROCK_SHORE_H * t0);
-        const color = lerpColor(SAND_COLOR, ROCK_BASE, t0);
+        const sw = Math.max(1, Math.ceil(t1 * transW) - Math.floor(t0 * transW));
+        const sh = Math.round(BEACH_SHORE_H * (1 - tSmooth) + ROCK_SHORE_H * tSmooth);
+        const color = lerpColor(SAND_COLOR, ROCK_BASE, tSmooth);
         gfx.fillStyle(color, 1);
         gfx.fillRect(sx, wy, sw, sh);
-        // Step highlight top edge
-        gfx.fillStyle(lerpColor(0xE8D0A0, ROCK_LIGHT, t0), 0.5);
-        gfx.fillRect(sx, wy, sw, 2);
+        // Top edge highlight
+        gfx.fillStyle(lerpColor(0xE8D0A0, ROCK_LIGHT, tSmooth), 0.4);
+        gfx.fillRect(sx, wy, sw, 1);
       }
 
       // ── Rocky coastline (right) — pixel-art layered blocks ──
@@ -262,8 +276,8 @@ export class WaterArea {
     const gfx = this.structGfx;
     const { _waterY: wy, _pierX: px } = this;
     const pierW = 18;
-    const pierH = 55;
-    const planks = 7;
+    const pierH = 30; // ends at wy+68, well above boat lane (wy+75)
+    const planks = 5;
 
     // Pier deck
     gfx.fillStyle(PIER_WOOD, 1);
@@ -548,7 +562,7 @@ export class WaterArea {
       this._lighthouseSpot = new SoftSpotLight({
         x: this._lighthouseX, y: this._lighthouseTopY - 5,
         radius: 180, color: 0xFFFF88, intensity: 0,
-        angle: 0, coneAngle: Math.PI / 12,
+        angle: 0, coneAngle: Math.PI / 8,
         noOcclusion: true,
       });
       this._lighthouseBulb = {
@@ -713,8 +727,8 @@ export class WaterArea {
   update(delta: number, elevation: number): void {
     if (this._level === 0) return;
     const dt = delta / 1000;
-    this._waveTime        += dt * 0.12; // much slower
-    this._bonfireTime     += dt;
+    this._waveTime    += dt * 0.12;
+    this._bonfireTime += dt * 0.55; // slowed for more organic feel
     this._lighthouseAngle  = (this._lighthouseAngle + dt * 0.75) % (Math.PI * 2);
 
     // Rotate lighthouse beam
@@ -749,35 +763,57 @@ export class WaterArea {
 
     const { _width: w, _waterY: wy } = this;
 
-    // Slow wave sparkles (daytime only)
-    if (this._nightFactor < 0.85) {
-      const dt = 1 - this._nightFactor;
-      const t  = this._waveTime;
-      for (let i = 0; i < 7; i++) {
-        const phase = Math.sin(t * 1.8 + i * 1.3);
-        const sx    = ((i * 137 + Math.floor(t * 3) * 53) % (w - 30)) + 15;
-        const sy    = wy + 30 + ((i * 29) % 50);
-        gfx.fillStyle(0xFFFFFF, 0.07 * dt * Math.max(0, phase));
-        gfx.fillRect(sx, sy, 8 + (i % 4) * 3, 1);
+    // Animated wave crests — scrolling horizontal sparkle lines
+    {
+      const t   = this._waveTime;
+      const nf  = this._nightFactor;
+      const dayA = Math.max(0, 1 - nf * 1.2);
+      // Scroll speed: wave lines drift right slowly
+      const scroll = (t * 14) % 60;
+      for (let row = 0; row < 5; row++) {
+        const rowY  = wy + 22 + row * 14 + Math.round(Math.sin(t * 0.9 + row * 0.7) * 2);
+        const alpha = (0.10 + 0.06 * Math.sin(t * 1.3 + row * 1.1)) * dayA;
+        for (let col = 0; col < w; col += 52) {
+          const x = (col + Math.round(scroll * (0.8 + row * 0.15))) % w;
+          const wl = 14 + (row % 3) * 6;
+          gfx.fillStyle(0xFFFFFF, alpha);
+          gfx.fillRect(x, rowY, wl, 1);
+          // Bright glint at crest
+          gfx.fillStyle(0xFFFFFF, alpha * 2.0);
+          gfx.fillRect(x, rowY, 3, 1);
+        }
+      }
+      // Night moonlight shimmer — thin lines, cool white
+      if (nf > 0.3) {
+        const moonA = (nf - 0.3) * 0.12;
+        for (let col = 0; col < w; col += 70) {
+          const x = (col + Math.round(scroll * 0.5)) % w;
+          gfx.fillStyle(0xCCEEFF, moonA);
+          gfx.fillRect(x, wy + 18, 20, 1);
+          gfx.fillRect(x + 8, wy + 38, 12, 1);
+          gfx.fillRect(x + 4, wy + 60, 16, 1);
+        }
       }
     }
 
-    // Buoys
+    // Buoys — dim by elevation so they match day/night lighting
+    const buoyBrightness = Math.max(0.35, Math.min(1.0, (1 - this._nightFactor * 0.7)));
     for (const b of this._buoys) {
-      const bobY = b.y + Math.sin(b.phase) * 1.5;
-      gfx.fillStyle(b.color, 1);
-      gfx.fillRect(b.x - 4, bobY - 5, 8, 8);
+      const bobY  = b.y + Math.sin(b.phase) * 1.5;
+      const bCol  = dimColor(b.color, buoyBrightness);
+      gfx.fillStyle(bCol, 1);
+      gfx.fillRect(b.x - 4, Math.round(bobY) - 5, 8, 8);
       gfx.fillStyle(0x000000, 0.25);
-      gfx.fillRect(b.x - 3, bobY - 4, 6, 6);
-      gfx.fillStyle(b.color, 1);
-      gfx.fillRect(b.x - 3, bobY - 4, 6, 6);
-      // Top cone marker
-      gfx.fillStyle(0xFFFFFF, 0.9);
-      gfx.fillRect(b.x - 1, bobY - 7, 2, 3);
-      // Night glow
+      gfx.fillRect(b.x - 3, Math.round(bobY) - 4, 6, 6);
+      gfx.fillStyle(bCol, 1);
+      gfx.fillRect(b.x - 3, Math.round(bobY) - 4, 6, 6);
+      // Top marker pole
+      gfx.fillStyle(dimColor(0xFFFFFF, buoyBrightness * 0.9), 0.9);
+      gfx.fillRect(b.x - 1, Math.round(bobY) - 7, 2, 3);
+      // Night glow halo
       if (this._nightFactor > 0.15) {
-        gfx.fillStyle(b.color, this._nightFactor * 0.6);
-        gfx.fillRect(b.x - 6, bobY - 7, 12, 12);
+        gfx.fillStyle(b.color, this._nightFactor * 0.45);
+        gfx.fillRect(b.x - 5, Math.round(bobY) - 6, 10, 10);
       }
     }
 
@@ -788,44 +824,80 @@ export class WaterArea {
   private drawBonfire(): void {
     const gfx = this.fxGfx;
     const { _bonfireX: bx, _bonfireY: by } = this;
-    const t  = this._bonfireTime;
+    const t  = this._bonfireTime; // already slowed in update()
     const nf = this._nightFactor;
 
-    // Logs (always visible)
-    gfx.fillStyle(0x3A2010, 1);
-    gfx.fillRect(bx - 9, by + 2, 18, 4);
-    gfx.fillRect(bx - 6, by + 4, 12, 3);
+    // Logs (always visible, with glowing embers)
+    gfx.fillStyle(0x2A1508, 1);
+    gfx.fillRect(bx - 10, by + 2, 20, 4);
+    gfx.fillRect(bx - 7, by + 4, 14, 3);
+    // Ember glow on logs
+    if (nf > 0.05) {
+      const emberA = nf * (0.4 + 0.3 * Math.sin(t * 3.1));
+      gfx.fillStyle(0xFF5500, emberA);
+      gfx.fillRect(bx - 8, by + 2, 16, 3);
+    }
 
-    if (nf < 0.08) return;
-    const alpha = Math.min(1, nf * 1.6);
+    if (nf < 0.06) return;
+    const alpha = Math.min(1, nf * 1.8);
 
-    gfx.fillStyle(0xFF4400, alpha * 0.85);
-    gfx.fillRect(bx - 7, by - 1, 14, 4);
+    // Base glow (wide, low, hot orange)
+    gfx.fillStyle(0xFF3300, alpha * 0.7);
+    gfx.fillRect(bx - 8, by - 2, 16, 5);
 
-    const f1 = 0.6 + 0.4 * Math.sin(t * 7.8);
-    const f2 = 0.65 + 0.35 * Math.sin(t * 5.3 + 1.1);
-    const f3 = 0.55 + 0.45 * Math.sin(t * 10.2 + 0.6);
+    // Outer flame — slow wobble
+    const f1 = 0.55 + 0.45 * Math.sin(t * 3.2);
+    const h1  = Math.round(12 * f1);
+    gfx.fillStyle(0xDD1100, alpha * 0.85);
+    gfx.fillRect(bx - 8, by - h1, 16, h1 + 2);
 
-    const h1 = Math.round(10 * f1);
-    gfx.fillStyle(0xFF2200, alpha * 0.9);
-    gfx.fillRect(bx - 7, by - h1, 14, h1);
+    // Mid flame — slightly offset
+    const f2  = 0.6 + 0.4 * Math.sin(t * 2.7 + 0.8);
+    const h2  = Math.round(18 * f2);
+    const ox2 = Math.round(Math.sin(t * 1.9) * 2);
+    gfx.fillStyle(0xFF5500, alpha * 0.82);
+    gfx.fillRect(bx - 6 + ox2, by - h2, 12, h2 + 1);
 
-    const h2 = Math.round(15 * f2);
-    gfx.fillStyle(0xFF6600, alpha * 0.85);
-    gfx.fillRect(bx - 5, by - h2, 10, h2);
+    // Inner flame — hot orange-yellow
+    const f3  = 0.65 + 0.35 * Math.sin(t * 3.8 + 1.4);
+    const h3  = Math.round(22 * f3);
+    const ox3 = Math.round(Math.sin(t * 2.4 + 0.5) * 1.5);
+    gfx.fillStyle(0xFF8800, alpha * 0.78);
+    gfx.fillRect(bx - 4 + ox3, by - h3, 8, h3);
 
-    const h3 = Math.round(20 * f3);
-    gfx.fillStyle(0xFFAA00, alpha * 0.75);
-    gfx.fillRect(bx - 3, by - h3, 6, h3);
+    // Core — yellow-white hot
+    const f4  = 0.7 + 0.3 * Math.sin(t * 4.6 + 0.2);
+    const h4  = Math.round(14 * f4);
+    gfx.fillStyle(0xFFCC00, alpha * 0.7);
+    gfx.fillRect(bx - 2, by - h4 - 4, 4, h4);
+    gfx.fillStyle(0xFFEE44, alpha * 0.55);
+    gfx.fillRect(bx - 1, by - h4 - 8, 2, 6);
 
-    gfx.fillStyle(0xFFEE22, alpha * 0.55);
-    gfx.fillRect(bx - 1, by - h3 - 4, 3, 5);
+    // Sparks — rise and drift
+    gfx.fillStyle(0xFFFF88, alpha * 0.8);
+    for (let i = 0; i < 7; i++) {
+      const phase  = t * (1.8 + i * 0.4) + i * 1.3;
+      const rise   = (phase % (Math.PI * 2)) / (Math.PI * 2);
+      const drift  = Math.sin(t * 2.1 + i * 0.9) * 9;
+      const sx     = bx + Math.round(drift);
+      const sy     = by - 8 - Math.round(rise * 22);
+      const fade   = 1 - rise;
+      if (fade > 0.1) {
+        gfx.fillStyle(i % 3 === 0 ? 0xFFAA22 : 0xFFFF44, alpha * fade * 0.75);
+        gfx.fillRect(sx, sy, 1 + (i % 2), 1 + (i % 2));
+      }
+    }
 
-    gfx.fillStyle(0xFFFF44, alpha * 0.65);
-    for (let i = 0; i < 5; i++) {
-      const sx = bx + Math.round(Math.sin(t * 3.7 + i * 1.57) * 8);
-      const sy = by - 10 - Math.round(Math.abs(Math.sin(t * 2.3 + i * 2.1)) * 12);
-      gfx.fillRect(sx, sy, 1, 1);
+    // Smoke puffs — grey dots drifting up slowly (day-visible)
+    const smokeA = Math.max(0, 0.25 - nf * 0.1);
+    if (smokeA > 0.01) {
+      for (let i = 0; i < 4; i++) {
+        const sp    = t * 0.4 + i * 0.7;
+        const rise2 = (sp % (Math.PI * 2)) / (Math.PI * 2);
+        const driftS = Math.sin(t * 0.8 + i * 1.1) * 7;
+        gfx.fillStyle(0x888888, smokeA * (1 - rise2) * 0.8);
+        gfx.fillCircle(bx + Math.round(driftS), by - 14 - Math.round(rise2 * 18), 3 + i % 3);
+      }
     }
   }
 
@@ -834,25 +906,34 @@ export class WaterArea {
     const { _lighthouseX: lx, _lighthouseTopY: ty } = this;
     const nf    = this._nightFactor;
     const angle = this._lighthouseAngle;
-    const len   = 150;
-    const spread = Math.PI / 16;
-    const a1 = angle - spread;
-    const a2 = angle + spread;
+    const len   = 160;
+    const spread = Math.PI / 14;
+    const ox = lx, oy = ty - 5;
 
-    gfx.fillStyle(0xFFFF88, nf * 0.14);
+    // Soft penumbra: 3 overlapping triangles of decreasing width and alpha
+    for (let i = 0; i < 3; i++) {
+      const s = spread * (1 + i * 0.55);
+      const a = nf * (0.05 - i * 0.015);
+      const l = len * (1 - i * 0.1);
+      gfx.fillStyle(0xFFFF88, a);
+      gfx.fillTriangle(
+        ox, oy,
+        ox + Math.cos(angle - s) * l, oy + Math.sin(angle - s) * l,
+        ox + Math.cos(angle + s) * l, oy + Math.sin(angle + s) * l,
+      );
+    }
+    // Bright core beam
+    gfx.fillStyle(0xFFFF88, nf * 0.28);
     gfx.fillTriangle(
-      lx, ty - 5,
-      lx + Math.cos(a1) * len, ty - 5 + Math.sin(a1) * len,
-      lx + Math.cos(a2) * len, ty - 5 + Math.sin(a2) * len,
+      ox, oy,
+      ox + Math.cos(angle - spread * 0.4) * len * 0.6, oy + Math.sin(angle - spread * 0.4) * len * 0.6,
+      ox + Math.cos(angle + spread * 0.4) * len * 0.6, oy + Math.sin(angle + spread * 0.4) * len * 0.6,
     );
-    gfx.fillStyle(0xFFFF88, nf * 0.22);
-    gfx.fillTriangle(
-      lx, ty - 5,
-      lx + Math.cos(a1) * len * 0.4, ty - 5 + Math.sin(a1) * len * 0.4,
-      lx + Math.cos(a2) * len * 0.4, ty - 5 + Math.sin(a2) * len * 0.4,
-    );
-    gfx.fillStyle(0xFFFF44, nf * 0.45);
-    gfx.fillCircle(lx, ty - 5, 5);
+    // Lens glow
+    gfx.fillStyle(0xFFFFAA, nf * 0.6);
+    gfx.fillCircle(ox, oy, 4);
+    gfx.fillStyle(0xFFFFFF, nf * 0.8);
+    gfx.fillCircle(ox, oy, 2);
   }
 
   // ── Lighting updates ──────────────────────────────────────────────────────
