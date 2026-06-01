@@ -96,12 +96,12 @@ export class Car {
     const tailAngle = direction === 1 ? Math.PI : 0;
 
     this.headlight = new SoftSpotLight({
-      x: headX, y: headY, ...headSpot, angle: headAngle, noOcclusion: true,
+      x: headX, y: headY, ...headSpot, angle: headAngle,
     });
     this.headSpot = { x: headX, y: headY, ...headPoint, noOcclusion: true };
 
     this.taillight = new SoftSpotLight({
-      x: tailX, y: tailY, ...tailSpot, angle: tailAngle, noOcclusion: true,
+      x: tailX, y: tailY, ...tailSpot, angle: tailAngle,
     });
     this.tailSpot = { x: tailX, y: tailY, ...tailPoint, noOcclusion: true };
   }
