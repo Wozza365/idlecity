@@ -12,6 +12,8 @@ export class Stars {
   private gfx: Phaser.GameObjects.Graphics;
   private readonly STAR_COUNT = 50;
   private groundY: number;
+  private _starsWereVisible = false;
+  private _lastDrawnAngle = NaN;
 
   constructor(scene: Phaser.Scene, groundY: number) {
     this.gfx = scene.add.graphics().setDepth(2);
@@ -41,6 +43,21 @@ export class Stars {
   update(elevation: number, sunAngle: number, width: number): void {
     // Star visibility fades in smoothly at night (elevation < 0) and fades out at sunrise
     const starAlpha = Math.max(0, Math.min(1, -elevation * 3));
+
+    if (starAlpha === 0) {
+      if (this._starsWereVisible) {
+        this.gfx.clear();
+        this._starsWereVisible = false;
+      }
+      return;
+    }
+
+    // At steady full-night, skip when parallax shift is imperceptible
+    const angleDelta = Math.abs(sunAngle - this._lastDrawnAngle);
+    if (this._starsWereVisible && starAlpha >= 0.99 && angleDelta < 0.002) return;
+
+    this._starsWereVisible = true;
+    this._lastDrawnAngle = sunAngle;
 
     this.gfx.clear();
 

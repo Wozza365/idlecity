@@ -75,6 +75,7 @@ export class CarManager {
   private currentLevel: number = 0;
   private _lights: LightSource[] = [];
   private shadowGfx: Phaser.GameObjects.Graphics | null = null;
+  private _lastCarShadowAngle = NaN;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -107,6 +108,7 @@ export class CarManager {
     for (const car of this.allCars) car.destroy();
     this.shadowGfx?.destroy();
     this.shadowGfx = null;
+    this._lastCarShadowAngle = NaN;
     this.laneCars = [];
     this.lanes    = [];
     this._lights  = [];
@@ -203,10 +205,17 @@ export class CarManager {
   updateShadow(sunAngle: number): void {
     const gfx = this.shadowGfx;
     if (!gfx) return;
-    gfx.clear();
 
     const elevation = Math.sin(sunAngle);
-    if (elevation <= 0.02) return;
+    if (elevation <= 0.02) {
+      if (!isNaN(this._lastCarShadowAngle)) {
+        gfx.clear();
+        this._lastCarShadowAngle = NaN;
+      }
+      return;
+    }
+
+    gfx.clear();
 
     const totalAlpha = Math.min(0.65, elevation * 0.82 + 0.12);
 

@@ -45,6 +45,7 @@ export class VergeRiver {
   private _level:   number = 0;
   private _width:   number = 0;
   private _groundY: number = 0;
+  private _lastLightingElevation = NaN;
 
   get extraLights(): LightSource[] { return [...this.lampLights, ...this.bollardLights]; }
 
@@ -543,6 +544,8 @@ export class VergeRiver {
   // ── Day/night lamp glow ───────────────────────────────────────────
 
   updateLighting(elevation: number): void {
+    if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
+    this._lastLightingElevation = elevation;
     const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
 
     for (const spot of this.lampSpots) spot.setIntensity(nightFactor * 3.5);

@@ -73,6 +73,8 @@ export class LightingSystem {
 
   private readonly shadowRenderer: ShadowMapRenderer;
   private readonly composite: LightingComposite;
+  private _cachedSegments: Segment[] | null = null;
+  private _segmentsDirty = true;
 
   constructor(scene: Phaser.Scene, _groundY: number) {
     this.scene = scene;
@@ -103,12 +105,20 @@ export class LightingSystem {
     if (idx !== -1) this.lights.splice(idx, 1);
   }
 
+  markSegmentsDirty(): void {
+    this._segmentsDirty = true;
+  }
+
   // Called every frame from GameScene.onClockTick().
   update(sunAngle: number): void {
     const elevation = Math.sin(sunAngle);
     this.composite.setAmbient(ambientFromElevation(elevation));
 
-    const segs = this.collectSegments();
+    if (this._segmentsDirty || this._cachedSegments === null) {
+      this._cachedSegments = this.collectSegments();
+      this._segmentsDirty = false;
+    }
+    const segs = this._cachedSegments;
 
     this.shadowRenderer.beginFrame();
     for (const light of this.lights) {

@@ -17,6 +17,7 @@ export class SunMoon {
   readonly moonLight:   Phaser.GameObjects.Light;
   private DEBUG_SHADOWS = false;
   private _shadowAlpha  = 0;
+  private _lastShadowAngle = NaN;
   get shadowAlpha(): number { return this._shadowAlpha; }
 
   constructor(private scene: Phaser.Scene, groundY: number) {
@@ -136,11 +137,15 @@ export class SunMoon {
     sunY: number,
     _width: number,
   ): void {
-    this._shadowAlpha = 0;
-    const gfx = this.shadowGfx;
-    gfx.clear();
-    this.debugGfx.clear();
-    if (elevation <= 0.02) return;
+    if (elevation <= 0.02) {
+      this._shadowAlpha = 0;
+      if (!isNaN(this._lastShadowAngle)) {
+        this.shadowGfx.clear();
+        this.debugGfx.clear();
+        this._lastShadowAngle = NaN;
+      }
+      return;
+    }
 
     const totalAlpha  = Math.min(0.99, elevation * 1.26 + 0.18);
     const maxShadow   = ROAD_H + VERGE_H + RIVER_H;
@@ -148,6 +153,14 @@ export class SunMoon {
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
     this._shadowAlpha = totalAlpha * 0.4;
+
+    // Skip redraw when sun barely moved — shadow shift is sub-pixel
+    if (!isNaN(this._lastShadowAngle) && Math.abs(sunAngle - this._lastShadowAngle) < 0.002) return;
+    this._lastShadowAngle = sunAngle;
+
+    const gfx = this.shadowGfx;
+    gfx.clear();
+    this.debugGfx.clear();
 
     const SHADOW_NUM_SAMPLES = 33;
     const SHADOW_DISC_SPREAD = 0.40;

@@ -121,8 +121,8 @@ export class GameScene extends Phaser.Scene {
     // Resize listener
     this.scale.on('resize', this.onResize, this);
 
-    // Tax tick — every 100 ms
-    this.time.addEvent({ delay: 100, loop: true, callback: this.onTaxTick, callbackScope: this });
+    // Tax tick — every 250 ms
+    this.time.addEvent({ delay: 250, loop: true, callback: this.onTaxTick, callbackScope: this });
 
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
@@ -256,6 +256,7 @@ export class GameScene extends Phaser.Scene {
     this.state.gold -= cost;
     plot.level = Math.min(plot.level + 1, MAX_LEVEL);
     this.plotContainers[index] = this.renderPlot(index);
+    this.lightingSystem?.markSegmentsDirty();
     this.plotUIs[index].destroy();
     this.plotUIs[index] = new PlotUI(
       this,
@@ -280,6 +281,7 @@ export class GameScene extends Phaser.Scene {
     this.state.plots[index].unlocked = true;
     this.state.plots[index].level = 1;
     this.plotContainers[index] = this.renderPlot(index);
+    this.lightingSystem?.markSegmentsDirty();
     const nextUnlock = this.state.plots.findIndex(p => !p.unlocked);
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotUIs[i].destroy();
@@ -442,7 +444,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onTaxTick(): void {
-    this.state.gold += this.taxRate / 10;
+    this.state.gold += this.taxRate / 4;
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
   }

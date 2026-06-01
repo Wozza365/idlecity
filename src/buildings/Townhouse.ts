@@ -419,6 +419,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
   updateWindowLights(elevation: number): void {
     const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    if (t < 0.01) return;
     const time = this.scene.time.now / 1000;
 
     this.windowLights.forEach((light, i) => {

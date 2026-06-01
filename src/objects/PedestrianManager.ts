@@ -68,6 +68,7 @@ export class PedestrianManager {
   // ordering relative to Graphics, which is why Rectangle pedestrians were never darkened.
   private bodyGfx:      Phaser.GameObjects.Graphics;
   private pedShadowGfx: Phaser.GameObjects.Graphics;
+  private _hadPedsLastFrame = false;
 
   constructor(scene: Phaser.Scene, groundY: number, plotWidth: number) {
     this.groundY    = groundY;
@@ -94,8 +95,12 @@ export class PedestrianManager {
   ): void {
     this.elevation = Math.sin(sunAngle);
 
-    this.bodyGfx.clear();
-    this.pedShadowGfx.clear();
+    const hasPeds = this.pedestrians.length > 0;
+    if (hasPeds || this._hadPedsLastFrame) {
+      this.bodyGfx.clear();
+      this.pedShadowGfx.clear();
+    }
+    this._hadPedsLastFrame = hasPeds;
 
     const rightBound = this.getRightBound(plots);
     if (rightBound <= 0) return;

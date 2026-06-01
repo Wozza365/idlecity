@@ -47,6 +47,7 @@ export class Car {
   private readonly headSpotIntensity: number;
   private readonly taillightIntensity: number;
   private readonly tailSpotIntensity: number;
+  private _lastLightingElevation = NaN;
 
   constructor(scene: Phaser.Scene, config: CarConfig) {
     const { def, x, y, speed, direction, sceneWidth, offscreenBuffer } = config;
@@ -135,6 +136,8 @@ export class Car {
 
   // elevation = Math.sin(sunAngle): +1 noon, -1 midnight.
   updateLighting(elevation: number): void {
+    if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
+    this._lastLightingElevation = elevation;
     // nightFactor: 0 at full day (elev ≥ 0.1), 1 at full night (elev ≤ -0.2)
     const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
 
