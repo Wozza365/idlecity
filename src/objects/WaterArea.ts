@@ -105,10 +105,10 @@ export class WaterArea {
   private _cafeBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
   private _pierSpot:   SoftSpotLight | null = null;
   private _pierBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
-  private _bonfireLight:  Extract<LightSource, { type?: 'point' }> | null = null;
-  private _bonfireLight2: Extract<LightSource, { type?: 'point' }> | null = null;
+  private _bonFireLights: Array<Extract<LightSource, { type?: 'point' }>> = [];
   private _lighthouseSpot: SoftSpotLight | null = null;
   private _lighthouseBulb: Extract<LightSource, { type?: 'point' }> | null = null;
+  private _beamSprite: Phaser.GameObjects.Image | null = null;
   private _buoyBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
   private _nativeLights: Phaser.GameObjects.Light[] = [];
 
@@ -120,8 +120,7 @@ export class WaterArea {
     if (this._cafeBulb)   out.push(this._cafeBulb);
     if (this._pierSpot)   out.push(...this._pierSpot.beams);
     if (this._pierBulb)   out.push(this._pierBulb);
-    if (this._bonfireLight)  out.push(this._bonfireLight);
-    if (this._bonfireLight2) out.push(this._bonfireLight2);
+    for (const b of this._bonFireLights) out.push(b);
     if (this._lighthouseSpot) out.push(...this._lighthouseSpot.beams);
     if (this._lighthouseBulb) out.push(this._lighthouseBulb);
     for (const b of this._buoyBulbs) out.push(b);
@@ -557,20 +556,19 @@ export class WaterArea {
       this._pierBulb = null;
     }
 
-    // ── Bonfire — two overlapping warm point lights with large radius so the
-    // pow(1-d,2) falloff gradient is visible across the disc (not just the last 2px).
+    // ── Bonfire — four small overlapping point lights at varied positions/colors.
+    // Using multiple smaller lights instead of one big circle produces an organic,
+    // flickering warmth rather than a uniform disc.
     if (lv >= 9) {
-      this._bonfireLight = {
-        x: this._bonfireX - 3, y: this._bonfireY - 10,
-        radius: 65, color: 0xFF6600, intensity: 0, noOcclusion: true,
-      };
-      this._bonfireLight2 = {
-        x: this._bonfireX + 4, y: this._bonfireY - 6,
-        radius: 50, color: 0xFFAA00, intensity: 0, noOcclusion: true,
-      };
+      const bx = this._bonfireX, by = this._bonfireY;
+      this._bonFireLights = [
+        { x: bx,     y: by - 12, radius: 40, color: 0xFF4400, intensity: 0, noOcclusion: true },
+        { x: bx - 5, y: by - 6,  radius: 34, color: 0xFF6600, intensity: 0, noOcclusion: true },
+        { x: bx + 6, y: by - 4,  radius: 28, color: 0xFF8800, intensity: 0, noOcclusion: true },
+        { x: bx + 1, y: by - 9,  radius: 22, color: 0xFFAA00, intensity: 0, noOcclusion: true },
+      ];
     } else {
-      this._bonfireLight  = null;
-      this._bonfireLight2 = null;
+      this._bonFireLights = [];
     }
 
     // ── Lighthouse sweeping SoftSpotLight (level 8+) ──
@@ -586,9 +584,12 @@ export class WaterArea {
         radius: 3, color: 0xFFFF88, intensity: 0, noOcclusion: true,
       };
       this._nativeLights.push(this.scene.lights.addLight(this._lighthouseX, this._lighthouseTopY - 5, 80, 0xFFFF88, 0));
+      this.createBeamSprite();
     } else {
       this._lighthouseSpot = null;
       this._lighthouseBulb = null;
+      this._beamSprite?.destroy();
+      this._beamSprite = null;
     }
 
     // ── Buoy lights — small warm points (level 7+) ──
@@ -798,16 +799,20 @@ export class WaterArea {
       }
     }
 
-    // Bonfire light flicker — two lights at slightly different rates
-    if (this._nightFactor > 0.05) {
+    // Bonfire light flicker — four lights with independent phases/frequencies
+    if (this._nightFactor > 0.05 && this._bonFireLights.length > 0) {
       const t  = this._bonfireTime;
-      const f1 = 0.65 + 0.30 * Math.sin(t * 4.1) + 0.15 * Math.sin(t * 9.7);
-      const f2 = 0.70 + 0.25 * Math.sin(t * 3.3 + 0.8) + 0.12 * Math.sin(t * 7.4 + 1.2);
       const nf = this._nightFactor;
-      if (this._bonfireLight)
-        (this._bonfireLight  as { intensity: number }).intensity = nf * 5.0 * f1;
-      if (this._bonfireLight2)
-        (this._bonfireLight2 as { intensity: number }).intensity = nf * 4.0 * f2;
+      const phases = [0,    0.8,  1.5,  2.3];
+      const freqs  = [4.1,  3.3,  5.7,  2.9];
+      const bases  = [0.65, 0.70, 0.68, 0.72];
+      const amps   = [0.28, 0.22, 0.25, 0.20];
+      const intens = [4.0,  3.2,  2.8,  2.2];
+      for (let i = 0; i < this._bonFireLights.length; i++) {
+        const f = bases[i] + amps[i] * Math.sin(t * freqs[i] + phases[i])
+                           + 0.10   * Math.sin(t * freqs[i] * 2.3 + phases[i]);
+        (this._bonFireLights[i] as { intensity: number }).intensity = nf * intens[i] * f;
+      }
     }
 
     this.updateBeachPeople(delta, elevation);
@@ -900,7 +905,11 @@ export class WaterArea {
     }
 
     if (this._level >= 9)                             this.drawBonfire();
-    if (this._level >= 8 && this._nightFactor > 0.08) this.drawLighthouseBeam();
+    if (this._level >= 8 && this._nightFactor > 0.08) {
+      this.drawLighthouseBeam();
+    } else if (this._beamSprite) {
+      this._beamSprite.setAlpha(0);
+    }
   }
 
   private drawBonfire(): void {
@@ -983,43 +992,75 @@ export class WaterArea {
     }
   }
 
+  // Pre-render a lighthouse beam into a CanvasTexture using a proper radial gradient
+  // (smooth radial falloff) + CSS blur (smooth angular edge falloff). The texture is
+  // created once and reused; only the sprite rotation changes each frame.
+  private createBeamSprite(): void {
+    const texKey = '__lh_beam__';
+    const len    = 160;
+    const spread = Math.PI / 14;   // half-angle of the cone
+    const blurPx = 10;             // blur radius for angular edge softness
+
+    // Canvas dimensions: extra space on all sides so blur doesn't clip.
+    const W    = len + blurPx * 2 + 4;
+    const half = Math.ceil(len * Math.tan(spread)) + blurPx + 4;
+    const H    = half * 2;
+    const sx   = blurPx + 2;      // source x on canvas (lighthouse lens)
+    const sy   = H / 2;           // source y on canvas (vertically centred)
+
+    // Draw the raw cone with a radial gradient on an off-screen DOM canvas
+    // so the sharp edges can be blurred smoothly onto the Phaser texture.
+    const off = document.createElement('canvas');
+    off.width  = W;
+    off.height = H;
+    const oct  = off.getContext('2d')!;
+
+    oct.beginPath();
+    oct.moveTo(sx, sy);
+    oct.lineTo(W, sy - (W - sx) * Math.tan(spread));
+    oct.lineTo(W, sy + (W - sx) * Math.tan(spread));
+    oct.closePath();
+
+    const grad = oct.createRadialGradient(sx, sy, 0, sx, sy, len);
+    grad.addColorStop(0,    'rgba(255,255,200,0.55)');
+    grad.addColorStop(0.25, 'rgba(255,255,170,0.30)');
+    grad.addColorStop(0.60, 'rgba(255,255,140,0.10)');
+    grad.addColorStop(1,    'rgba(255,255,120,0)');
+    oct.fillStyle = grad;
+    oct.fill();
+
+    // Composite the blurred cone onto the Phaser CanvasTexture.
+    // CSS blur is applied as a context filter before drawing — this gives
+    // a true per-pixel Gaussian falloff at the angular edges, not polygon steps.
+    if (this.scene.textures.exists(texKey)) this.scene.textures.remove(texKey);
+    const ct  = this.scene.textures.createCanvas(texKey, W, H) as Phaser.Textures.CanvasTexture;
+    const ctx = ct.context;
+    ctx.filter = `blur(${blurPx}px)`;
+    ctx.drawImage(off, 0, 0);
+    ctx.filter = 'none';
+    ct.refresh();
+
+    // Create (or replace) the sprite. Origin is set so the "source" pixel on the
+    // texture aligns with the lighthouse position; rotation sweeps the beam.
+    this._beamSprite?.destroy();
+    this._beamSprite = this.scene.add.image(
+      this._lighthouseX, this._lighthouseTopY - 5, texKey,
+    )
+      .setOrigin(sx / W, 0.5)
+      .setDepth(5.69)                   // below structGfx (5.7) so tower overlaps beam
+      .setAlpha(0)
+      .setBlendMode(Phaser.BlendModes.ADD);
+  }
+
   private drawLighthouseBeam(): void {
     const gfx = this.fxGfx;
     const { _lighthouseX: lx, _lighthouseTopY: ty } = this;
-    const nf     = this._nightFactor;
-    const angle  = this._lighthouseAngle;
-    const len    = 160;
-    const spread = Math.PI / 14;
+    const nf    = this._nightFactor;
+    const angle = this._lighthouseAngle;
     const ox = lx, oy = ty - 5;
 
-    // Smooth fan: N angular slices each given alpha = peakAlpha × cos²(t × π/2)
-    // where t = normalised distance from beam centre (0=centre, 1=edge).
-    // Three nested layers at decreasing lengths naturally brighten the region near
-    // the source (all layers overlap) and feather the radial tip (only the outermost
-    // layer reaches it), eliminating sharp triangular edges and hard cutoffs.
-    const N = 22;
-    const layers: Array<{ lenFrac: number; halfSpread: number; peakAlpha: number }> = [
-      { lenFrac: 1.00, halfSpread: spread,        peakAlpha: 0.12 },
-      { lenFrac: 0.62, halfSpread: spread * 0.88, peakAlpha: 0.09 },
-      { lenFrac: 0.38, halfSpread: spread * 0.70, peakAlpha: 0.07 },
-    ];
-    for (const { lenFrac, halfSpread, peakAlpha } of layers) {
-      const sl = len * lenFrac;
-      for (let i = 0; i < N; i++) {
-        const a0   = angle - halfSpread + (i / N) * 2 * halfSpread;
-        const a1   = angle - halfSpread + ((i + 1) / N) * 2 * halfSpread;
-        const aMid = (a0 + a1) * 0.5;
-        const t    = Math.abs(aMid - angle) / halfSpread; // 0=centre, 1=edge
-        const angFalloff = Math.pow(Math.cos(t * Math.PI * 0.5), 2);
-        const alpha = nf * peakAlpha * angFalloff;
-        if (alpha < 0.004) continue;
-        gfx.fillStyle(0xFFFF88, alpha);
-        gfx.fillTriangle(
-          ox, oy,
-          ox + Math.cos(a0) * sl, oy + Math.sin(a0) * sl,
-          ox + Math.cos(a1) * sl, oy + Math.sin(a1) * sl,
-        );
-      }
+    if (this._beamSprite) {
+      this._beamSprite.setPosition(ox, oy).setRotation(angle).setAlpha(nf);
     }
 
     // Lens glow
@@ -1049,8 +1090,7 @@ export class WaterArea {
 
     // Bonfire (flicker handled in update)
     if (nf < 0.05) {
-      if (this._bonfireLight)  (this._bonfireLight  as { intensity: number }).intensity = 0;
-      if (this._bonfireLight2) (this._bonfireLight2 as { intensity: number }).intensity = 0;
+      for (const b of this._bonFireLights) (b as { intensity: number }).intensity = 0;
     }
 
     // Lighthouse
