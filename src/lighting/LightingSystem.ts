@@ -53,11 +53,11 @@ function ambientFromElevation(elevation: number): AmbientState {
       r: lerp(0.68, 0.3, t),
       g: lerp(0.72, 0.25, t),
       b: lerp(0.87, 0.4, t),
-      intensity: 0.35,
+      intensity: 0.5,
     };
   } else {
     // Full night
-    return { r: 0.68, g: 0.72, b: 0.87, intensity: 0.35 };
+    return { r: 0.68, g: 0.72, b: 0.87, intensity: 0.5 };
   }
 }
 
