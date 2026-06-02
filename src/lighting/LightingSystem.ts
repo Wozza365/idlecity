@@ -6,7 +6,6 @@ import {
   buildScreenBoundary,
   segmentsFromRect,
   segmentsFromPolygon,
-  segmentsFromCircle,
   computeVisibilityPolygon,
   computeSpotVisibilityPolygon,
 } from '../utils/visibilityPolygon';
@@ -179,10 +178,6 @@ export class LightingSystem {
           segs.push(...segmentsFromRect(bounds.x, bounds.y, bounds.width, bounds.height));
         }
       }
-    }
-
-    for (const tree of this._treeOccluders) {
-      segs.push(...segmentsFromCircle(tree.x, tree.y, tree.r));
     }
 
     return segs;
