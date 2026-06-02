@@ -89,7 +89,7 @@ export class WaterArea {
   private _buoys: Array<{ x: number; y: number; color: number; phase: number }> = [];
 
   // Dock glow lights (positions populated in drawDock, rendered in drawFx)
-  private _dockGlows: Array<{ x: number; y: number }> = [];
+  private _dockGlows: Array<{ x: number; y: number; bright?: boolean }> = [];
 
   // Sprites from the High Tides asset pack
   private _foamSprites: Phaser.GameObjects.Sprite[] = [];
@@ -427,14 +427,22 @@ export class WaterArea {
     gfx.fillStyle(0x7A5828, 1);
     gfx.fillRect(dx1, deckEnd - 3, dockW, 4);
 
-    // Glow light positions — front edge + both sides (rendered in drawFx with nightFactor)
+    // Glow light positions (rendered in drawFx with nightFactor)
     this._dockGlows = [];
-    for (let gx = dx1 + 16; gx < dx2 - 8; gx += 20) {
-      this._dockGlows.push({ x: gx, y: deckEnd - 6 });
-    }
+    // Outer edge dots — left and right walls
     for (let gy = wy + 8; gy < deckEnd - 6; gy += 11) {
       this._dockGlows.push({ x: dx1 + 2, y: gy });
       this._dockGlows.push({ x: dx2 - 2, y: gy });
+    }
+    // U-shaped path inset from edges — left arm, front, right arm (slightly brighter)
+    const inset = 7;
+    const pathY = deckEnd - 10;
+    for (let gy = wy + 8; gy <= pathY; gy += 11) {
+      this._dockGlows.push({ x: dx1 + inset, y: gy, bright: true });
+      this._dockGlows.push({ x: dx2 - inset, y: gy, bright: true });
+    }
+    for (let gx = dx1 + inset; gx <= dx2 - inset; gx += 11) {
+      this._dockGlows.push({ x: gx, y: pathY, bright: true });
     }
 
     // Dock slots for BoatManager (at the water-level edge of dock)
@@ -927,13 +935,15 @@ export class WaterArea {
 
     // Dock glow lights — dim in day, visible at night
     if (this._dockGlows.length > 0) {
-      const glowA = 0.18 + this._nightFactor * 0.55;
+      const nf = this._nightFactor;
       for (const g of this._dockGlows) {
-        gfx.fillStyle(0xFFE090, glowA);
-        gfx.fillCircle(g.x, g.y, 1.5);
-        if (this._nightFactor > 0.2) {
-          gfx.fillStyle(0xFFCC60, (this._nightFactor - 0.2) * 0.35);
-          gfx.fillCircle(g.x, g.y, 3);
+        const baseA  = g.bright ? 0.28 + nf * 0.65 : 0.18 + nf * 0.55;
+        const radius = g.bright ? 2.0 : 1.5;
+        gfx.fillStyle(0xFFE090, baseA);
+        gfx.fillCircle(g.x, g.y, radius);
+        if (nf > 0.2) {
+          gfx.fillStyle(0xFFCC60, (nf - 0.2) * (g.bright ? 0.45 : 0.30));
+          gfx.fillCircle(g.x, g.y, g.bright ? 4 : 3);
         }
       }
     }
