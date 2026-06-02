@@ -53,7 +53,7 @@ export class Boat {
     this.sceneWidth = sceneWidth;
     this.dockX = dockX;
     this.dockDuration = dockDuration;
-    this.baseSpeed = def.speed * (0.9 + Math.random() * 0.2); // ±10% variation
+    this.baseSpeed = def.speed * (0.95 + Math.random() * 0.1); // ±5% variation
     this.bobPhase = Math.random() * Math.PI * 2;
 
     this.gfx = scene.add.graphics().setDepth(5.9);

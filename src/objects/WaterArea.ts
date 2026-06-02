@@ -280,40 +280,46 @@ export class WaterArea {
   private drawPier(): void {
     const gfx = this.structGfx;
     const { _waterY: wy, _pierX: px } = this;
-    const pierW = 18;
-    const pierH = 30; // ends at wy+68, well above boat lane (wy+75)
-    const planks = 5;
+    const pierW    = 12;
+    const deckEnd  = wy + 44;          // end of solid deck
+    const beamEnd  = wy + 72;          // bottom of support beams
+    const waterEdge = wy + BEACH_SHORE_H; // wy+48: open water starts here at beach
+    const planks   = 6;
 
-    // Pier deck
+    // Shadow beneath beams — box-shadow style, offset down in y
+    gfx.fillStyle(0x000000, 0.18);
+    gfx.fillRect(px - pierW / 2 - 2, beamEnd + 2, pierW + 4, 5);
+
+    // Support beams going into water (drawn before deck so deck covers top portion)
+    for (const bx2 of [px - 3, px + 3]) {
+      // Beach portion under deck: dark wood
+      if (deckEnd < waterEdge) {
+        gfx.fillStyle(0x3A2808, 0.75);
+        gfx.fillRect(bx2 - 1, deckEnd, 2, waterEdge - deckEnd);
+      }
+      // Below waterline: barely visible dark
+      gfx.fillStyle(0x1E1006, 0.28);
+      gfx.fillRect(bx2 - 1, waterEdge, 2, beamEnd - waterEdge);
+    }
+
+    // Pier deck — connects from land edge (wy) into the water
     gfx.fillStyle(PIER_WOOD, 1);
-    gfx.fillRect(px - pierW / 2, wy + BEACH_SHORE_H - 10, pierW, pierH);
+    gfx.fillRect(px - pierW / 2, wy, pierW, deckEnd - wy);
 
     // Plank lines
     gfx.fillStyle(0x000000, 0.13);
     for (let i = 0; i <= planks; i++) {
-      const py2 = wy + BEACH_SHORE_H - 10 + Math.round((i / planks) * pierH);
+      const py2 = wy + Math.round((i / planks) * (deckEnd - wy));
       gfx.fillRect(px - pierW / 2, py2, pierW, 1);
     }
 
-    // Side railings
+    // Subtle left-edge highlight
+    gfx.fillStyle(0xFFFFFF, 0.10);
+    gfx.fillRect(px - pierW / 2, wy, 1, deckEnd - wy);
+
+    // Front end cap
     gfx.fillStyle(0x8A6030, 1);
-    gfx.fillRect(px - pierW / 2 - 2, wy + BEACH_SHORE_H - 10, 3, pierH);
-    gfx.fillRect(px + pierW / 2 - 1, wy + BEACH_SHORE_H - 10, 3, pierH);
-
-    // Railing posts
-    gfx.fillStyle(0x9A7040, 1);
-    for (let i = 0; i <= 4; i++) {
-      const py2 = wy + BEACH_SHORE_H - 10 + Math.round((i / 4) * pierH);
-      gfx.fillRect(px - pierW / 2 - 2, py2 - 1, 3, 2);
-      gfx.fillRect(px + pierW / 2 - 1, py2 - 1, 3, 2);
-    }
-
-    // Pier end platform + mooring posts
-    gfx.fillStyle(PIER_WOOD, 1);
-    gfx.fillRect(px - pierW / 2 - 4, wy + BEACH_SHORE_H - 10 + pierH - 5, pierW + 8, 8);
-    gfx.fillStyle(0x6A4818, 1);
-    gfx.fillRect(px - pierW / 2 - 3, wy + BEACH_SHORE_H - 10 + pierH - 2, 3, 6);
-    gfx.fillRect(px + pierW / 2 + 1, wy + BEACH_SHORE_H - 10 + pierH - 2, 3, 6);
+    gfx.fillRect(px - pierW / 2 - 2, deckEnd - 3, pierW + 4, 4);
   }
 
   // ── Beach café (level 4+) ─────────────────────────────────────────────────
@@ -481,11 +487,12 @@ export class WaterArea {
 
   private setupBuoys(): void {
     const { _width: w, _waterY: wy } = this;
+    // Positioned clear of pier (23%) and dock (36–60%)
     this._buoys = [
-      { x: Math.floor(w * 0.28), y: wy + 58, color: 0xFF3333, phase: 0 },
-      { x: Math.floor(w * 0.43), y: wy + 70, color: 0xFF7700, phase: Math.PI * 0.5 },
-      { x: Math.floor(w * 0.57), y: wy + 62, color: 0xFF3333, phase: Math.PI },
-      { x: Math.floor(w * 0.74), y: wy + 75, color: 0xFF7700, phase: Math.PI * 1.5 },
+      { x: Math.floor(w * 0.31), y: wy + 68, color: 0xFF3333, phase: 0 },
+      { x: Math.floor(w * 0.63), y: wy + 74, color: 0xFF7700, phase: Math.PI * 0.5 },
+      { x: Math.floor(w * 0.74), y: wy + 70, color: 0xFF3333, phase: Math.PI },
+      { x: Math.floor(w * 0.84), y: wy + 77, color: 0xFF7700, phase: Math.PI * 1.5 },
     ];
   }
 
@@ -539,18 +546,18 @@ export class WaterArea {
 
     // ── Pier end lamp — downward spot (level 6+) ──
     const pierEndX = this._pierX;
-    const pierEndY = wy + BEACH_SHORE_H + 35;
+    const pierEndY = wy + 44; // at deck end
     if (lv >= 6) {
       this._pierSpot = new SoftSpotLight({
         x: pierEndX, y: pierEndY,
-        radius: 40, color: 0xFFDD88, intensity: 0,
-        angle: Math.PI / 2, coneAngle: Math.PI / 2.5,
+        radius: 58, color: 0xFFDD88, intensity: 0,
+        angle: Math.PI / 2, coneAngle: Math.PI / 2.2,
         noOcclusion: true,
       });
       this._pierBulb = {
-        x: pierEndX, y: pierEndY, radius: 2, color: 0xFFFAE0, intensity: 0, noOcclusion: true,
+        x: pierEndX, y: pierEndY, radius: 3, color: 0xFFFAE0, intensity: 0, noOcclusion: true,
       };
-      this._nativeLights.push(this.scene.lights.addLight(pierEndX, pierEndY, 45, 0xFFDD88, 0));
+      this._nativeLights.push(this.scene.lights.addLight(pierEndX, pierEndY, 60, 0xFFDD88, 0));
     } else {
       this._pierSpot = null;
       this._pierBulb = null;
