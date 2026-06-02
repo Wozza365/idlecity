@@ -88,6 +88,9 @@ export class WaterArea {
   // Buoys
   private _buoys: Array<{ x: number; y: number; color: number; phase: number }> = [];
 
+  // Dock glow lights (positions populated in drawDock, rendered in drawFx)
+  private _dockGlows: Array<{ x: number; y: number }> = [];
+
   // Sprites from the High Tides asset pack
   private _foamSprites: Phaser.GameObjects.Sprite[] = [];
 
@@ -164,6 +167,7 @@ export class WaterArea {
     if (level >= 3) this.drawPier();
     if (level >= 4) this.drawBeachCafe();
     if (level >= 5) this.drawDock();
+    else { this._dockGlows = []; }
     if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
     else { this._buoys = []; }
     if (level >= 8) this.drawLighthouse();
@@ -370,21 +374,23 @@ export class WaterArea {
     const waterBeamEnd = wy + 62;             // where visible wood transitions to shadow
     const beamEnd      = wy + 72;             // bottom of submerged beams
 
-    // Box-shadow beneath beams — small, offset down in y
-    gfx.fillStyle(0x000000, 0.14);
-    gfx.fillRect(dx1 + 4, beamEnd + 2, dockW - 8, 3);
-
     // Submerged beam section — barely visible, shadow-like
     for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) {
       gfx.fillStyle(0x2A1806, 0.28);
       gfx.fillRect(bx2 - 2, waterBeamEnd, 4, beamEnd - waterBeamEnd);
     }
+    // Right-edge post submerged section
+    gfx.fillStyle(0x2A1806, 0.28);
+    gfx.fillRect(dx2 - 4, waterBeamEnd, 4, beamEnd - waterBeamEnd);
 
     // Visible wooden beam section — dark wood, clearly readable as structure
     for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) {
       gfx.fillStyle(0x5A3810, 0.85);
       gfx.fillRect(bx2 - 2, deckEnd, 4, waterBeamEnd - deckEnd);
     }
+    // Right-edge post visible section
+    gfx.fillStyle(0x5A3810, 0.85);
+    gfx.fillRect(dx2 - 4, deckEnd, 4, waterBeamEnd - deckEnd);
 
     // Main dock body — starts from land edge (wy) and sticks out into water
     gfx.fillStyle(DOCK_WOOD, 1);
@@ -403,6 +409,13 @@ export class WaterArea {
       gfx.fillRect(dx1 + i, wy, 1, deckEnd - wy);
     }
 
+    // Right-edge wall — slightly darker strip to give the dock a natural side face
+    gfx.fillStyle(0x7A5828, 1);
+    gfx.fillRect(dx2 - 4, wy, 4, deckEnd - wy);
+    // Inner shadow line against the right wall
+    gfx.fillStyle(0x000000, 0.15);
+    gfx.fillRect(dx2 - 5, wy, 1, deckEnd - wy);
+
     // Mooring bollards along top edge
     gfx.fillStyle(0x555555, 1);
     for (const x of [dx1 + 14, dx1 + Math.floor(dockW / 2), dx2 - 18]) {
@@ -413,6 +426,12 @@ export class WaterArea {
     // Front end cap
     gfx.fillStyle(0x7A5828, 1);
     gfx.fillRect(dx1, deckEnd - 3, dockW, 4);
+
+    // Glow light positions along the front of the deck (rendered in drawFx with nightFactor)
+    this._dockGlows = [];
+    for (let gx = dx1 + 16; gx < dx2 - 8; gx += 20) {
+      this._dockGlows.push({ x: gx, y: deckEnd - 6 });
+    }
 
     // Dock slots for BoatManager (at the water-level edge of dock)
     this._dockSlots = [
@@ -863,6 +882,8 @@ export class WaterArea {
           // Sine curve gives each dash its own Y offset
           const y = Math.round(wv.baseY + wv.amp * Math.sin(wv.freq * x + t * wv.speed));
           if (y < wy || y >= wy + WATER_H) continue;
+          // Clip waves that fall under the dock deck
+          if (this._level >= 5 && x >= this._dockX1 && x < this._dockX2 && y < wy + BEACH_SHORE_H) continue;
           gfx.fillStyle(0xFFFFFF, a);
           gfx.fillRect(x, y, wv.len, 1);
           // Brighter leading edge
@@ -914,6 +935,19 @@ export class WaterArea {
       if (this._nightFactor > 0.15) {
         gfx.fillStyle(b.color, this._nightFactor * 0.45);
         gfx.fillRect(b.x - 5, Math.round(bobY) - 6, 10, 10);
+      }
+    }
+
+    // Dock glow lights — dim in day, visible at night
+    if (this._dockGlows.length > 0) {
+      const glowA = 0.18 + this._nightFactor * 0.55;
+      for (const g of this._dockGlows) {
+        gfx.fillStyle(0xFFE090, glowA);
+        gfx.fillCircle(g.x, g.y, 1.5);
+        if (this._nightFactor > 0.2) {
+          gfx.fillStyle(0xFFCC60, (this._nightFactor - 0.2) * 0.35);
+          gfx.fillCircle(g.x, g.y, 3);
+        }
       }
     }
 

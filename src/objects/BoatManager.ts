@@ -5,8 +5,8 @@ import { Boat } from './Boat';
 import { pickRandomBoat } from './BoatAssets';
 
 // Spawn interval bounds (ms) — decreases with level
-const BASE_INTERVAL_MS = 55_000;
-const MIN_INTERVAL_MS  = 10_000;
+const BASE_INTERVAL_MS = 69_000;
+const MIN_INTERVAL_MS  = 12_500;
 const DOCK_DURATION_MS = 7_000;
 const DOCK_VARY_MS     = 5_000;
 
