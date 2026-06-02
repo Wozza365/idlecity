@@ -562,10 +562,10 @@ export class WaterArea {
     if (lv >= 9) {
       const bx = this._bonfireX, by = this._bonfireY;
       this._bonFireLights = [
-        { x: bx,     y: by - 12, radius: 40, color: 0xFF4400, intensity: 0, noOcclusion: true },
-        { x: bx - 5, y: by - 6,  radius: 34, color: 0xFF6600, intensity: 0, noOcclusion: true },
-        { x: bx + 6, y: by - 4,  radius: 28, color: 0xFF8800, intensity: 0, noOcclusion: true },
-        { x: bx + 1, y: by - 9,  radius: 22, color: 0xFFAA00, intensity: 0, noOcclusion: true },
+        { x: bx,     y: by - 12, radius: 38, color: 0xFF6600, intensity: 0, noOcclusion: true },
+        { x: bx - 5, y: by - 6,  radius: 32, color: 0xFF8800, intensity: 0, noOcclusion: true },
+        { x: bx + 6, y: by - 4,  radius: 26, color: 0xFFAA00, intensity: 0, noOcclusion: true },
+        { x: bx + 1, y: by - 9,  radius: 20, color: 0xFFCC00, intensity: 0, noOcclusion: true },
       ];
     } else {
       this._bonFireLights = [];
