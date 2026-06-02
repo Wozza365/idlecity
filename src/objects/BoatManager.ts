@@ -88,7 +88,7 @@ export class BoatManager {
     this.spawnTimer -= delta;
     if (this.spawnTimer <= 0 && this.boats.length < maxBoats(this.waterLevel)) {
       // Night multiplier: at full night boats are 3× less frequent
-      const nightMult = 1 + 2 * Math.max(0, (0.05 - elevation) / 0.25);
+      const nightMult = 1 + 2 * Math.max(0, (0.15 - elevation) / 0.25);
       this.spawnTimer = spawnInterval(this.waterLevel) * nightMult * (0.7 + Math.random() * 0.6);
       this.spawnBoat();
     }

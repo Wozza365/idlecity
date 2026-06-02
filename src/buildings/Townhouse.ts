@@ -418,7 +418,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
   updateWindowLights(elevation: number): void {
-    const t    = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     const time = this.scene.time.now / 1000;
 
     this.windowLights.forEach((light, i) => {

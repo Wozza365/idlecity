@@ -139,7 +139,7 @@ export class Car {
     if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
     this._lastLightingElevation = elevation;
     // nightFactor: 0 at full day (elev ≥ 0.1), 1 at full night (elev ≤ -0.2)
-    const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+    const nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
 
     // Tint the sprite darker at night so the car body dims against the ambient.
     const v = Math.round(255 * (1 - 0.75 * nightFactor));

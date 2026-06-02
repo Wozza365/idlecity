@@ -1073,7 +1073,7 @@ export class WaterArea {
   updateLighting(elevation: number): void {
     if (Math.abs(elevation - this._lastLightElevation) < 0.002) return;
     this._lastLightElevation = elevation;
-    this._nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+    this._nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
     const nf = this._nightFactor;
 
     // Dock spots

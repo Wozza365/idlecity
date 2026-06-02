@@ -157,7 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.waterArea?.update(delta, elevation);
     this.waterArea?.updateShadows(this.sunAngle);
     this.boatManager?.update(delta, elevation);
-    const t = Math.max(0, Math.min(1, (0.3 - elevation) / 0.3));
+    const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     for (const c of this.plotContainers) {
       if (hasSmokeUpdate(c)) c.updateSmoke(t);
       if (hasFlagUpdate(c)) c.updateFlag();

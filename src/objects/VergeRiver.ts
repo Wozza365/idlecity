@@ -545,7 +545,7 @@ export class VergeRiver {
   updateLighting(elevation: number): void {
     if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
     this._lastLightingElevation = elevation;
-    const nightFactor = Math.max(0, Math.min(1, (0.1 - elevation) / 0.3));
+    const nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
 
     for (const spot of this.lampSpots) spot.setIntensity(nightFactor * 3.5);
     for (const bulb of this.lampBulbs)    (bulb as { intensity: number }).intensity = nightFactor * 300;

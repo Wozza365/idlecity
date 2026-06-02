@@ -133,7 +133,7 @@ export class Boat {
   updateLighting(elevation: number): void {
     if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
     this._lastLightingElevation = elevation;
-    this.nightFactor = Math.max(0, Math.min(1, (0.05 - elevation) / 0.25));
+    this.nightFactor = Math.max(0, Math.min(1, (0.15 - elevation) / 0.25));
     this.redraw();
 
     this.portLight.intensity      = this.nightFactor * 25;
