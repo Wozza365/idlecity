@@ -366,17 +366,24 @@ export class WaterArea {
     const gfx = this.structGfx;
     const { _waterY: wy, _dockX1: dx1, _dockX2: dx2 } = this;
     const dockW   = dx2 - dx1;
-    const deckEnd = wy + 34;   // end of solid deck (shorter than before)
-    const beamEnd = wy + 68;   // bottom of support beams in water
+    const deckEnd      = wy + BEACH_SHORE_H;  // wy+48: matches beach height
+    const waterBeamEnd = wy + 62;             // where visible wood transitions to shadow
+    const beamEnd      = wy + 72;             // bottom of submerged beams
 
-    // Shadow beneath beams — box-shadow style, offset down in y
-    gfx.fillStyle(0x000000, 0.18);
-    gfx.fillRect(dx1 + 4, beamEnd + 2, dockW - 8, 5);
+    // Box-shadow beneath beams — small, offset down in y
+    gfx.fillStyle(0x000000, 0.14);
+    gfx.fillRect(dx1 + 4, beamEnd + 2, dockW - 8, 3);
 
-    // Support beams going into water (drawn before deck so deck covers their tops)
+    // Submerged beam section — barely visible, shadow-like
     for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) {
-      gfx.fillStyle(0x2A1806, 0.32);
-      gfx.fillRect(bx2 - 2, deckEnd, 4, beamEnd - deckEnd);
+      gfx.fillStyle(0x2A1806, 0.28);
+      gfx.fillRect(bx2 - 2, waterBeamEnd, 4, beamEnd - waterBeamEnd);
+    }
+
+    // Visible wooden beam section — dark wood, clearly readable as structure
+    for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) {
+      gfx.fillStyle(0x5A3810, 0.85);
+      gfx.fillRect(bx2 - 2, deckEnd, 4, waterBeamEnd - deckEnd);
     }
 
     // Main dock body — starts from land edge (wy) and sticks out into water
@@ -385,8 +392,8 @@ export class WaterArea {
 
     // Horizontal plank lines
     gfx.fillStyle(0x000000, 0.08);
-    for (let j = 0; j <= 4; j++) {
-      const y = wy + Math.round((j / 4) * (deckEnd - wy));
+    for (let j = 0; j <= 6; j++) {
+      const y = wy + Math.round((j / 6) * (deckEnd - wy));
       gfx.fillRect(dx1, y, dockW, 1);
     }
 
@@ -507,7 +514,7 @@ export class WaterArea {
     this._dockSpots = [];
     this._dockBulbs = [];
     if (lv >= 5) {
-      const lampY = wy + 28; // near deck front edge for max water illumination
+      const lampY = wy + 42; // near deck front edge for max water illumination
       for (const sx of this._dockSlots) {
         const spot = new SoftSpotLight({
           x: sx, y: lampY,
