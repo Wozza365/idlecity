@@ -456,7 +456,7 @@ export class Tier1House extends Phaser.GameObjects.Container {
 
     this.windowLights.forEach((light, i) => {
       const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
-      light.intensity = t * 0.375 * flicker;
+      light.intensity = t * 0.45 * flicker;
     });
     if (this.porchSoftLight) {
       const flicker = 1 + Math.sin(time * 1.3 + 1.2) * 0.08;

@@ -417,7 +417,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
     this.windowLights.forEach((light, i) => {
       const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
-      light.intensity = t * 0.375 * flicker;
+      light.intensity = t * 0.45 * flicker;
     });
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);

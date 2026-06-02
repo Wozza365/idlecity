@@ -267,7 +267,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   updateWindowLights(elevation: number): void {
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
-    for (const light of this.windowLights) light.intensity = t * 0.28;
+    for (const light of this.windowLights) light.intensity = t * 0.336;
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.5);
   }
