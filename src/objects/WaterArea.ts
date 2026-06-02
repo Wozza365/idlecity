@@ -429,14 +429,17 @@ export class WaterArea {
 
     // Glow light positions (rendered in drawFx with nightFactor)
     this._dockGlows = [];
-    // Outer edge dots — left and right walls
+    const inset = 21;
+    const pathY = deckEnd - inset; // U-bottom inset matches side inset
+    // Outer edge dots — left wall, right wall, front row
     for (let gy = wy + 8; gy < deckEnd - 6; gy += 11) {
       this._dockGlows.push({ x: dx1 + 2, y: gy });
       this._dockGlows.push({ x: dx2 - 2, y: gy });
     }
-    // U-shaped path inset from edges — left arm, front, right arm (slightly brighter)
-    const inset = 21;
-    const pathY = deckEnd - 10;
+    for (let gx = dx1 + 2; gx <= dx2 - 2; gx += 11) {
+      this._dockGlows.push({ x: gx, y: deckEnd - 6 });
+    }
+    // U-shaped path inset — left arm, right arm, front bar (slightly brighter)
     for (let gy = wy + 8; gy <= pathY; gy += 11) {
       this._dockGlows.push({ x: dx1 + inset, y: gy, bright: true });
       this._dockGlows.push({ x: dx2 - inset, y: gy, bright: true });
