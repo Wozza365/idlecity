@@ -2,10 +2,6 @@ import Phaser from 'phaser';
 import { ROAD_H, VERGE_H, WATER_H } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
-import {
-  HT_LAND_SEA_TILE_W, HT_LAND_SEA_CROP_Y0, HT_LAND_SEA_CROP_Y1,
-  HT_LAND_SEA_CROP_H, HT_LAND_SEA_FOAM_Y,
-} from './HighTidesAssets';
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 
@@ -94,7 +90,6 @@ export class WaterArea {
 
   // Sprites from the High Tides asset pack
   private _foamSprites: Phaser.GameObjects.Sprite[] = [];
-  private _transitionSprites: Phaser.GameObjects.Sprite[] = [];
 
   // Animation
   private _waveTime        = 0;
@@ -173,8 +168,8 @@ export class WaterArea {
     if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
     else { this._buoys = []; }
     if (level >= 8) this.drawLighthouse();
-    if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); this.initTransitionSprites(); }
-    else { this.destroyFoamSprites(); this.destroyTransitionSprites(); }
+    if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
+    else { this.destroyFoamSprites(); }
 
     this.rebuildLights();
   }
@@ -641,53 +636,6 @@ export class WaterArea {
     }
   }
 
-  private setupTransitionFrames(): void {
-    if (!this.scene.textures.exists('ht-land-sea')) return;
-    const tex = this.scene.textures.get('ht-land-sea');
-    if (!tex.has('f0')) {
-      tex.add('f0', 0, 0, HT_LAND_SEA_CROP_Y0, HT_LAND_SEA_TILE_W, HT_LAND_SEA_CROP_H);
-      tex.add('f1', 0, 0, HT_LAND_SEA_CROP_Y1, HT_LAND_SEA_TILE_W, HT_LAND_SEA_CROP_H);
-    }
-    if (!this.scene.anims.exists('ht-land-sea-anim')) {
-      this.scene.anims.create({
-        key: 'ht-land-sea-anim',
-        frames: [
-          { key: 'ht-land-sea', frame: 'f0' },
-          { key: 'ht-land-sea', frame: 'f1' },
-        ],
-        frameRate: 1,
-        repeat: -1,
-      });
-    }
-  }
-
-  private destroyTransitionSprites(): void {
-    for (const s of this._transitionSprites) s.destroy();
-    this._transitionSprites = [];
-  }
-
-  private initTransitionSprites(): void {
-    this.destroyTransitionSprites();
-    this.setupTransitionFrames();
-    if (!this.scene.anims.exists('ht-land-sea-anim')) return;
-
-    const bx = this._beachEndX;
-    const wy = this._waterY;
-    const edgeY  = wy + BEACH_SHORE_H;
-    const originY = HT_LAND_SEA_FOAM_Y / HT_LAND_SEA_CROP_H; // ~0.22 — anchor at foam line
-    const count   = Math.ceil(bx / HT_LAND_SEA_TILE_W) + 1;
-
-    for (let i = 0; i < count; i++) {
-      const x = i * HT_LAND_SEA_TILE_W;
-      const sprite = this.scene.add.sprite(x, edgeY, 'ht-land-sea', 'f0')
-        .setOrigin(0, originY)
-        .setDepth(5.67)
-        .setAlpha(0.55);
-      sprite.play({ key: 'ht-land-sea-anim', startFrame: i % 2 });
-      this._transitionSprites.push(sprite);
-    }
-  }
-
   private initBeachPeople(): void {
     const { _level: lv, _beachEndX: bx, _waterY: wy } = this;
     const count = Math.min(3 + Math.floor(lv * 0.55), 8);
@@ -777,12 +725,9 @@ export class WaterArea {
       pgfx.fillRect(x, top, p.w, Math.round(p.h));
     }
 
-    // Fade foam + transition sprites with daylight
+    // Fade foam sprites with daylight
     for (const fs of this._foamSprites) {
       fs.setAlpha(Math.max(0, 0.55 * brightness));
-    }
-    for (const ts of this._transitionSprites) {
-      ts.setAlpha(Math.max(0, 0.55 * brightness));
     }
   }
 
@@ -1115,7 +1060,6 @@ export class WaterArea {
     for (const nl of this._nativeLights) this.scene.lights.removeLight(nl);
     this._nativeLights = [];
     this.destroyFoamSprites();
-    this.destroyTransitionSprites();
     this.waterGfx.destroy();
     this.shadowGfx.destroy();
     this.structGfx.destroy();
