@@ -435,7 +435,7 @@ export class WaterArea {
       this._dockGlows.push({ x: dx2 - 2, y: gy });
     }
     // U-shaped path inset from edges — left arm, front, right arm (slightly brighter)
-    const inset = 7;
+    const inset = 21;
     const pathY = deckEnd - 10;
     for (let gy = wy + 8; gy <= pathY; gy += 11) {
       this._dockGlows.push({ x: dx1 + inset, y: gy, bright: true });
