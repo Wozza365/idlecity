@@ -38,25 +38,16 @@ function ambientFromElevation(elevation: number): AmbientState {
     // Full day
     return { r: 1.0, g: 0.95, b: 0.85, intensity: 1.0 };
   } else if (e >= 0.0) {
-    // Golden hour → twilight
+    // Dusk/dawn: lerp day white-yellow → night blue (no dark-purple intermediate)
     const t = e / 0.3;
     return {
-      r: lerp(0.3, 1.0, t),
-      g: lerp(0.25, 0.95, t),
-      b: lerp(0.4, 0.85, t),
+      r: lerp(0.68, 1.0, t),
+      g: lerp(0.72, 0.95, t),
+      b: lerp(0.87, 0.85, t),
       intensity: lerp(0.5, 1.0, t),
     };
-  } else if (e >= -0.2) {
-    // Twilight → deep night — colour shifts to night blue, intensity stays at dusk floor
-    const t = (e + 0.2) / 0.2;
-    return {
-      r: lerp(0.68, 0.3, t),
-      g: lerp(0.72, 0.25, t),
-      b: lerp(0.87, 0.4, t),
-      intensity: 0.5,
-    };
   } else {
-    // Full night
+    // Night (twilight through full night): consistent blue ambient
     return { r: 0.68, g: 0.72, b: 0.87, intensity: 0.5 };
   }
 }
