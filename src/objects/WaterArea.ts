@@ -557,15 +557,16 @@ export class WaterArea {
       this._pierBulb = null;
     }
 
-    // ── Bonfire — two small overlapping warm lights (breaks the uniform-circle feel) ──
+    // ── Bonfire — two overlapping warm point lights with large radius so the
+    // pow(1-d,2) falloff gradient is visible across the disc (not just the last 2px).
     if (lv >= 9) {
       this._bonfireLight = {
         x: this._bonfireX - 3, y: this._bonfireY - 10,
-        radius: 18, color: 0xFF6600, intensity: 0, noOcclusion: true,
+        radius: 65, color: 0xFF6600, intensity: 0, noOcclusion: true,
       };
       this._bonfireLight2 = {
         x: this._bonfireX + 4, y: this._bonfireY - 6,
-        radius: 14, color: 0xFFAA00, intensity: 0, noOcclusion: true,
+        radius: 50, color: 0xFFAA00, intensity: 0, noOcclusion: true,
       };
     } else {
       this._bonfireLight  = null;
@@ -804,9 +805,9 @@ export class WaterArea {
       const f2 = 0.70 + 0.25 * Math.sin(t * 3.3 + 0.8) + 0.12 * Math.sin(t * 7.4 + 1.2);
       const nf = this._nightFactor;
       if (this._bonfireLight)
-        (this._bonfireLight  as { intensity: number }).intensity = nf * 80 * f1;
+        (this._bonfireLight  as { intensity: number }).intensity = nf * 5.0 * f1;
       if (this._bonfireLight2)
-        (this._bonfireLight2 as { intensity: number }).intensity = nf * 60 * f2;
+        (this._bonfireLight2 as { intensity: number }).intensity = nf * 4.0 * f2;
     }
 
     this.updateBeachPeople(delta, elevation);
@@ -985,34 +986,43 @@ export class WaterArea {
   private drawLighthouseBeam(): void {
     const gfx = this.fxGfx;
     const { _lighthouseX: lx, _lighthouseTopY: ty } = this;
-    const nf    = this._nightFactor;
-    const angle = this._lighthouseAngle;
-    const len   = 160;
+    const nf     = this._nightFactor;
+    const angle  = this._lighthouseAngle;
+    const len    = 160;
     const spread = Math.PI / 14;
     const ox = lx, oy = ty - 5;
 
-    // Soft outer halo (slightly wider, very faint)
-    gfx.fillStyle(0xFFFF88, nf * 0.05);
-    gfx.fillTriangle(
-      ox, oy,
-      ox + Math.cos(angle - spread * 1.6) * len * 0.75, oy + Math.sin(angle - spread * 1.6) * len * 0.75,
-      ox + Math.cos(angle + spread * 1.6) * len * 0.75, oy + Math.sin(angle + spread * 1.6) * len * 0.75,
-    );
-    // Main beam
-    gfx.fillStyle(0xFFFF88, nf * 0.16);
-    gfx.fillTriangle(
-      ox, oy,
-      ox + Math.cos(angle - spread) * len, oy + Math.sin(angle - spread) * len,
-      ox + Math.cos(angle + spread) * len, oy + Math.sin(angle + spread) * len,
-    );
-    // Bright core
-    gfx.fillStyle(0xFFFFCC, nf * 0.28);
-    gfx.fillTriangle(
-      ox, oy,
-      ox + Math.cos(angle - spread * 0.35) * len * 0.55, oy + Math.sin(angle - spread * 0.35) * len * 0.55,
-      ox + Math.cos(angle + spread * 0.35) * len * 0.55, oy + Math.sin(angle + spread * 0.35) * len * 0.55,
-    );
-    // Lens
+    // Smooth fan: N angular slices each given alpha = peakAlpha × cos²(t × π/2)
+    // where t = normalised distance from beam centre (0=centre, 1=edge).
+    // Three nested layers at decreasing lengths naturally brighten the region near
+    // the source (all layers overlap) and feather the radial tip (only the outermost
+    // layer reaches it), eliminating sharp triangular edges and hard cutoffs.
+    const N = 22;
+    const layers: Array<{ lenFrac: number; halfSpread: number; peakAlpha: number }> = [
+      { lenFrac: 1.00, halfSpread: spread,        peakAlpha: 0.12 },
+      { lenFrac: 0.62, halfSpread: spread * 0.88, peakAlpha: 0.09 },
+      { lenFrac: 0.38, halfSpread: spread * 0.70, peakAlpha: 0.07 },
+    ];
+    for (const { lenFrac, halfSpread, peakAlpha } of layers) {
+      const sl = len * lenFrac;
+      for (let i = 0; i < N; i++) {
+        const a0   = angle - halfSpread + (i / N) * 2 * halfSpread;
+        const a1   = angle - halfSpread + ((i + 1) / N) * 2 * halfSpread;
+        const aMid = (a0 + a1) * 0.5;
+        const t    = Math.abs(aMid - angle) / halfSpread; // 0=centre, 1=edge
+        const angFalloff = Math.pow(Math.cos(t * Math.PI * 0.5), 2);
+        const alpha = nf * peakAlpha * angFalloff;
+        if (alpha < 0.004) continue;
+        gfx.fillStyle(0xFFFF88, alpha);
+        gfx.fillTriangle(
+          ox, oy,
+          ox + Math.cos(a0) * sl, oy + Math.sin(a0) * sl,
+          ox + Math.cos(a1) * sl, oy + Math.sin(a1) * sl,
+        );
+      }
+    }
+
+    // Lens glow
     gfx.fillStyle(0xFFFF44, nf * 0.55);
     gfx.fillCircle(ox, oy, 4);
   }
