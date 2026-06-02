@@ -170,3 +170,13 @@ void main() {
     gl_FragColor = vec4(clamp(ambient + lit, 0.0, 1.5), scene.a);
 }
 `;
+
+// ── Tree-mask eraser fragment shader ─────────────────────────────────────────
+// Writes vec4(0) to zero out accumulated light at tree canopy positions,
+// so trees are only affected by ambient, not dynamic point/spot lights.
+export const MASK_FRAG = /* glsl */`
+precision mediump float;
+void main() {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+}
+`;

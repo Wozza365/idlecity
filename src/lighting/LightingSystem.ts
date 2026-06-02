@@ -149,6 +149,7 @@ export class LightingSystem {
         this.shadowRenderer.renderPointLight(light as Parameters<ShadowMapRenderer['renderPointLight']>[0], poly);
       }
     }
+    this.shadowRenderer.renderTreeMasks(this._treeOccluders);
     this.shadowRenderer.endFrame();
   }
 

@@ -3,7 +3,7 @@ import { type LightSource } from './LightingSystem';
 import { type Point } from '../utils/visibilityPolygon';
 import {
   QUAD_VERT, LIGHT_DISC_FRAG, SPOT_DISC_FRAG,
-  POLY_VERT, POLY_FRAG,
+  POLY_VERT, POLY_FRAG, MASK_FRAG,
 } from './shaders';
 
 // Raw WebGL shadow map renderer — two sub-passes per light:
@@ -58,6 +58,11 @@ interface PolyProgram {
   uResolution: WebGLUniformLocation;
 }
 
+interface MaskProgram {
+  program: WebGLProgram;
+  aPosition: number;
+}
+
 // Minimal WebGLTextureWrapper-compatible shim so Phaser's texture unit system
 // (WebGLTextureUnitsWrapper.bind) can bind our raw WebGLTexture via
 // texture.webGLTexture without receiving undefined.
@@ -81,6 +86,7 @@ export class ShadowMapRenderer {
   private readonly discProg: DiscProgram;
   private readonly spotProg: SpotProgram;
   private readonly polyProg: PolyProgram;
+  private readonly maskProg: MaskProgram;
 
   private readonly quadBuf: WebGLBuffer;
   private readonly polyBuf: WebGLBuffer;
@@ -126,6 +132,12 @@ export class ShadowMapRenderer {
       program: polyRaw,
       aPosition:   gl.getAttribLocation(polyRaw, 'aPosition'),
       uResolution: gl.getUniformLocation(polyRaw, 'uResolution')!,
+    };
+
+    const maskRaw = linkProgram(gl, QUAD_VERT, MASK_FRAG);
+    this.maskProg = {
+      program: maskRaw,
+      aPosition: gl.getAttribLocation(maskRaw, 'aPosition'),
     };
 
     // ── Fullscreen quad (NDC, two triangles) ───────────────────────────────
@@ -294,6 +306,70 @@ export class ShadowMapRenderer {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  // Zero out shadow-map pixels inside each tree canopy circle so that dynamic
+  // lights (headlights, streetlamps) don't illuminate the tree canopy. Trees
+  // then receive ambient-only tinting from the composite shader.
+  renderTreeMasks(trees: Array<{ x: number; y: number; r: number }>): void {
+    if (trees.length === 0) return;
+    const { gl } = this;
+    const { width, height } = this.shadowMap;
+    const SEGS = 16;
+
+    for (const tree of trees) {
+      // Build a circle polygon for the stencil.
+      const fanVerts: number[] = [];
+      const cx = tree.x, cy = tree.y, r = tree.r;
+      for (let i = 1; i < SEGS - 1; i++) {
+        const a0 = (0 / SEGS) * Math.PI * 2;
+        const a1 = (i / SEGS) * Math.PI * 2;
+        const a2 = ((i + 1) / SEGS) * Math.PI * 2;
+        fanVerts.push(
+          cx + Math.cos(a0) * r, cy + Math.sin(a0) * r,
+          cx + Math.cos(a1) * r, cy + Math.sin(a1) * r,
+          cx + Math.cos(a2) * r, cy + Math.sin(a2) * r,
+        );
+      }
+
+      // Step 1: stamp circle into stencil.
+      gl.enable(gl.STENCIL_TEST);
+      gl.stencilMask(0xff);
+      gl.clear(gl.STENCIL_BUFFER_BIT);
+      gl.colorMask(false, false, false, false);
+      gl.stencilFunc(gl.ALWAYS, 1, 0xff);
+      gl.stencilOp(gl.REPLACE, gl.REPLACE, gl.REPLACE);
+
+      gl.useProgram(this.polyProg.program);
+      gl.uniform2f(this.polyProg.uResolution, width, height);
+
+      const fanData = new Float32Array(fanVerts);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.polyBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, fanData, gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(this.polyProg.aPosition);
+      gl.vertexAttribPointer(this.polyProg.aPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, fanData.length / 2);
+
+      // Step 2: overwrite (no blend) with vec4(0) where stencil == 1.
+      gl.colorMask(true, true, true, true);
+      gl.stencilFunc(gl.EQUAL, 1, 0xff);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+      gl.stencilMask(0x00);
+      gl.disable(gl.BLEND);
+
+      gl.useProgram(this.maskProg.program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf);
+      gl.enableVertexAttribArray(this.maskProg.aPosition);
+      gl.vertexAttribPointer(this.maskProg.aPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      // Restore additive blend for subsequent draws.
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.stencilMask(0xff);
+      gl.clear(gl.STENCIL_BUFFER_BIT);
+      gl.disable(gl.STENCIL_TEST);
+    }
+  }
+
   // Restore Phaser's WebGL state after all lights have been rendered.
   endFrame(): void {
     const { gl, renderer } = this;
@@ -313,6 +389,7 @@ export class ShadowMapRenderer {
     gl.deleteProgram(this.discProg.program);
     gl.deleteProgram(this.spotProg.program);
     gl.deleteProgram(this.polyProg.program);
+    gl.deleteProgram(this.maskProg.program);
     gl.deleteBuffer(this.quadBuf);
     gl.deleteBuffer(this.polyBuf);
     gl.deleteTexture(this.shadowMap.texture);
