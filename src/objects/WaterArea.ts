@@ -427,10 +427,14 @@ export class WaterArea {
     gfx.fillStyle(0x7A5828, 1);
     gfx.fillRect(dx1, deckEnd - 3, dockW, 4);
 
-    // Glow light positions along the front of the deck (rendered in drawFx with nightFactor)
+    // Glow light positions — front edge + both sides (rendered in drawFx with nightFactor)
     this._dockGlows = [];
     for (let gx = dx1 + 16; gx < dx2 - 8; gx += 20) {
       this._dockGlows.push({ x: gx, y: deckEnd - 6 });
+    }
+    for (let gy = wy + 8; gy < deckEnd - 6; gy += 11) {
+      this._dockGlows.push({ x: dx1 + 2, y: gy });
+      this._dockGlows.push({ x: dx2 - 2, y: gy });
     }
 
     // Dock slots for BoatManager (at the water-level edge of dock)
@@ -529,26 +533,9 @@ export class WaterArea {
 
     const { _level: lv, _waterY: wy } = this;
 
-    // ── Dock post lights — SoftSpotLight pointing down (level 5+) ──
+    // Dock uses ambient dot glows only (drawn in drawFx) — no directional spots
     this._dockSpots = [];
     this._dockBulbs = [];
-    if (lv >= 5) {
-      const lampY = wy + 42; // near deck front edge for max water illumination
-      for (const sx of this._dockSlots) {
-        const spot = new SoftSpotLight({
-          x: sx, y: lampY,
-          radius: 65, color: 0xFFCC66, intensity: 0,
-          angle: Math.PI / 2, coneAngle: Math.PI / 2.5,
-          noOcclusion: true,
-        });
-        const bulb: Extract<LightSource, { type?: 'point' }> = {
-          x: sx, y: lampY, radius: 3, color: 0xFFFAE0, intensity: 0, noOcclusion: true,
-        };
-        this._dockSpots.push(spot);
-        this._dockBulbs.push(bulb);
-        this._nativeLights.push(this.scene.lights.addLight(sx, lampY, 72, 0xFFCC66, 0));
-      }
-    }
 
     // ── Café exterior light — downward spot (level 4+) ──
     const cafeLampX = this._cafeX + 30;
