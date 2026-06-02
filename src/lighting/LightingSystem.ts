@@ -44,7 +44,7 @@ function ambientFromElevation(elevation: number): AmbientState {
       r: lerp(0.3, 1.0, t),
       g: lerp(0.25, 0.95, t),
       b: lerp(0.4, 0.85, t),
-      intensity: lerp(0.35, 1.0, t),
+      intensity: lerp(0.5, 1.0, t),
     };
   } else if (e >= -0.2) {
     // Twilight → deep night — colour shifts to night blue, intensity stays at dusk floor
