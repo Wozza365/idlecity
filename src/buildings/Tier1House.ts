@@ -452,18 +452,22 @@ export class Tier1House extends Phaser.GameObjects.Container {
   updateWindowLights(elevation: number): void {
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
+    const ambientIntensity = elevation >= 0.3 ? 1.0
+      : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
+      : 0.5;
+    const tNorm = t * (0.5 / ambientIntensity);
     const time = this.scene.time.now / 1000;
 
     this.windowLights.forEach((light, i) => {
       const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
-      light.intensity = t * 0.45 * flicker;
+      light.intensity = tNorm * 0.45 * flicker;
     });
     if (this.porchSoftLight) {
       const flicker = 1 + Math.sin(time * 1.3 + 1.2) * 0.08;
-      this.porchSoftLight.setIntensity(t * 2.5 * flicker);
+      this.porchSoftLight.setIntensity(tNorm * 2.5 * flicker);
     }
-    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
-    if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.45);
+    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
+    if (this.lampConeGfx) this.lampConeGfx.setAlpha(tNorm * 0.45);
   }
 
   updateSmoke(t: number): void {
