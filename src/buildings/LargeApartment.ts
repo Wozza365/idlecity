@@ -348,9 +348,9 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // fabric never extends past the building boundary.
     if (level >= 57) {
       const nFlags  = 6;
-      const margin  = HF_MARG;             // diagonal flag's true horizontal footprint
+      const margin  = HF_MARG + 8;         // inset further from edges
       const span    = bw - 2 * margin;
-      const step    = Math.round(span / (nFlags - 1));
+      const step    = Math.round(span / (nFlags - 1)) + 2;
       for (let fi = 0; fi < nFlags; fi++) {
         const poleX = bx + margin + fi * step;
         const dir   = fi < 3 ? -1 : 1;    // left half flies left, right half flies right
