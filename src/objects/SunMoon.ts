@@ -149,7 +149,7 @@ export class SunMoon {
 
     const totalAlpha  = Math.min(0.99, elevation * 1.26 + 0.18);
     const maxShadow   = ROAD_H + VERGE_H + RIVER_H;
-    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5)) * 0.3;
+    const shadowExtent = Math.max(6, maxShadow * Math.pow(1 - elevation, 0.5)) * 0.15;
     const shadBot      = Math.min(groundY + shadowExtent, panelTop);
 
     this._shadowAlpha = totalAlpha * 0.4;
