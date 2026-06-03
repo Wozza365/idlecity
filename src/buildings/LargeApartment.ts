@@ -17,6 +17,13 @@ const LOBBY_H   = 34;
 const FLOOR_H   = 18;
 const PARAPET_H = 10;
 
+// Hotel flag dimensions — shared between constructor (margin calc) and draw
+const HF_FW   = 20;  // flag length along pole direction
+const HF_FH   = 13;  // flag height perpendicular to pole
+const HF_POLE = 18;  // diagonal pole length
+// Horizontal footprint of one flag (pole tip + flag body projected onto x-axis at 45°)
+const HF_MARG = Math.ceil(HF_POLE + (HF_FW + HF_FH) * Math.SQRT1_2); // ≈ 42
+
 // Hotel flag: three distinct colour bands per flag [inner, mid, outer]
 const HOTEL_PALETTES: ReadonlyArray<readonly [number, number, number]> = [
   [0xcc2020, 0xffffff, 0x2233cc],  // red-white-blue
@@ -341,9 +348,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // fabric never extends past the building boundary.
     if (level >= 57) {
       const nFlags  = 6;
-      const fw_     = 20;   // must match drawHotelFlags
-      const pole_   = 18;   // must match drawHotelFlags
-      const margin  = pole_ + fw_;          // minimum pole-to-edge inset
+      const margin  = HF_MARG;             // diagonal flag's true horizontal footprint
       const span    = bw - 2 * margin;
       const step    = Math.round(span / (nFlags - 1));
       for (let fi = 0; fi < nFlags; fi++) {
@@ -502,16 +507,18 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
   private drawHotelFlags(gfx: Phaser.GameObjects.Graphics, time: number): void {
     gfx.clear();
-    const fw      = 20;   // flag width (horizontal extent from pole tip)
-    const fh      = 13;   // flag height
-    const poleLen = 18;   // diagonal pole length
-    const maxDroop = 4;   // how many px the free end droops below the attachment
+    const fw      = HF_FW;
+    const fh      = HF_FH;
+    const poleLen = HF_POLE;
+    // At 45° the unit vectors are:
+    //   extension (along pole): (dir * c, -c)
+    //   hang (perpendicular, "below" pole):  (dir * c,  c)
+    const c = Math.SQRT1_2; // cos/sin 45° ≈ 0.7071
 
     for (let i = 0; i < this.hotelFlags.length; i++) {
       const { poleX, poleY, dir, palette } = this.hotelFlags[i];
       const phase = this.hotelFlagPhases[i];
 
-      // Diagonal pole: base at lobbyTop, tip angled up and outward
       const tipX = poleX + dir * poleLen;
       const tipY = poleY - poleLen;
 
@@ -520,36 +527,35 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       gfx.fillStyle(0xd0d8e0, 1);
       gfx.fillCircle(tipX, tipY, 1.5);
 
-      // Waving motion — free end oscillates, hoist stays fixed
-      const maxWave = Math.sin(time * 3.8 + phase) * 2.5;
+      // Wave ripples perpendicular to the flag face (grows from hoist→fly)
+      const maxWave = Math.sin(time * 3.8 + phase) * 2;
 
-      // Draw flag as a drooping diagonal parallelogram with 3 colour bands.
-      // The flag extends outward (away from building) from the pole tip.
-      // Droop and wave both increase linearly from hoist (t=0) to fly (t=1).
+      // Flag is a parallelogram whose long axis follows the pole direction exactly.
+      // Top edge:    tipX + t·fw·(dir·c, −c)
+      // Bottom edge: top  +    fh·(dir·c,  c)   ← perpendicular hang direction
+      // Wave applied as a small perpendicular offset that grows with t.
       const nBands = palette.length;
       for (let b = 0; b < nBands; b++) {
         const t0 = b / nBands;
         const t1 = (b + 1) / nBands;
+        const w0 = maxWave * t0;
+        const w1 = maxWave * t1;
 
-        // x positions along the flag (outward from the building)
-        const x0 = tipX + dir * Math.round(t0 * fw);
-        const x1 = tipX + dir * Math.round(t1 * fw);
+        // Top-edge points (wave nudges in hang direction)
+        const tx0 = tipX + dir * t0 * fw * c + dir * w0 * c * 0.35;
+        const ty0 = tipY       - t0 * fw * c +       w0 * c * 0.35;
+        const tx1 = tipX + dir * t1 * fw * c + dir * w1 * c * 0.35;
+        const ty1 = tipY       - t1 * fw * c +       w1 * c * 0.35;
 
-        // y positions: inner edge fixed at tipY, outer edge droops + waves
-        const droop0 = maxDroop * t0;
-        const droop1 = maxDroop * t1;
-        const wave0  = maxWave * t0;
-        const wave1  = maxWave * t1;
-
-        const topY0 = tipY + droop0 + wave0 * 0.45;
-        const topY1 = tipY + droop1 + wave1 * 0.45;
-        const botY0 = tipY + fh + droop0 + wave0;
-        const botY1 = tipY + fh + droop1 + wave1;
+        // Bottom-edge = top + fh along hang direction + wave
+        const bx0 = tx0 + dir * fh * c + dir * w0 * c * 0.65;
+        const by0 = ty0       + fh * c +       w0 * c * 0.65;
+        const bx1 = tx1 + dir * fh * c + dir * w1 * c * 0.65;
+        const by1 = ty1       + fh * c +       w1 * c * 0.65;
 
         gfx.fillStyle(palette[b], 1);
-        // Quad as two triangles: (x0,top0)→(x1,top1)→(x1,bot1)→(x0,bot0)
-        gfx.fillTriangle(x0, topY0, x1, topY1, x0, botY0);
-        gfx.fillTriangle(x1, topY1, x1, botY1, x0, botY0);
+        gfx.fillTriangle(tx0, ty0, tx1, ty1, bx0, by0);
+        gfx.fillTriangle(tx1, ty1, bx1, by1, bx0, by0);
       }
     }
   }
