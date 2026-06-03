@@ -17,11 +17,14 @@ const LOBBY_H   = 34;
 const FLOOR_H   = 18;
 const PARAPET_H = 10;
 
-// Hotel flag: two-tone colors [dark, light] per flag slot
-const FLAG_COLORS: [number, number][] = [
-  [0xcc2222, 0xee4444],
-  [0x2244cc, 0x3366ee],
-  [0x228822, 0x44aa44],
+// Hotel flag: three distinct colour bands per flag [inner, mid, outer]
+const HOTEL_PALETTES: ReadonlyArray<readonly [number, number, number]> = [
+  [0xcc2020, 0xffffff, 0x2233cc],  // red-white-blue
+  [0x228844, 0xffdd00, 0xffffff],  // green-gold-white
+  [0xcc2266, 0xffffff, 0x7722cc],  // crimson-white-purple
+  [0xff6600, 0xffffff, 0x002288],  // orange-white-navy
+  [0x1155bb, 0xffdd00, 0x1155bb],  // royal-gold-royal
+  [0x882211, 0xffee44, 0x116633],  // burgundy-yellow-forest
 ];
 
 export class LargeApartment extends Phaser.GameObjects.Container {
@@ -36,7 +39,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private flagPoleX = 0;
   private flagTop   = 0;
   private hotelFlagGfx:    Phaser.GameObjects.Graphics | null = null;
-  private hotelFlags: Array<{ poleX: number; poleY: number; dir: 1 | -1; colorIdx: number }> = [];
+  private hotelFlags: Array<{ poleX: number; poleY: number; dir: 1 | -1; palette: readonly [number, number, number] }> = [];
   private hotelFlagPhases: number[] = [];
   private lightPhases:   number[] = [];
   private windowRects:   Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
@@ -334,12 +337,12 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     // ── Lv 57+: diagonal hotel flags (data setup only — added after glass) ──
     if (level >= 57) {
-      const nFlags = 3;
+      const nFlags = 5;
       for (let fi = 0; fi < nFlags; fi++) {
         const t_    = (fi + 1) / (nFlags + 1);
         const poleX = bx + Math.round(bw * t_);
         const dir   = fi % 2 === 0 ? 1 : -1;
-        this.hotelFlags.push({ poleX, poleY: lobbyTop, dir: dir as 1 | -1, colorIdx: fi % FLAG_COLORS.length });
+        this.hotelFlags.push({ poleX, poleY: lobbyTop, dir: dir as 1 | -1, palette: HOTEL_PALETTES[fi % HOTEL_PALETTES.length] });
         this.hotelFlagPhases.push(Math.random() * Math.PI * 2);
       }
     }
@@ -492,43 +495,55 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
   private drawHotelFlags(gfx: Phaser.GameObjects.Graphics, time: number): void {
     gfx.clear();
-    const fw = 16, fh = 10;
-    const poleLen = 14; // diagonal pole length in pixels
+    const fw      = 20;   // flag width (horizontal extent from pole tip)
+    const fh      = 13;   // flag height
+    const poleLen = 18;   // diagonal pole length
+    const maxDroop = 4;   // how many px the free end droops below the attachment
 
     for (let i = 0; i < this.hotelFlags.length; i++) {
-      const { poleX, poleY, dir, colorIdx } = this.hotelFlags[i];
+      const { poleX, poleY, dir, palette } = this.hotelFlags[i];
       const phase = this.hotelFlagPhases[i];
-      const [colorDark, colorLight] = FLAG_COLORS[colorIdx];
 
-      // Diagonal pole: attaches at (poleX, poleY), tip goes up+dir*poleLen
+      // Diagonal pole: base at lobbyTop, tip angled up and outward
       const tipX = poleX + dir * poleLen;
       const tipY = poleY - poleLen;
 
-      // Draw pole as a thin diagonal line
       gfx.lineStyle(1, 0xa0a8b0, 1);
       gfx.moveTo(poleX, poleY).lineTo(tipX, tipY).strokePath();
-      // Pole tip cap
       gfx.fillStyle(0xd0d8e0, 1);
       gfx.fillCircle(tipX, tipY, 1.5);
 
-      // Flag hangs from tip, waves horizontally
-      // fx = tip, flag extends in the opposite horizontal direction to dir
-      const fx   = tipX;
-      const fy   = tipY;
-      const wave = Math.sin(time * 3.8 + phase) * 2;
-      const mid  = Math.sin(time * 3.8 + phase + 1) * 1.2;
-      // Flag extends away from pole attachment (so flag waves freely)
-      const fEndX = fx - dir * fw;
-      const mcx   = fx - dir * Math.round(fw / 2);
-      const fWave  = dir > 0 ? -wave : wave;
-      const fMid   = dir > 0 ? -mid  : mid;
+      // Waving motion — free end oscillates, hoist stays fixed
+      const maxWave = Math.sin(time * 3.8 + phase) * 2.5;
 
-      gfx.fillStyle(colorDark, 1);
-      gfx.fillTriangle(fx, fy, fx, fy + fh, mcx, fy + fh + fMid);
-      gfx.fillTriangle(fx, fy, mcx, fy + fh + fMid, mcx, fy + fMid);
-      gfx.fillStyle(colorLight, 1);
-      gfx.fillTriangle(mcx, fy + fMid, mcx, fy + fh + fMid, fEndX, fy + fh + fWave);
-      gfx.fillTriangle(mcx, fy + fMid, fEndX, fy + fh + fWave, fEndX, fy + fWave);
+      // Draw flag as a drooping diagonal parallelogram with 3 colour bands.
+      // The flag extends outward (away from building) from the pole tip.
+      // Droop and wave both increase linearly from hoist (t=0) to fly (t=1).
+      const nBands = palette.length;
+      for (let b = 0; b < nBands; b++) {
+        const t0 = b / nBands;
+        const t1 = (b + 1) / nBands;
+
+        // x positions along the flag (outward from the building)
+        const x0 = tipX + dir * Math.round(t0 * fw);
+        const x1 = tipX + dir * Math.round(t1 * fw);
+
+        // y positions: inner edge fixed at tipY, outer edge droops + waves
+        const droop0 = maxDroop * t0;
+        const droop1 = maxDroop * t1;
+        const wave0  = maxWave * t0;
+        const wave1  = maxWave * t1;
+
+        const topY0 = tipY + droop0 + wave0 * 0.45;
+        const topY1 = tipY + droop1 + wave1 * 0.45;
+        const botY0 = tipY + fh + droop0 + wave0;
+        const botY1 = tipY + fh + droop1 + wave1;
+
+        gfx.fillStyle(palette[b], 1);
+        // Quad as two triangles: (x0,top0)→(x1,top1)→(x1,bot1)→(x0,bot0)
+        gfx.fillTriangle(x0, topY0, x1, topY1, x0, botY0);
+        gfx.fillTriangle(x1, topY1, x1, botY1, x0, botY0);
+      }
     }
   }
 
