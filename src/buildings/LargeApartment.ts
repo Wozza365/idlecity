@@ -510,9 +510,6 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const fw      = HF_FW;
     const fh      = HF_FH;
     const poleLen = HF_POLE;
-    // At 45° the unit vectors are:
-    //   extension (along pole): (dir * c, -c)
-    //   hang (perpendicular, "below" pole):  (dir * c,  c)
     const c = Math.SQRT1_2; // cos/sin 45° ≈ 0.7071
 
     for (let i = 0; i < this.hotelFlags.length; i++) {
@@ -530,10 +527,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       // Wave ripples perpendicular to the flag face (grows from hoist→fly)
       const maxWave = Math.sin(time * 3.8 + phase) * 2;
 
-      // Flag is a parallelogram whose long axis follows the pole direction exactly.
-      // Top edge:    tipX + t·fw·(dir·c, −c)
-      // Bottom edge: top  +    fh·(dir·c,  c)   ← perpendicular hang direction
-      // Wave applied as a small perpendicular offset that grows with t.
+      // Flag hangs DOWN from the pole tip at 45°:
+      //   extension direction: (dir·c,  c)  — outward + downward
+      //   hang direction:     (−dir·c,  c)  — inward  + downward (perpendicular)
+      // Wave nudges in the hang direction, growing from hoist to fly.
       const nBands = palette.length;
       for (let b = 0; b < nBands; b++) {
         const t0 = b / nBands;
@@ -541,16 +538,16 @@ export class LargeApartment extends Phaser.GameObjects.Container {
         const w0 = maxWave * t0;
         const w1 = maxWave * t1;
 
-        // Top-edge points (wave nudges in hang direction)
-        const tx0 = tipX + dir * t0 * fw * c + dir * w0 * c * 0.35;
-        const ty0 = tipY       - t0 * fw * c +       w0 * c * 0.35;
-        const tx1 = tipX + dir * t1 * fw * c + dir * w1 * c * 0.35;
-        const ty1 = tipY       - t1 * fw * c +       w1 * c * 0.35;
+        // Top-edge points (wave nudges inward)
+        const tx0 = tipX + dir * t0 * fw * c - dir * w0 * c * 0.35;
+        const ty0 = tipY       + t0 * fw * c +       w0 * c * 0.35;
+        const tx1 = tipX + dir * t1 * fw * c - dir * w1 * c * 0.35;
+        const ty1 = tipY       + t1 * fw * c +       w1 * c * 0.35;
 
         // Bottom-edge = top + fh along hang direction + wave
-        const bx0 = tx0 + dir * fh * c + dir * w0 * c * 0.65;
+        const bx0 = tx0 - dir * fh * c - dir * w0 * c * 0.65;
         const by0 = ty0       + fh * c +       w0 * c * 0.65;
-        const bx1 = tx1 + dir * fh * c + dir * w1 * c * 0.65;
+        const bx1 = tx1 - dir * fh * c - dir * w1 * c * 0.65;
         const by1 = ty1       + fh * c +       w1 * c * 0.65;
 
         gfx.fillStyle(palette[b], 1);
