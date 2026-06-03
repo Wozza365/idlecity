@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
+import { type LightSource } from '../lighting/LightingSystem';
+import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import { type DoorEntrance } from './types';
 
 function lerpColor(a: number, b: number, t: number): number {
@@ -22,6 +24,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
   readonly doorEntrances: DoorEntrance[] = [];
   private windowLights:  Phaser.GameObjects.Light[] = [];
   private neonLights:    Phaser.GameObjects.Light[] = [];
+  private neonSpots:     SoftSpotLight[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private neonGfx:        Phaser.GameObjects.Graphics | null = null;
@@ -33,6 +36,12 @@ export class SmallApartment extends Phaser.GameObjects.Container {
   private neonPhases:  number[] = [];
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; shop?: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
+
+  get extraLights(): LightSource[] {
+    const out: LightSource[] = [];
+    for (const spot of this.neonSpots) out.push(...spot.beams);
+    return out;
+  }
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -217,7 +226,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       // Neon light source
       const nc = NEON_COLORS[s % NEON_COLORS.length];
       this.neonLights.push(scene.lights.addLight(
-        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 100, nc, 0,
+        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 35, nc, 0,
       ));
     }
 
@@ -437,31 +446,38 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         const nx  = sx + 3;
         const nw  = sw_ - doorW - 7;
 
-        // Soft outer bloom halo — larger rect at low alpha creates the glow corona
-        neonGfx.fillStyle(nc, 0.4);
-        neonGfx.fillRect(nx - 4, signY - 2, nw + 8, signH + 4);
-
-        // Core sign body — draw three times so ADD accumulates to max brightness
+        // Neon tube border: tiny circles (1.5px) along sign perimeter, like the for-sale bulbs
         neonGfx.fillStyle(nc, 1);
-        neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
-        neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
-        neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
+        const step = 4;
+        for (let px = nx; px <= nx + nw; px += step) {
+          neonGfx.fillCircle(px, signY,          1.5);
+          neonGfx.fillCircle(px, signY + signH,  1.5);
+        }
+        for (let py = signY + step; py < signY + signH; py += step) {
+          neonGfx.fillCircle(nx,      py, 1.5);
+          neonGfx.fillCircle(nx + nw, py, 1.5);
+        }
 
-        // Outer glow border (wide soft ring)
-        neonGfx.lineStyle(4, nc, 0.6);
-        neonGfx.strokeRect(nx - 2, signY - 1, nw + 4, signH + 2);
-        // Sharp inner border
-        neonGfx.lineStyle(2, nc, 1);
-        neonGfx.strokeRect(nx - 1, signY, nw + 2, signH);
-
-        // Bright white squiggle lines — full alpha so text "pops" against coloured fill
-        neonGfx.lineStyle(2, 0xffffff, 1);
+        // Unreadable pixel-art "text": white dots inside
+        neonGfx.fillStyle(0xffffff, 1);
         const segW_ = Math.round(nw / 4);
         for (let si = 0; si < 3; si++) {
           const lx_ = nx + segW_ * si + 2;
-          neonGfx.moveTo(lx_, signY + 2).lineTo(lx_ + segW_ - 4, signY + 2).strokePath();
-          neonGfx.moveTo(lx_, signY + 5).lineTo(lx_ + Math.round((segW_ - 4) * 0.55), signY + 5).strokePath();
+          for (let px = lx_; px < lx_ + segW_ - 4; px += 3) neonGfx.fillCircle(px, signY + 2, 1);
+          for (let px = lx_; px < lx_ + Math.round((segW_ - 4) * 0.55); px += 3) neonGfx.fillCircle(px, signY + 5, 1);
         }
+
+        // Downward SoftSpotLight illuminating the shop face below the sign
+        this.neonSpots.push(new SoftSpotLight({
+          x:           nx + Math.round(nw / 2),
+          y:           signY + signH,
+          radius:      58,
+          color:       nc,
+          intensity:   0,
+          angle:       Math.PI / 2,
+          coneAngle:   Math.PI / 2 * 0.6,
+          noOcclusion: true,
+        }));
       }
     }
     this.add(neonGfx);
@@ -547,13 +563,14 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       light.intensity = tNorm * 0.42 * flicker;
     });
     this.neonLights.forEach((light, i) => {
-      const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.18;
-      light.intensity = tNorm * 2.2 * pulse;
+      const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.12;
+      light.intensity = tNorm * 0.4 * pulse;
     });
+    for (const spot of this.neonSpots) spot.setIntensity(tNorm * 2.0);
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
     if (this.lampConeGfx)    this.lampConeGfx.setAlpha(tNorm * 0.45);
-    if (this.neonGfx)        this.neonGfx.setAlpha(Math.min(1, tNorm * 1.6));
+    if (this.neonGfx)        this.neonGfx.setAlpha(tNorm * 0.9);
     if (this.flagLight)      this.flagLight.intensity = tNorm * 0.6;
   }
 
