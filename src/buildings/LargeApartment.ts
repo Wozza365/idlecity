@@ -65,14 +65,14 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const pentBw     = level >= 68 ? Math.round(bw * 0.86) : bw;
     const pentBx     = level >= 68 ? bx + Math.round((bw - pentBw) / 2) : bx;
 
-    // ── Cream concrete body ───────────────────────────────────────
-    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, 0xe0d8c8);
+    // ── Dark steel-frame curtain wall body ────────────────────────
+    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, 0x1a2230);
     body.setLighting(true);
     this.add(body);
 
-    // Penthouse (lighter cream, slightly inset)
+    // Penthouse (slightly lighter dark, inset)
     if (pentFloors > 0) {
-      const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, 0xf0eade);
+      const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, 0x202a38);
       pent.setLighting(true);
       this.add(pent);
     }
@@ -81,18 +81,19 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Foundation plinth ─────────────────────────────────────────
-    gfx.fillStyle(0x888880, 1);
+    gfx.fillStyle(0x2a3040, 1);
     gfx.fillRect(bx, bodyBot, bw, FOUND_H);
-    gfx.fillStyle(0x686860, 1);
+    gfx.fillStyle(0x181e28, 1);
     gfx.fillRect(bx, bodyBot, bw, 1);
 
-    // ── Parapet cap ───────────────────────────────────────────────
-    gfx.fillStyle(0xd0c8b8, 1);
+    // ── Parapet — dark steel cap with bright metal edge ───────────
+    gfx.fillStyle(0x1a2230, 1);
     gfx.fillRect(bx, top, bw, PARAPET_H);
-    gfx.fillStyle(0xe8e0d0, 1);
-    gfx.fillRect(bx - 2, top, bw + 4, 3);
-    gfx.fillStyle(0xb0a890, 1);
-    gfx.fillRect(bx - 2, top + 3, bw + 4, 1);
+    // Bright aluminium coping strip
+    gfx.fillStyle(0x90a8c0, 1);
+    gfx.fillRect(bx - 2, top, bw + 4, 2);
+    gfx.fillStyle(0x4a6080, 1);
+    gfx.fillRect(bx - 2, top + 2, bw + 4, 1);
 
     // ── Sidewalk ──────────────────────────────────────────────────
     gfx.fillStyle(0xb8b0a0, 1);
@@ -102,45 +103,49 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       gfx.moveTo(px, buildGY).lineTo(px, groundY).strokePath();
     }
 
-    // ── Dark structural grid lines ────────────────────────────────
-    // 3 vertical columns dividing building into 4 bays
+    // ── Curtain wall grid ─────────────────────────────────────────
+    // Thin aluminium mullions dividing 4 glass bays
     const nCols    = 4;
-    const colW     = Math.max(5, Math.round(bw * 0.045));
+    const colW     = Math.max(3, Math.round(bw * 0.030)); // thin mullions
     const bayW     = Math.round((bw - colW * (nCols - 1)) / nCols);
-    // Horizontal floor lines
     const upperH   = lobbyTop - bodyTop;
     const nFloors  = Math.max(2, Math.floor(upperH / FLOOR_H));
     const actualFH = Math.round(upperH / nFloors);
 
-    gfx.lineStyle(1, 0xc0b8a8, 0.35);
+    // Spandrel bands at each floor line (thin dark strip)
+    gfx.fillStyle(0x0e141e, 1);
     for (let f = 1; f < nFloors; f++) {
       const fy = lobbyTop - f * actualFH;
-      gfx.moveTo(bx, fy).lineTo(bx + bw, fy).strokePath();
+      gfx.fillRect(bx, fy, bw, 2);
     }
 
-    // Vertical structural column dividers
-    gfx.fillStyle(0x4a5058, 0.18);
+    // Vertical mullion strips
+    gfx.fillStyle(0x0e141e, 1);
     for (let c = 1; c < nCols; c++) {
       const cx_ = bx + c * (bayW + colW) - colW;
       gfx.fillRect(cx_, bodyTop, colW, upperH);
     }
+    // Outer edge mullions
+    gfx.fillRect(bx,           bodyTop, colW, upperH);
+    gfx.fillRect(bx + bw - colW, bodyTop, colW, upperH);
 
-    // ── Lv 62+: mid-building accent band ─────────────────────────
+    // ── Lv 62+: mid-building horizontal accent band ───────────────
     const midBandFloor = level >= 62 ? Math.round(nFloors * 0.5) : -1;
     if (midBandFloor > 0) {
       const mby = lobbyTop - midBandFloor * actualFH;
-      gfx.fillStyle(0x4a5058, 0.55);
-      gfx.fillRect(bx, mby, bw, 4);
-      gfx.fillStyle(0x6878a0, 0.25);
+      // Wider dark spandrel + teal tint accent
+      gfx.fillStyle(0x0a1018, 1);
+      gfx.fillRect(bx, mby - 1, bw, 5);
+      gfx.fillStyle(0x1a6080, 0.6);
       gfx.fillRect(bx, mby + 1, bw, 2);
     }
 
-    // ── Lv 64+: vertical fin accents (upper half) ─────────────────
+    // ── Lv 64+: vertical fin accents ──────────────────────────────
     const finsFrom = level >= 64 ? Math.round(nFloors * 0.55) : nFloors + 1;
 
-    // ── Floor windows (4 bays) ────────────────────────────────────
-    const wh     = Math.round(actualFH * 0.68);
-    const panelW = Math.round(bayW * 0.80);
+    // ── Floor glass panels (4 bays, near floor-to-ceiling) ────────
+    const wh     = Math.round(actualFH * 0.84);
+    const panelW = bayW - colW;
 
     for (let f = 0; f < nFloors; f++) {
       const floorBot = lobbyTop - f * actualFH;
@@ -148,21 +153,22 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
       if (panelY < bodyTop + 2 || panelY + wh > floorBot - 1) continue;
 
-      // Balcony slab: lv 58+, every 3rd floor
+      // Balcony slab: lv 58+, every 3rd floor — dark steel
       if (level >= 58 && f % 3 === 0 && f > 0) {
-        gfx.fillStyle(0xb0a898, 1);
-        gfx.fillRect(bx - 3, floorBot - 2, bw + 6, 3);
-        gfx.fillStyle(0x8898b0, 0.5);
-        gfx.fillRect(bx - 3, floorBot - 5, bw + 6, 1);
+        gfx.fillStyle(0x2a3848, 1);
+        gfx.fillRect(bx - 4, floorBot - 3, bw + 8, 4);
+        // Glass railing above slab
+        gfx.fillStyle(0x5080a8, 0.35);
+        gfx.fillRect(bx - 4, floorBot - 7, bw + 8, 3);
       }
 
       for (let c = 0; c < nCols; c++) {
-        const panelX = bx + c * (bayW + colW) + Math.round((bayW - panelW) / 2);
+        const panelX = bx + c * (bayW + colW) + colW;
 
-        // Lv 64+: vertical fins between bays (upper floors)
+        // Lv 64+: extra silver fin projection between upper bays
         if (level >= 64 && f >= finsFrom && c < nCols - 1) {
           const finX = bx + (c + 1) * (bayW + colW) - colW;
-          gfx.fillStyle(0x38404a, 0.65);
+          gfx.fillStyle(0x506070, 0.8);
           gfx.fillRect(finX - 1, panelY, colW + 2, wh);
         }
 
@@ -171,25 +177,25 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
       // One light per bay per floor
       for (let c = 0; c < nCols; c++) {
-        const panelX = bx + c * (bayW + colW) + Math.round((bayW - panelW) / 2);
+        const panelX = bx + c * (bayW + colW) + colW;
         this.windowLights.push(scene.lights.addLight(
           panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 80, 0xffaa44, 0,
         ));
       }
     }
 
-    // ── Hotel lobby entrance ──────────────────────────────────────
-    gfx.fillStyle(0x1a2a38, 1);
+    // ── Hotel lobby entrance — bright full-height glass ───────────
+    gfx.fillStyle(0x1c3a52, 1);
     gfx.fillRect(bx, lobbyTop, bw, LOBBY_H);
-    // Lobby glass pane dividers
-    gfx.lineStyle(1, 0x3a5a78, 0.9);
-    for (let lx = bx + 20; lx < bx + bw - 4; lx += 20) {
-      gfx.moveTo(lx, lobbyTop).lineTo(lx, bodyBot).strokePath();
+    // Interior glow panels
+    gfx.fillStyle(0x2a5070, 0.5);
+    for (let lx = bx + 4; lx < bx + bw - 4; lx += 16) {
+      gfx.fillRect(lx, lobbyTop + 4, 12, LOBBY_H - 8);
     }
-    // Lobby cap bar
-    gfx.fillStyle(0x2a3840, 1);
+    // Lobby frame bar
+    gfx.fillStyle(0x0e141e, 1);
     gfx.fillRect(bx, lobbyTop, bw, 3);
-    gfx.fillStyle(0x4a6878, 0.5);
+    gfx.fillStyle(0x4a90b8, 0.4);
     gfx.fillRect(bx, lobbyTop + 1, bw, 1);
 
     // Two symmetrical doors
@@ -210,32 +216,33 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       this.doorEntrances.push({ x: doorX + Math.round(doorW / 2), y: bodyBot });
     }
 
-    // ── Lv 60+: corner glass accent strips ───────────────────────
+    // ── Lv 60+: bright corner pillar fins ────────────────────────
     if (level >= 60) {
-      gfx.fillStyle(0x3a4858, 0.55);
-      gfx.fillRect(bx,           bodyTop, 7, upperH);
-      gfx.fillRect(bx + bw - 7,  bodyTop, 7, upperH);
-      gfx.fillStyle(0x5a7898, 0.25);
-      gfx.fillRect(bx + 2,       bodyTop, 3, upperH);
-      gfx.fillRect(bx + bw - 5,  bodyTop, 3, upperH);
+      // Exposed structural corner columns — bright aluminium
+      gfx.fillStyle(0x5a7090, 1);
+      gfx.fillRect(bx - 3,      bodyTop, 5, upperH + LOBBY_H);
+      gfx.fillRect(bx + bw - 2, bodyTop, 5, upperH + LOBBY_H);
+      gfx.fillStyle(0x7898b8, 0.5);
+      gfx.fillRect(bx - 3,      bodyTop, 2, upperH + LOBBY_H);
+      gfx.fillRect(bx + bw - 2, bodyTop, 2, upperH + LOBBY_H);
     }
 
-    // ── Lv 61+: entrance canopy with angled supports ──────────────
+    // ── Lv 61+: entrance canopy — flat glass overhang ─────────────
     if (level >= 61) {
-      const cW = Math.round(bw * 0.55);
+      const cW = Math.round(bw * 0.60);
       const cX = bx + Math.round((bw - cW) / 2);
-      const cY = lobbyTop - 10;
-      gfx.fillStyle(0x3a4050, 1);
-      gfx.fillRect(cX, cY, cW, 5);
-      gfx.fillStyle(0x5a6070, 1);
+      const cY = bodyBot - Math.round(LOBBY_H * 0.88) - 6;
+      gfx.fillStyle(0x2a4a62, 0.85);
+      gfx.fillRect(cX, cY, cW, 4);
+      gfx.fillStyle(0x4a90b8, 0.5);
       gfx.fillRect(cX, cY, cW, 1);
-      // Angled support brackets
-      gfx.lineStyle(2, 0x4a5060, 1);
-      gfx.moveTo(cX + 6,      cY + 5).lineTo(cX + 6,      lobbyTop).strokePath();
-      gfx.moveTo(cX + cW - 6, cY + 5).lineTo(cX + cW - 6, lobbyTop).strokePath();
+      // Thin support rods
+      gfx.fillStyle(0x4a6880, 1);
+      gfx.fillRect(cX + 6,      cY + 4, 2, bodyBot - Math.round(LOBBY_H * 0.88) - cY - 4);
+      gfx.fillRect(cX + cW - 8, cY + 4, 2, bodyBot - Math.round(LOBBY_H * 0.88) - cY - 4);
       // Shadow below canopy
-      gfx.fillStyle(0x000000, 0.18);
-      gfx.fillRect(cX + 2, cY + 5, cW, 5);
+      gfx.fillStyle(0x000000, 0.15);
+      gfx.fillRect(cX + 2, cY + 4, cW, 4);
     }
 
     // ── Lv 63+: rooftop HVAC cluster ─────────────────────────────
@@ -244,11 +251,11 @@ export class LargeApartment extends Phaser.GameObjects.Container {
         const aX = bx + Math.round(bw * (ai * 0.18 + 0.04));
         const aW = ai % 2 === 0 ? 13 : 10;
         const aH = ai % 2 === 0 ? 9 : 7;
-        gfx.fillStyle(0x8888a0, 1);
+        gfx.fillStyle(0x2a3848, 1);
         gfx.fillRect(aX, top - aH, aW, aH);
-        gfx.fillStyle(0x686880, 1);
-        gfx.fillRect(aX, top - aH, aW, 2);
-        gfx.fillStyle(0xa0a0b8, 0.4);
+        gfx.fillStyle(0x90a8c0, 1);
+        gfx.fillRect(aX, top - aH, aW, 1);
+        gfx.fillStyle(0x182030, 1);
         gfx.fillRect(aX + 1, top - aH + 3, aW - 2, 2);
       }
     }
@@ -283,14 +290,19 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       }
     }
 
-    // ── Lv 59+: rooftop plant room ────────────────────────────────
+    // ── Lv 59+: rooftop mechanical penthouse ─────────────────────
     if (level >= 59) {
-      const prW = Math.round(bw * 0.40);
+      const prW = Math.round(bw * 0.42);
       const prH = 14;
-      gfx.fillStyle(0xc8c0b0, 1);
-      gfx.fillRect(bx + Math.round((bw - prW) / 2), top - prH, prW, prH);
-      gfx.fillStyle(0xb0a898, 1);
-      gfx.fillRect(bx + Math.round((bw - prW) / 2), top - prH, prW, 2);
+      const prX = bx + Math.round((bw - prW) / 2);
+      gfx.fillStyle(0x1a2230, 1);
+      gfx.fillRect(prX, top - prH, prW, prH);
+      gfx.fillStyle(0x304060, 0.6);
+      for (let px = prX + 5; px < prX + prW - 4; px += 14) {
+        gfx.fillRect(px, top - prH + 3, 10, prH - 6);
+      }
+      gfx.fillStyle(0x90a8c0, 1);
+      gfx.fillRect(prX - 1, top - prH, prW + 2, 2);
     }
 
     // ── Lv 69+: antenna mast ─────────────────────────────────────
@@ -385,7 +397,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       const accentGfx = scene.add.graphics();
       accentGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
       const mby = lobbyTop - midBandFloor * actualFH;
-      accentGfx.fillStyle(0x4466ff, 1);
+      accentGfx.fillStyle(0x22aacc, 1);
       for (let ax = bx + 4; ax < bx + bw - 4; ax += 6) {
         accentGfx.fillCircle(ax, mby + 2, 2);
       }
@@ -523,9 +535,14 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
     gfx.clear();
     for (const { wx, wy, ww, wh } of this.windowRects) {
-      gfx.fillStyle(lerpColor(0x4a7a9a, 0xffcc66, t), 1);
+      // Day: vibrant steel-blue reflection; night: warm amber interior
+      gfx.fillStyle(lerpColor(0x3a88c8, 0xffcc66, t), 1);
       gfx.fillRect(wx, wy, ww, wh);
-      gfx.fillStyle(0xffffff, 0.16);
+      // Reflection highlight at top of each pane
+      gfx.fillStyle(0xffffff, Math.max(0, 0.22 - t * 0.18));
+      gfx.fillRect(wx, wy, ww, Math.max(1, Math.round(wh * 0.22)));
+      // Horizontal mid-pane divider bar
+      gfx.fillStyle(0x0e141e, 0.4);
       gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);
     }
   }
