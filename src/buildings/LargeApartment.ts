@@ -336,12 +336,19 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     this.add(gfx);
 
     // ── Lv 57+: diagonal hotel flags (data setup only — added after glass) ──
+    // 3 left-flying on the left half, 3 right-flying on the right half.
+    // Pole positions are inset by (poleLen + fw) from each edge so flag
+    // fabric never extends past the building boundary.
     if (level >= 57) {
-      const nFlags = 5;
+      const nFlags  = 6;
+      const fw_     = 20;   // must match drawHotelFlags
+      const pole_   = 18;   // must match drawHotelFlags
+      const margin  = pole_ + fw_;          // minimum pole-to-edge inset
+      const span    = bw - 2 * margin;
+      const step    = Math.round(span / (nFlags - 1));
       for (let fi = 0; fi < nFlags; fi++) {
-        const t_    = (fi + 1) / (nFlags + 1);
-        const poleX = bx + Math.round(bw * t_);
-        const dir   = fi % 2 === 0 ? 1 : -1;
+        const poleX = bx + margin + fi * step;
+        const dir   = fi < 3 ? -1 : 1;    // left half flies left, right half flies right
         this.hotelFlags.push({ poleX, poleY: lobbyTop, dir: dir as 1 | -1, palette: HOTEL_PALETTES[fi % HOTEL_PALETTES.length] });
         this.hotelFlagPhases.push(Math.random() * Math.PI * 2);
       }
