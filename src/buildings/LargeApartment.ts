@@ -333,19 +333,13 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
-    // ── Lv 57+: diagonal hotel flags ─────────────────────────────
+    // ── Lv 57+: diagonal hotel flags (data setup only — added after glass) ──
     if (level >= 57) {
-      const hotelFlagGfx = scene.add.graphics();
-      hotelFlagGfx.setLighting(true);
-      this.add(hotelFlagGfx);
-      this.hotelFlagGfx = hotelFlagGfx;
-
-      // 3 flags, evenly spaced, alternating left/right lean
       const nFlags = 3;
       for (let fi = 0; fi < nFlags; fi++) {
-        const t_     = (fi + 1) / (nFlags + 1);
-        const poleX  = bx + Math.round(bw * t_);
-        const dir    = fi % 2 === 0 ? 1 : -1; // 1 = leans right, -1 = leans left
+        const t_    = (fi + 1) / (nFlags + 1);
+        const poleX = bx + Math.round(bw * t_);
+        const dir   = fi % 2 === 0 ? 1 : -1;
         this.hotelFlags.push({ poleX, poleY: lobbyTop, dir: dir as 1 | -1, colorIdx: fi % FLAG_COLORS.length });
         this.hotelFlagPhases.push(Math.random() * Math.PI * 2);
       }
@@ -411,6 +405,14 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     this.drawWindowGlass(windowGlassGfx, 0);
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
+
+    // ── Lv 57+: hotel flag graphics — added after glass so flags render on top ──
+    if (level >= 57) {
+      const hotelFlagGfx = scene.add.graphics();
+      hotelFlagGfx.setLighting(true);
+      this.add(hotelFlagGfx);
+      this.hotelFlagGfx = hotelFlagGfx;
+    }
 
     this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
 
