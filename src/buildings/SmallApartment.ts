@@ -10,16 +10,28 @@ function lerpColor(a: number, b: number, t: number): number {
            Math.round(ab + (bb - ab) * t));
 }
 
-const FOUND_H   = 6;
+const FOUND_H   = 8;
 const PARAPET_H = 12;
-const FLOOR_H   = 20;
+const SHOP_H    = 30;
+const FLOOR_H   = 22;
+
+// Neon sign color per shop slot
+const NEON_COLORS = [0xff2266, 0x22ddff, 0xffaa00, 0x44ff88];
 
 export class SmallApartment extends Phaser.GameObjects.Container {
   readonly doorEntrances: DoorEntrance[] = [];
-  private windowLights:   Phaser.GameObjects.Light[] = [];
+  private windowLights:  Phaser.GameObjects.Light[] = [];
+  private neonLights:    Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
+  private neonGfx:        Phaser.GameObjects.Graphics | null = null;
+  private flagGfx:        Phaser.GameObjects.Graphics | null = null;
+  private flagLight:      Phaser.GameObjects.Light | null = null;
+  private flagPoleX = 0;
+  private flagTop   = 0;
+  private lightPhases: number[] = [];
+  private neonPhases:  number[] = [];
+  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; shop?: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
@@ -27,14 +39,17 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
     const w       = plotWidth;
     const h       = buildingHeight(level);
+    const bw      = Math.round(w * 0.88);
+    const bx      = x + Math.round((w - bw) / 2);
     const buildGY = groundY - YARD_H;
     const top     = buildGY - h;
     const bodyTop = top + PARAPET_H;
     const bodyBot = buildGY - FOUND_H;
     const bodyH   = bodyBot - bodyTop;
+    const shopTop = bodyBot - SHOP_H;
 
-    // ── Body ──────────────────────────────────────────────────────
-    const body = scene.add.rectangle(x + w / 2, (bodyTop + bodyBot) / 2, w, bodyH, 0xd4b880);
+    // ── Brick body ────────────────────────────────────────────────
+    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyH, 0x8a3a28);
     body.setLighting(true);
     this.add(body);
 
@@ -42,229 +57,388 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Foundation plinth ─────────────────────────────────────────
-    gfx.fillStyle(0x9a8860, 1);
-    gfx.fillRect(x, bodyBot, w, FOUND_H);
-    gfx.lineStyle(1, 0x7a6840, 1);
-    gfx.moveTo(x, bodyBot).lineTo(x + w, bodyBot).strokePath();
+    gfx.fillStyle(0x707868, 1);
+    gfx.fillRect(bx, bodyBot, bw, FOUND_H);
+    gfx.lineStyle(1, 0x505850, 1);
+    gfx.moveTo(bx, bodyBot).lineTo(bx + bw, bodyBot).strokePath();
 
     // ── Parapet ───────────────────────────────────────────────────
-    gfx.fillStyle(0xa08860, 1);
-    gfx.fillRect(x, top, w, PARAPET_H);
-    gfx.fillStyle(0xb89870, 1);
-    gfx.fillRect(x, top, w, 2);
-    gfx.fillStyle(0x886848, 1);
-    gfx.fillRect(x, top + PARAPET_H - 1, w, 1);
+    gfx.fillStyle(0x6a7068, 1);
+    gfx.fillRect(bx, top, bw, PARAPET_H);
+    // Coping stones — widest, lightest, top 4px
+    gfx.fillStyle(0x8a9088, 1);
+    gfx.fillRect(bx - 2, top, bw + 4, 4);
+    // Shadow strip under coping
+    gfx.fillStyle(0x4a504a, 1);
+    gfx.fillRect(bx - 2, top + 4, bw + 4, 1);
+    // Base shadow where parapet meets brick
+    gfx.fillStyle(0x3a1810, 0.3);
+    gfx.fillRect(bx, top + PARAPET_H - 1, bw, 1);
 
     // ── Sidewalk ──────────────────────────────────────────────────
-    gfx.fillStyle(0xc0b090, 1);
+    gfx.fillStyle(0xb8b0a0, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
-
-    // ── Brick courses ─────────────────────────────────────────────
-    gfx.lineStyle(1, 0xb09050, 0.14);
-    for (let by = bodyTop + 4; by < bodyBot; by += 5) {
-      gfx.moveTo(x, by).lineTo(x + w, by).strokePath();
+    gfx.lineStyle(1, 0xa0988a, 0.4);
+    for (let px = x + 30; px < x + w; px += 30) {
+      gfx.moveTo(px, buildGY).lineTo(px, groundY).strokePath();
     }
 
-    // ── Floors & windows: 3 cols ──────────────────────────────────
-    const nFloors  = Math.max(2, Math.floor(bodyH / FLOOR_H));
-    const actualFH = Math.round(bodyH / nFloors);
-    const cols     = 3;
-    const ww       = Math.round(w * 0.16);
-    const wh       = Math.round(ww * 1.35);
-    const hPad     = Math.round(w / (cols + 1));
+    // ── Brick mortar courses (upper section only) ─────────────────
+    gfx.lineStyle(1, 0x6a2818, 0.22);
+    for (let by = bodyTop + 4; by < shopTop; by += 5) {
+      gfx.moveTo(bx, by).lineTo(bx + bw, by).strokePath();
+    }
 
+    // ── Upper floor glass curtain wall ────────────────────────────
+    const upperH   = shopTop - bodyTop;
+    const nFloors  = Math.max(2, Math.floor(upperH / FLOOR_H));
+    const actualFH = Math.round(upperH / nFloors);
+    const spanH    = 5;
+
+    // Brick piers between glass panels
+    const nCols   = 3;
+    const pierW   = Math.max(6, Math.round(bw * 0.055));
+    const panelW  = Math.round((bw - pierW * (nCols + 1)) / nCols);
+    const panelH  = Math.round((actualFH - spanH) * 0.78);
+
+    // Lv 45+: precast concrete spandrel bands
+    if (level >= 45) {
+      for (let f = 0; f < nFloors; f++) {
+        const spanY = shopTop - (f + 1) * actualFH;
+        gfx.fillStyle(0x7a8078, 1);
+        gfx.fillRect(bx, spanY, bw, spanH);
+        gfx.fillStyle(0x9aa098, 1);
+        gfx.fillRect(bx, spanY, bw, 1);
+        gfx.fillStyle(0x5a605a, 1);
+        gfx.fillRect(bx, spanY + spanH - 1, bw, 1);
+      }
+    }
+
+    // Lv 46+: corner structural concrete columns
+    if (level >= 46) {
+      const colW = pierW + 2;
+      gfx.fillStyle(0x8a9088, 1);
+      gfx.fillRect(bx,               bodyTop, colW, upperH);
+      gfx.fillRect(bx + bw - colW,   bodyTop, colW, upperH);
+      gfx.fillStyle(0xaab0a8, 1);
+      gfx.fillRect(bx,               bodyTop, colW, 2);
+      gfx.fillRect(bx + bw - colW,   bodyTop, colW, 2);
+    }
+
+    // Glass panels and per-floor lights
     for (let f = 0; f < nFloors; f++) {
-      const wy = bodyBot - (f + 1) * actualFH + Math.round((actualFH - wh) / 2);
-      if (wy < bodyTop + 2 || wy + wh > bodyBot - 2) continue;
+      const floorBot  = shopTop - f * actualFH;
+      const panelY    = floorBot - spanH - panelH - Math.round((actualFH - spanH - panelH) / 2);
 
-      for (let c = 0; c < cols; c++) {
-        const wxx = Math.round(x + hPad * (c + 1) - ww / 2);
+      if (panelY < bodyTop + 2 || panelY + panelH > floorBot - 1) continue;
 
-        // Lv 52+: decorative brick arch header
-        if (level >= 52) {
-          gfx.fillStyle(0xb89860, 1);
-          gfx.fillRect(wxx - 4, wy - 5, ww + 8, 4);
-          gfx.fillRect(wxx + Math.round(ww / 2) - 2, wy - 8, 4, 4);
-        }
+      for (let c = 0; c < nCols; c++) {
+        const panelX = bx + pierW * (c + 1) + panelW * c;
 
-        // Window frame
-        gfx.fillStyle(0xf0e8d8, 1);
-        gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
-
-        // Lv 47+: flower boxes ground floor
-        if (level >= 47 && f === 0) {
-          gfx.fillStyle(0x5a3818, 1);
-          gfx.fillRect(wxx - 2, wy + wh + 3, ww + 4, 4);
-          const flowerCols = [0xee3030, 0xffcc00, 0xff88cc];
-          for (let fi = 0; fi < 3; fi++) {
-            gfx.fillStyle(flowerCols[fi % 3], 1);
-            gfx.fillCircle(wxx + Math.round((ww + 4) * (fi + 0.5) / 3), wy + wh + 1, 2);
+        // Lv 47+: balcony railing above glass panels (upper floors only)
+        if (level >= 47 && f > 0) {
+          gfx.fillStyle(0x4a5050, 1);
+          gfx.fillRect(panelX - 1, panelY + panelH + 1, panelW + 2, 2);
+          for (let ri = panelX + 1; ri < panelX + panelW; ri += 4) {
+            gfx.fillRect(ri, panelY + panelH + 1, 1, 4);
           }
         }
 
-        // Lv 51+: window A/C unit on upper floors
-        if (level >= 51 && f >= 2) {
-          gfx.fillStyle(0x909898, 1);
-          gfx.fillRect(wxx, wy + wh - 4, ww, 5);
-          gfx.fillStyle(0x788080, 1);
-          gfx.fillRect(wxx, wy + wh - 4, ww, 2);
+        // Lv 52+: tinted spandrel accents on alternate floors
+        if (level >= 52 && f % 2 === 1) {
+          gfx.fillStyle(0x2a4858, 0.4);
+          gfx.fillRect(panelX, panelY + panelH, panelW, spanH - 1);
         }
 
-        this.windowRects.push({ wx: wxx, wy, ww, wh });
+        this.windowRects.push({ wx: panelX, wy: panelY, ww: panelW, wh: panelH });
       }
 
-      // 1 point light per floor
-      if (f % 2 === 0) {
-        this.windowLights.push(scene.lights.addLight(
-          x + w / 2, bodyBot - (f + 1) * actualFH + actualFH / 2, 88, 0xffaa44, 0,
-        ));
-      }
+      this.windowLights.push(scene.lights.addLight(
+        bx + bw / 2, floorBot - Math.round(actualFH / 2), 88, 0xffaa44, 0,
+      ));
     }
 
-    // ── Lv 43+: string courses between floor groups ───────────────
+    // ── Shop fronts ground floor ───────────────────────────────────
+    const nShops  = 2;
+    const shopW   = Math.round(bw / nShops);
+    const doorW   = Math.round(shopW * 0.23);
+    const doorH   = Math.round(SHOP_H * 0.78);
+    const signH   = 8;
+    const signY   = shopTop + 2;
+
+    for (let s = 0; s < nShops; s++) {
+      const sx   = bx + s * shopW;
+      const sw_  = (s === nShops - 1) ? (bx + bw - sx) : shopW;
+
+      // Shop frame / fascia
+      gfx.fillStyle(0x2a2820, 1);
+      gfx.fillRect(sx, shopTop, sw_, SHOP_H);
+
+      // Neon sign housing (lv 42+ gets drawn on neonGfx, but housing always visible)
+      if (level >= 42) {
+        gfx.fillStyle(0x1a1810, 1);
+        gfx.fillRect(sx + 2, signY, sw_ - doorW - 4, signH);
+        // Dim frame border
+        gfx.lineStyle(1, NEON_COLORS[s % NEON_COLORS.length] & 0x444444 | 0x222222, 1);
+        gfx.strokeRect(sx + 2, signY, sw_ - doorW - 5, signH);
+      }
+
+      // Display window (large glass)
+      const dispX = sx + 2;
+      const dispW = sw_ - doorW - 6;
+      const dispY = signY + signH + 2;
+      const dispH = SHOP_H - signH - 6;
+      gfx.fillStyle(0x1e3040, 1);
+      gfx.fillRect(dispX - 1, dispY - 1, dispW + 2, dispH + 2);
+      // Store for glass animation
+      this.windowRects.push({ wx: dispX, wy: dispY, ww: dispW, wh: dispH, shop: true });
+
+      // Door
+      const doorX = sx + sw_ - doorW - 2;
+      const doorY = bodyBot - doorH;
+      gfx.fillStyle(0x1a1810, 1);
+      gfx.fillRect(doorX, doorY, doorW, doorH);
+      gfx.fillStyle(0x2a5066, 0.5);
+      gfx.fillRect(doorX + 2, doorY + 2, doorW - 4, doorH - 4);
+      // Glass pane divider
+      gfx.fillStyle(0x3a3830, 1);
+      gfx.fillRect(doorX + Math.round(doorW / 2) - 1, doorY, 2, doorH);
+      // Door handle
+      gfx.fillStyle(0xd0c060, 1);
+      gfx.fillRect(doorX + doorW - 5, doorY + Math.round(doorH * 0.48), 3, 2);
+
+      // Door entrance for pedestrian manager
+      this.doorEntrances.push({ x: doorX + Math.round(doorW / 2), y: bodyBot });
+
+      // Neon light source
+      const nc = NEON_COLORS[s % NEON_COLORS.length];
+      this.neonLights.push(scene.lights.addLight(
+        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 55, nc, 0,
+      ));
+    }
+
+    // Shop fascia divider pier between shops
+    gfx.fillStyle(0x2a2820, 1);
+    gfx.fillRect(bx + shopW - 2, shopTop, 4, SHOP_H);
+
+    // Header band at top of shop front (caps shop fronts against upper brick)
+    gfx.fillStyle(0x1e1e18, 1);
+    gfx.fillRect(bx, shopTop - 3, bw, 4);
+    // Shadow under header band
+    gfx.fillStyle(0x000000, 0.35);
+    gfx.fillRect(bx, shopTop + 1, bw, 3);
+
+    // ── Lv 43+: hanging diagonal bunting flags ────────────────────
     if (level >= 43) {
-      for (let f = 3; f < nFloors; f += 4) {
-        const scY = bodyBot - f * actualFH;
-        gfx.fillStyle(0xa08860, 1);
-        gfx.fillRect(x, scY - 2, w, 3);
-        gfx.fillStyle(0xc0a878, 1);
-        gfx.fillRect(x, scY - 2, w, 1);
+      const buntY   = shopTop - 5;
+      const pennantColors = [0xdd2222, 0x2255cc, 0xeecc00, 0x22aa44, 0xdd6600, 0xcc22aa];
+      const seg     = 20;  // spacing between attachment hooks
+      const sagPx   = 6;
+      let ci        = 0;
+
+      for (let hx = bx + 2; hx + seg <= bx + bw - 2; hx += seg) {
+        const hx2 = hx + seg;
+        const mid = Math.round((hx + hx2) / 2);
+
+        // String (catenary sag)
+        gfx.lineStyle(1, 0x888878, 0.65);
+        gfx.moveTo(hx, buntY).lineTo(mid, buntY + sagPx).lineTo(hx2, buntY).strokePath();
+
+        // Pennant triangles along this string segment
+        for (let step = 3; step <= seg - 3; step += 7) {
+          const t_   = step / seg;
+          const py   = buntY + Math.sin(t_ * Math.PI) * sagPx;
+          const px_  = hx + step;
+          gfx.fillStyle(pennantColors[ci % pennantColors.length], 1);
+          gfx.fillTriangle(px_, Math.round(py), px_ + 4, Math.round(py), px_ + 2, Math.round(py) + 5);
+          ci++;
+        }
       }
     }
 
-    // ── Lv 44+: corbelled brick cornice ──────────────────────────
-    if (level >= 44) {
-      gfx.fillStyle(0xa08860, 1);
-      gfx.fillRect(x - 1, top + PARAPET_H - 6, w + 2, 5);
-      gfx.fillStyle(0xb89870, 1);
-      for (let cx = x + 2; cx < x + w - 2; cx += 6) {
-        gfx.fillRect(cx, top + PARAPET_H - 9, 4, 4);
+    // Lv 48+: entrance canopy over shop area center
+    if (level >= 48) {
+      const cW  = Math.round(bw * 0.38);
+      const cX  = bx + Math.round((bw - cW) / 2);
+      const cY  = shopTop - 14;
+      gfx.fillStyle(0x283830, 1);
+      gfx.fillRect(cX, cY, cW, 5);
+      // Canopy shadow cast below
+      gfx.fillStyle(0x000000, 0.25);
+      gfx.fillRect(cX + 2, cY + 5, cW, 4);
+      // Support rods
+      gfx.fillStyle(0x485048, 1);
+      gfx.fillRect(cX + 2,       cY + 5, 2, cY + 14 - (cY + 5));
+      gfx.fillRect(cX + cW - 4,  cY + 5, 2, cY + 14 - (cY + 5));
+    }
+
+    // Lv 49+: street lamp
+    let lampPos: { cx: number; cy: number } | null = null;
+    if (level >= 49) {
+      const lx = bx - 10, ly = buildGY - 28;
+      gfx.fillStyle(0x3a3a3a, 1);
+      gfx.fillRect(lx - 1, ly, 3, 28);
+      gfx.fillRect(lx - 1, ly, 10, 2);
+      gfx.fillStyle(0xffe080, 1);
+      gfx.fillCircle(lx + 9, ly + 1, 3);
+      lampPos = { cx: lx + 9, cy: ly + 1 };
+    }
+
+    // Lv 50+: rooftop A/C units
+    if (level >= 50) {
+      for (let ai = 0; ai < 4; ai++) {
+        const aX = bx + Math.round(bw * (ai * 0.22 + 0.04));
+        gfx.fillStyle(0x8a8a92, 1);
+        gfx.fillRect(aX, top - 8, 14, 8);
+        gfx.fillStyle(0x6a6a72, 1);
+        gfx.fillRect(aX, top - 8, 14, 2);
+        // Cast shadow on roof
+        gfx.fillStyle(0x000000, 0.25);
+        gfx.fillRect(aX + 1, top, 14, 2);
       }
     }
 
-    // ── Lv 45+: rooftop water tower ──────────────────────────────
-    if (level >= 45) {
-      const twX = x + Math.round(w * 0.68);
-      const twW = 16, twH = 18;
-      gfx.fillStyle(0x8a7060, 1);
-      gfx.fillRect(twX, top - twH, twW, twH);
-      gfx.fillStyle(0x6a5040, 1);
-      gfx.fillRect(twX, top - twH, 3, twH);
-      gfx.fillRect(twX + twW - 3, top - twH, 3, twH);
-      gfx.fillStyle(0x6a5840, 1);
-      gfx.fillTriangle(twX - 2, top - twH, twX + twW + 2, top - twH, twX + Math.round(twW / 2), top - twH - 6);
-      // Legs
+    // Lv 51+: rooftop water tower
+    if (level >= 51) {
+      const twX = bx + Math.round(bw * 0.72);
+      const twW = 18, twH = 20;
+      // Tank body with vertical stave lines
       gfx.fillStyle(0x7a6858, 1);
-      gfx.fillRect(twX + 2,       top, 3, 6);
-      gfx.fillRect(twX + twW - 5, top, 3, 6);
+      gfx.fillRect(twX, top - twH, twW, twH);
+      gfx.fillStyle(0x5a4838, 1);
+      gfx.fillRect(twX,          top - twH, 3, twH);
+      gfx.fillRect(twX + twW - 3, top - twH, 3, twH);
+      gfx.lineStyle(1, 0x5a4838, 0.5);
+      for (let sx_ = twX + 6; sx_ < twX + twW - 3; sx_ += 4) {
+        gfx.moveTo(sx_, top - twH).lineTo(sx_, top).strokePath();
+      }
+      // Conical roof
+      gfx.fillStyle(0x504038, 1);
+      gfx.fillTriangle(twX - 2, top - twH, twX + twW + 2, top - twH,
+                       twX + Math.round(twW / 2), top - twH - 7);
+      // Support legs with shadow
+      gfx.fillStyle(0x6a5848, 1);
+      gfx.fillRect(twX + 2,        top, 3, 7);
+      gfx.fillRect(twX + twW - 5,  top, 3, 7);
+      gfx.fillStyle(0x000000, 0.3);
+      gfx.fillRect(twX + 3,        top, 2, 4);
+      gfx.fillRect(twX + twW - 4,  top, 2, 4);
     }
 
-    // ── Lv 46+: fire escape right side ───────────────────────────
-    if (level >= 46) {
-      const feX = x + w - 6;
-      gfx.fillStyle(0x606878, 1);
-      gfx.fillRect(feX,     top, 2, bodyH);
-      gfx.fillRect(feX + 4, top, 2, bodyH);
+    // Lv 53+: fire escape right side
+    if (level >= 53) {
+      const feX = bx + bw - 5;
+      gfx.fillStyle(0x505860, 1);
+      gfx.fillRect(feX,     bodyTop, 2, upperH);
+      gfx.fillRect(feX + 4, bodyTop, 2, upperH);
+      // Landing platforms every other floor
       for (let f = 0; f < nFloors; f += 2) {
-        const fy = bodyBot - f * actualFH - actualFH;
+        const fy = shopTop - f * actualFH - actualFH;
         gfx.fillRect(feX - 2, fy, 8, 2);
       }
+      // Shadow from fire escape
+      gfx.fillStyle(0x000000, 0.2);
+      gfx.fillRect(feX + 2, bodyTop, 4, upperH);
     }
 
-    // ── Entrance area ─────────────────────────────────────────────
-    const dw = Math.round(w * 0.24);
-    const dh = Math.round(actualFH * 0.80);
-    const dx = x + Math.round((w - dw) / 2);
-    const dy = bodyBot - dh;
-    this.doorEntrances = [{ x: dx + Math.round(dw / 2), y: bodyBot }];
-
-    // Lv 48+: entrance awning
-    if (level >= 48) {
-      gfx.fillStyle(0x7a6848, 1);
-      gfx.fillRect(dx - 10, dy - 8, dw + 20, 5);
-      gfx.lineStyle(2, 0x8a7858, 0.6);
-      for (let ax = dx - 8; ax < dx + dw + 10; ax += 8) {
-        gfx.moveTo(ax, dy - 8).lineTo(ax + 4, dy - 3).strokePath();
-      }
-    }
-
-    // Lv 42+: door surround
-    if (level >= 42) {
-      gfx.fillStyle(0xa08860, 1);
-      gfx.fillRect(dx - 5, dy - 2, dw + 10, dh + 2);
-    }
-
-    // Lv 49+: ground floor retail glazing
-    if (level >= 49) {
-      gfx.fillStyle(0x4a7088, 0.45);
-      gfx.fillRect(x + 2,    dy - 4, dx - x - 6, dh + 4);
-      gfx.fillRect(dx + dw + 4, dy - 4, x + w - dx - dw - 6, dh + 4);
-      gfx.lineStyle(1, 0x6a9090, 0.7);
-      for (let gx = x + 12; gx < x + w - 4; gx += 12) {
-        if (gx >= dx - 6 && gx <= dx + dw + 6) continue;
-        gfx.moveTo(gx, dy - 4).lineTo(gx, bodyBot).strokePath();
-      }
-    }
-
-    // Double door
-    gfx.fillStyle(0x1a1408, 1);
-    gfx.fillRect(dx, dy, Math.round(dw / 2) - 1, dh);
-    gfx.fillRect(dx + Math.round(dw / 2) + 1, dy, Math.round(dw / 2) - 1, dh);
-    gfx.fillStyle(0x4a7088, 0.5);
-    gfx.fillRect(dx + 2, dy + 2, Math.round(dw / 2) - 5, dh - 4);
-    gfx.fillRect(dx + Math.round(dw / 2) + 3, dy + 2, Math.round(dw / 2) - 5, dh - 4);
-
-    // ── Lv 50+: rooftop A/C units ─────────────────────────────────
-    if (level >= 50) {
-      for (let ai = 0; ai < 3; ai++) {
-        const aX = x + Math.round(w * (ai * 0.25 + 0.12));
-        gfx.fillStyle(0x888890, 1);
-        gfx.fillRect(aX, top - 7, 12, 7);
-        gfx.fillStyle(0x707080, 1);
-        gfx.fillRect(aX, top - 7, 12, 2);
-      }
-    }
-
-    // ── Lv 53+: rooftop antenna ───────────────────────────────────
-    if (level >= 53) {
-      const antX = x + Math.round(w * 0.3);
-      gfx.fillStyle(0x808898, 1);
-      gfx.fillRect(antX, top - 20, 2, 20);
-      gfx.fillRect(antX - 4, top - 15, 10, 1);
-      gfx.fillRect(antX - 2, top - 10, 6, 1);
-    }
-
-    // ── Lv 54+: pavement planters ─────────────────────────────────
+    // Lv 54+: street trees / planters
     if (level >= 54) {
-      for (const pX of [x + 6, x + w - 16]) {
-        gfx.fillStyle(0x404828, 1);
-        gfx.fillRect(pX, buildGY + 3, 10, 7);
-        gfx.fillStyle(0x307020, 1);
-        gfx.fillCircle(pX + 5, buildGY + 3, 5);
-        gfx.fillStyle(0x40902c, 1);
-        gfx.fillCircle(pX + 3, buildGY + 1, 3);
+      for (const [tX, isLeft] of [[x + 4, true], [x + w - 14, false]] as [number, boolean][]) {
+        gfx.fillStyle(0x3a4430, 1);
+        gfx.fillRect(tX, buildGY + 2, 10, 8);
+        // Trunk
+        gfx.fillStyle(0x5a3820, 1);
+        gfx.fillRect(tX + 4, buildGY - 4, 2, 6);
+        // Foliage
+        gfx.fillStyle(0x2a6818, 1);
+        gfx.fillCircle(tX + 5, buildGY - 8, 7);
+        gfx.fillStyle(0x388a22, 1);
+        gfx.fillCircle(tX + (isLeft ? 3 : 7), buildGY - 12, 4);
       }
     }
 
-    // ── Lv 55+: entrance portico columns ─────────────────────────
+    // Lv 55+: grand lobby glazing between shops
     if (level >= 55) {
-      const portW = dw + 28;
-      const portX = dx - 14;
-      gfx.fillStyle(0x9a8860, 1);
-      gfx.fillRect(portX,           dy - 10, 6, dh + 10);
-      gfx.fillRect(portX + portW - 6, dy - 10, 6, dh + 10);
-      gfx.fillRect(portX, dy - 10, portW, 4);
-      gfx.fillStyle(0xb0a070, 1);
-      gfx.fillRect(portX, dy - 10, portW, 1);
+      const lobW = Math.round(bw * 0.26);
+      const lobX = bx + Math.round((bw - lobW) / 2);
+      // Full-height glass lobby panel
+      gfx.fillStyle(0x1e3040, 1);
+      gfx.fillRect(lobX - 2, shopTop - 2, lobW + 4, SHOP_H + 2);
+      gfx.fillStyle(0x2a5066, 0.8);
+      gfx.fillRect(lobX, shopTop, lobW, SHOP_H);
+      // Vertical mullions
+      gfx.fillStyle(0x3a3830, 1);
+      for (let mx = lobX + 8; mx < lobX + lobW; mx += 8) {
+        gfx.fillRect(mx, shopTop, 1, SHOP_H);
+      }
+      // Lobby header
+      gfx.fillStyle(0x2a2820, 1);
+      gfx.fillRect(lobX - 2, shopTop - 2, lobW + 4, 3);
+      // Lobby light
+      this.windowRects.push({ wx: lobX, wy: shopTop, ww: lobW, wh: SHOP_H, shop: true });
+      this.windowLights.push(scene.lights.addLight(
+        lobX + Math.round(lobW / 2), shopTop + Math.round(SHOP_H / 2), 68, 0xffeedd, 0,
+      ));
     }
 
     this.add(gfx);
 
-    // ── Lamp cone (placeholder, no exterior lamps at base level) ──
+    // ── Lv 44+: flagpole + animated flag ─────────────────────────
+    if (level >= 44) {
+      const fpX    = bx + Math.round(bw * 0.18);
+      const fpTop_ = top - 30;
+      gfx.fillStyle(0xa0a0a8, 1);
+      gfx.fillRect(fpX - 1, fpTop_, 2, 30);
+      gfx.fillStyle(0xd0d0d8, 1);
+      gfx.fillRect(fpX - 1, fpTop_, 2, 2);
+
+      const flagGfx = scene.add.graphics();
+      flagGfx.setLighting(true);
+      this.add(flagGfx);
+      this.flagGfx   = flagGfx;
+      this.flagPoleX = fpX;
+      this.flagTop   = fpTop_;
+      this.flagLight = scene.lights.addLight(fpX + 9, fpTop_ + 5, 40, 0xfff0cc, 0);
+    }
+
+    // ── Lamp cone (ADD blend: lamp + neon glow) ───────────────────
     const lampConeGfx = scene.add.graphics();
     lampConeGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+    if (lampPos) {
+      lampConeGfx.fillStyle(0xffe080, 1);
+      lampConeGfx.fillCircle(lampPos.cx, lampPos.cy, 3);
+      this.windowLights.push(scene.lights.addLight(lampPos.cx, lampPos.cy, 44, 0xffcc44, 0));
+    }
     this.add(lampConeGfx);
     this.lampConeGfx = lampConeGfx;
+
+    // ── Neon sign glow (ADD blend, separate alpha from lamp) ──────
+    const neonGfx = scene.add.graphics();
+    neonGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+    if (level >= 42) {
+      for (let s = 0; s < nShops; s++) {
+        const sx  = bx + s * shopW;
+        const sw_ = (s === nShops - 1) ? (bx + bw - sx) : shopW;
+        const nc  = NEON_COLORS[s % NEON_COLORS.length];
+        const nx  = sx + 3;
+        const nw  = sw_ - doorW - 7;
+
+        // Glowing colored border
+        neonGfx.lineStyle(2, nc, 1);
+        neonGfx.strokeRect(nx - 1, signY, nw + 2, signH);
+
+        // Pixel-art squiggle lines (suggest unreadable text)
+        neonGfx.lineStyle(1, nc, 1);
+        const segW_ = Math.round(nw / 4);
+        for (let si = 0; si < 3; si++) {
+          const lx_ = nx + segW_ * si + 2;
+          neonGfx.moveTo(lx_, signY + 2).lineTo(lx_ + segW_ - 4, signY + 2).strokePath();
+          neonGfx.moveTo(lx_, signY + 5).lineTo(lx_ + Math.round((segW_ - 4) * 0.55), signY + 5).strokePath();
+        }
+      }
+    }
+    this.add(neonGfx);
+    this.neonGfx = neonGfx;
 
     // ── Window glass overlay ──────────────────────────────────────
     const windowGlassGfx = scene.add.graphics();
@@ -273,20 +447,44 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
 
+    this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
+    this.neonPhases  = this.neonLights.map(()   => Math.random() * Math.PI * 2);
+
+    // ── Shadow overlay ────────────────────────────────────────────
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(x, top, w, h);  // building body only — yard drawn by SunMoon at depth 9.5
-    if (level >= 45) {
-      const twX = x + Math.round(w * 0.68);
-      const twW = 16, twH = 18;
-      sg.fillRect(twX, top - twH, twW, twH);  // water tower body
-      sg.fillTriangle(twX - 2, top - twH, twX + twW + 2, top - twH, twX + Math.round(twW / 2), top - twH - 6);
+    // Main building silhouette with parapet outline
+    sg.beginPath();
+    sg.moveTo(bx - 2, top);
+    sg.lineTo(bx + bw + 2, top);
+    sg.lineTo(bx + bw + 2, top + 5);
+    sg.lineTo(bx + bw, top + 5);
+    sg.lineTo(bx + bw, buildGY);
+    sg.lineTo(bx, buildGY);
+    sg.lineTo(bx, top + 5);
+    sg.lineTo(bx - 2, top + 5);
+    sg.closePath();
+    sg.fillPath();
+
+    // Water tower (lv 51+)
+    if (level >= 51) {
+      const twX = bx + Math.round(bw * 0.72);
+      const twW = 18, twH = 20;
+      sg.fillRect(twX, top - twH, twW, twH);
+      sg.fillTriangle(twX - 2, top - twH, twX + twW + 2, top - twH,
+                      twX + Math.round(twW / 2), top - twH - 7);
     }
-    if (level >= 53) {
-      const antX = x + Math.round(w * 0.3);
-      sg.fillRect(antX, top - 20, 2, 20);
-      sg.fillRect(antX - 4, top - 15, 10, 1);
-      sg.fillRect(antX - 2, top - 10, 6, 1);
+    // Flag pole (lv 44+)
+    if (level >= 44) {
+      const fpX = bx + Math.round(bw * 0.18);
+      sg.fillRect(fpX - 1, top - 30, 2, 21);
+    }
+    // A/C units (lv 50+)
+    if (level >= 50) {
+      for (let ai = 0; ai < 4; ai++) {
+        const aX = bx + Math.round(bw * (ai * 0.22 + 0.04));
+        sg.fillRect(aX, top - 8, 14, 8);
+      }
     }
     sg.setDepth(9.15);
     sg.setAlpha(0);
@@ -294,6 +492,8 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      for (const light of this.neonLights)   scene.lights.removeLight(light);
+      if (this.flagLight) scene.lights.removeLight(this.flagLight);
       this.shadowGfx.destroy();
     });
   }
@@ -302,24 +502,67 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
   updateWindowLights(elevation: number): void {
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
-    if (t < 0.01) return;
+    if (t < 0.01 && this.windowLights.every(l => l.intensity < 0.01)) return;
+
     const ambientIntensity = elevation >= 0.3 ? 1.0
       : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
       : 0.5;
     const tNorm = t * (0.5 / ambientIntensity);
-    for (const light of this.windowLights) light.intensity = tNorm * 0.36;
+    const time  = this.scene.time.now / 1000;
+
+    this.windowLights.forEach((light, i) => {
+      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.08;
+      light.intensity = tNorm * 0.42 * flicker;
+    });
+    this.neonLights.forEach((light, i) => {
+      const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.18;
+      light.intensity = tNorm * 0.55 * pulse;
+    });
+
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
-    if (this.lampConeGfx) this.lampConeGfx.setAlpha(tNorm * 0.4);
+    if (this.lampConeGfx)    this.lampConeGfx.setAlpha(tNorm * 0.45);
+    if (this.neonGfx)        this.neonGfx.setAlpha(tNorm * 0.72);
+    if (this.flagLight)      this.flagLight.intensity = tNorm * 0.6;
+  }
+
+  updateFlag(): void {
+    if (this.flagGfx) this.drawFlag(this.flagGfx, this.scene.time.now / 1000);
+  }
+
+  private drawFlag(gfx: Phaser.GameObjects.Graphics, time: number): void {
+    gfx.clear();
+    const fx = this.flagPoleX + 1;
+    const fy = this.flagTop;
+    const fw = 16, fh = 10;
+    const wave = Math.sin(time * 4) * 2;
+    const mid  = Math.sin(time * 4 + 1) * 1.2;
+    const mcx  = fx + Math.round(fw / 2);
+    gfx.fillStyle(0xcc2222, 1);
+    gfx.fillTriangle(fx, fy, fx, fy + fh, mcx, fy + fh + mid);
+    gfx.fillTriangle(fx, fy, mcx, fy + fh + mid, mcx, fy + mid);
+    gfx.fillStyle(0xee4444, 1);
+    gfx.fillTriangle(mcx, fy + mid, mcx, fy + fh + mid, fx + fw, fy + fh + wave);
+    gfx.fillTriangle(mcx, fy + mid, fx + fw, fy + fh + wave, fx + fw, fy + wave);
   }
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
     gfx.clear();
-    for (const { wx, wy, ww, wh } of this.windowRects) {
-      gfx.fillStyle(lerpColor(0x9ac0d4, 0xffcc66, t), 1);
-      gfx.fillRect(wx, wy, ww, wh);
-      gfx.fillStyle(0xf0e8d8, 0.7);
-      gfx.fillRect(wx + Math.round(ww / 2) - 1, wy, 2, wh);
-      gfx.fillRect(wx, wy + Math.round(wh / 2) - 1, ww, 2);
+    for (const { wx, wy, ww, wh, shop } of this.windowRects) {
+      if (shop) {
+        // Shop display windows: larger glass, warm interior glow at night
+        gfx.fillStyle(lerpColor(0x3a6888, 0xffdd88, t), 1);
+        gfx.fillRect(wx, wy, ww, wh);
+        // Subtle reflection highlight
+        gfx.fillStyle(0xffffff, Math.max(0, 0.12 - t * 0.1));
+        gfx.fillRect(wx, wy, ww, 2);
+      } else {
+        // Upper floor curtain wall panels: tall glass, cool day / warm night
+        gfx.fillStyle(lerpColor(0x4a8aaa, 0xffcc66, t), 1);
+        gfx.fillRect(wx, wy, ww, wh);
+        // Single horizontal mid-pane divider
+        gfx.fillStyle(0xffffff, 0.18);
+        gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);
+      }
     }
   }
 }
