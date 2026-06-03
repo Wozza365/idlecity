@@ -217,7 +217,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       // Neon light source
       const nc = NEON_COLORS[s % NEON_COLORS.length];
       this.neonLights.push(scene.lights.addLight(
-        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 55, nc, 0,
+        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 100, nc, 0,
       ));
     }
 
@@ -437,16 +437,25 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         const nx  = sx + 3;
         const nw  = sw_ - doorW - 7;
 
-        // Filled sign body — in ADD blend this creates solid bright colour
-        neonGfx.fillStyle(nc, 0.7);
+        // Soft outer bloom halo — larger rect at low alpha creates the glow corona
+        neonGfx.fillStyle(nc, 0.4);
+        neonGfx.fillRect(nx - 4, signY - 2, nw + 8, signH + 4);
+
+        // Core sign body — draw three times so ADD accumulates to max brightness
+        neonGfx.fillStyle(nc, 1);
+        neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
+        neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
         neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
 
-        // Bright outer border (double-draw for extra bloom)
+        // Outer glow border (wide soft ring)
+        neonGfx.lineStyle(4, nc, 0.6);
+        neonGfx.strokeRect(nx - 2, signY - 1, nw + 4, signH + 2);
+        // Sharp inner border
         neonGfx.lineStyle(2, nc, 1);
         neonGfx.strokeRect(nx - 1, signY, nw + 2, signH);
 
-        // Pixel-art squiggle lines — thicker for visibility
-        neonGfx.lineStyle(2, 0xffffff, 0.5);
+        // Bright white squiggle lines — full alpha so text "pops" against coloured fill
+        neonGfx.lineStyle(2, 0xffffff, 1);
         const segW_ = Math.round(nw / 4);
         for (let si = 0; si < 3; si++) {
           const lx_ = nx + segW_ * si + 2;
@@ -539,7 +548,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     });
     this.neonLights.forEach((light, i) => {
       const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.18;
-      light.intensity = tNorm * 1.4 * pulse;
+      light.intensity = tNorm * 2.2 * pulse;
     });
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
