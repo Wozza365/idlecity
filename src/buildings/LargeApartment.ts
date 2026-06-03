@@ -27,7 +27,7 @@ const HF_MARG = Math.ceil(HF_POLE + (HF_FW + HF_FH) * Math.SQRT1_2); // ≈ 42
 // Hotel flag: three distinct colour bands per flag [inner, mid, outer]
 const HOTEL_PALETTES: ReadonlyArray<readonly [number, number, number]> = [
   [0xcc2020, 0xffffff, 0x2233cc],  // red-white-blue
-  [0x228844, 0xffdd00, 0xffffff],  // green-gold-white
+  [0x228844, 0xffdd00, 0x44aaff],  // green-gold-sky
   [0xcc2266, 0xffffff, 0x7722cc],  // crimson-white-purple
   [0xff6600, 0xffffff, 0x002288],  // orange-white-navy
   [0x1155bb, 0xffdd00, 0x1155bb],  // royal-gold-royal
@@ -76,18 +76,19 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const pentBx     = level >= 68 ? bx + Math.round((bw - pentBw) / 2) : bx;
 
     // ── Dark steel-frame curtain wall body ────────────────────────
-    // No setLighting — pedestrians also render without Phaser lighting,
-    // so structural elements must match to avoid brightness contrast.
-    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, 0x1a2230);
+    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, 0x3a5570);
+    body.setLighting(true);
     this.add(body);
 
     // Penthouse (slightly lighter dark, inset)
     if (pentFloors > 0) {
-      const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, 0x202a38);
+      const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, 0x2d4055);
+      pent.setLighting(true);
       this.add(pent);
     }
 
     const gfx = scene.add.graphics();
+    gfx.setLighting(true);
 
     // ── Foundation plinth ─────────────────────────────────────────
     gfx.fillStyle(0x2a3040, 1);
@@ -96,7 +97,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     gfx.fillRect(bx, bodyBot, bw, 1);
 
     // ── Parapet — dark steel cap with bright metal edge ───────────
-    gfx.fillStyle(0x1a2230, 1);
+    gfx.fillStyle(0x3a5570, 1);
     gfx.fillRect(bx, top, bw, PARAPET_H);
     // Bright aluminium coping strip
     gfx.fillStyle(0x90a8c0, 1);
@@ -118,14 +119,14 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const colW     = Math.max(3, Math.round(bw * 0.030)); // thin mullions
     const bayW     = Math.round((bw - colW * (nCols - 1)) / nCols);
     const upperH   = lobbyTop - bodyTop;
-    const nFloors  = Math.max(2, Math.floor(upperH / FLOOR_H));
+    const nFloors  = Math.max(2, Math.floor(upperH / (FLOOR_H * 2)));
     const actualFH = Math.round(upperH / nFloors);
 
-    // Spandrel bands at each floor line (thin dark strip)
+    // Spandrel bands — very thin to maximise visible glass
     gfx.fillStyle(0x0e141e, 1);
     for (let f = 1; f < nFloors; f++) {
       const fy = lobbyTop - f * actualFH;
-      gfx.fillRect(bx, fy, bw, 2);
+      gfx.fillRect(bx, fy, bw, 1);
     }
 
     // Vertical mullion strips
@@ -153,7 +154,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const finsFrom = level >= 64 ? Math.round(nFloors * 0.55) : nFloors + 1;
 
     // ── Floor glass panels (4 bays, near floor-to-ceiling) ────────
-    const wh     = Math.round(actualFH * 0.84);
+    const wh     = Math.round(actualFH * 0.93);
     const panelW = bayW - colW;
 
     for (let f = 0; f < nFloors; f++) {
@@ -194,10 +195,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     }
 
     // ── Hotel lobby entrance — bright full-height glass ───────────
-    gfx.fillStyle(0x1c3a52, 1);
+    gfx.fillStyle(0x2a5878, 1);
     gfx.fillRect(bx, lobbyTop, bw, LOBBY_H);
     // Interior glow panels
-    gfx.fillStyle(0x2a5070, 0.5);
+    gfx.fillStyle(0x3a7098, 0.5);
     for (let lx = bx + 4; lx < bx + bw - 4; lx += 16) {
       gfx.fillRect(lx, lobbyTop + 4, 12, LOBBY_H - 8);
     }
@@ -350,7 +351,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       const nFlags  = 6;
       const margin  = HF_MARG + 8;         // inset further from edges
       const span    = bw - 2 * margin;
-      const step    = Math.round(span / (nFlags - 1)) + 2;
+      const step    = Math.round(span / (nFlags - 1)) + 4;
       for (let fi = 0; fi < nFlags; fi++) {
         const poleX = bx + margin + fi * step;
         const dir   = fi < 3 ? -1 : 1;    // left half flies left, right half flies right
@@ -526,6 +527,16 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
       // Wave ripples perpendicular to the flag face (grows from hoist→fly)
       const maxWave = Math.sin(time * 3.8 + phase) * 2;
+
+      // Shadow: a dark offset silhouette drawn before the flag bands
+      const sO = 2;
+      const ftx = tipX + dir * fw * c;
+      const fty = tipY + fw * c;
+      const sbx0 = tipX - dir * fh * c, sby0 = tipY + fh * c;
+      const sbx1 = ftx  - dir * fh * c, sby1 = fty  + fh * c;
+      gfx.fillStyle(0x000000, 0.28);
+      gfx.fillTriangle(tipX + sO, tipY + sO, ftx + sO, fty + sO, sbx0 + sO, sby0 + sO);
+      gfx.fillTriangle(ftx + sO, fty + sO, sbx1 + sO, sby1 + sO, sbx0 + sO, sby0 + sO);
 
       // Flag hangs DOWN from the pole tip at 45°:
       //   extension direction: (dir·c,  c)  — outward + downward
