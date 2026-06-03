@@ -153,9 +153,13 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         this.windowRects.push({ wx: panelX, wy: panelY, ww: panelW, wh: panelH });
       }
 
-      this.windowLights.push(scene.lights.addLight(
-        bx + bw / 2, floorBot - Math.round(actualFH / 2), 88, 0xffaa44, 0,
-      ));
+      // One light per glass panel column
+      for (let c = 0; c < nCols; c++) {
+        const panelX = bx + pierW * (c + 1) + panelW * c;
+        this.windowLights.push(scene.lights.addLight(
+          panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 72, 0xffaa44, 0,
+        ));
+      }
     }
 
     // ── Shop fronts ground floor ───────────────────────────────────
@@ -357,28 +361,38 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       }
     }
 
-    // Lv 55+: grand lobby glazing between shops
+    // Lv 55+: decorative brick corner turrets rising above parapet
     if (level >= 55) {
-      const lobW = Math.round(bw * 0.26);
-      const lobX = bx + Math.round((bw - lobW) / 2);
-      // Full-height glass lobby panel
-      gfx.fillStyle(0x1e3040, 1);
-      gfx.fillRect(lobX - 2, shopTop - 2, lobW + 4, SHOP_H + 2);
-      gfx.fillStyle(0x2a5066, 0.8);
-      gfx.fillRect(lobX, shopTop, lobW, SHOP_H);
-      // Vertical mullions
-      gfx.fillStyle(0x3a3830, 1);
-      for (let mx = lobX + 8; mx < lobX + lobW; mx += 8) {
-        gfx.fillRect(mx, shopTop, 1, SHOP_H);
+      const turW = 8, turH = 10;
+      // Left turret body (brick matching body color)
+      gfx.fillStyle(0x8a3a28, 1);
+      gfx.fillRect(bx - 1, top - turH, turW, turH);
+      gfx.lineStyle(1, 0x6a2818, 0.22);
+      for (let by = top - turH + 4; by < top; by += 5) {
+        gfx.moveTo(bx - 1, by).lineTo(bx - 1 + turW, by).strokePath();
       }
-      // Lobby header
-      gfx.fillStyle(0x2a2820, 1);
-      gfx.fillRect(lobX - 2, shopTop - 2, lobW + 4, 3);
-      // Lobby light
-      this.windowRects.push({ wx: lobX, wy: shopTop, ww: lobW, wh: SHOP_H, shop: true });
-      this.windowLights.push(scene.lights.addLight(
-        lobX + Math.round(lobW / 2), shopTop + Math.round(SHOP_H / 2), 68, 0xffeedd, 0,
-      ));
+      // Left turret coping cap (grey stone, slightly wider)
+      gfx.fillStyle(0x8a9088, 1);
+      gfx.fillRect(bx - 2, top - turH - 3, turW + 2, 4);
+      gfx.fillStyle(0xaab0a8, 1);
+      gfx.fillRect(bx - 2, top - turH - 3, turW + 2, 1);
+      gfx.fillStyle(0x4a504a, 1);
+      gfx.fillRect(bx - 2, top - turH + 1, turW + 2, 1);
+
+      // Right turret body
+      gfx.fillStyle(0x8a3a28, 1);
+      gfx.fillRect(bx + bw - turW + 1, top - turH, turW, turH);
+      gfx.lineStyle(1, 0x6a2818, 0.22);
+      for (let by = top - turH + 4; by < top; by += 5) {
+        gfx.moveTo(bx + bw - turW + 1, by).lineTo(bx + bw + 1, by).strokePath();
+      }
+      // Right turret coping cap
+      gfx.fillStyle(0x8a9088, 1);
+      gfx.fillRect(bx + bw - turW, top - turH - 3, turW + 2, 4);
+      gfx.fillStyle(0xaab0a8, 1);
+      gfx.fillRect(bx + bw - turW, top - turH - 3, turW + 2, 1);
+      gfx.fillStyle(0x4a504a, 1);
+      gfx.fillRect(bx + bw - turW, top - turH + 1, turW + 2, 1);
     }
 
     this.add(gfx);
@@ -423,12 +437,16 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         const nx  = sx + 3;
         const nw  = sw_ - doorW - 7;
 
-        // Glowing colored border
+        // Filled sign body — in ADD blend this creates solid bright colour
+        neonGfx.fillStyle(nc, 0.7);
+        neonGfx.fillRect(nx, signY + 1, nw, signH - 1);
+
+        // Bright outer border (double-draw for extra bloom)
         neonGfx.lineStyle(2, nc, 1);
         neonGfx.strokeRect(nx - 1, signY, nw + 2, signH);
 
-        // Pixel-art squiggle lines (suggest unreadable text)
-        neonGfx.lineStyle(1, nc, 1);
+        // Pixel-art squiggle lines — thicker for visibility
+        neonGfx.lineStyle(2, 0xffffff, 0.5);
         const segW_ = Math.round(nw / 4);
         for (let si = 0; si < 3; si++) {
           const lx_ = nx + segW_ * si + 2;
@@ -486,6 +504,11 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         sg.fillRect(aX, top - 8, 14, 8);
       }
     }
+    // Corner turrets (lv 55+)
+    if (level >= 55) {
+      sg.fillRect(bx - 2, top - 13, 10, 13);
+      sg.fillRect(bx + bw - 8, top - 13, 10, 13);
+    }
     sg.setDepth(9.15);
     sg.setAlpha(0);
     this.shadowGfx = sg;
@@ -516,12 +539,12 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     });
     this.neonLights.forEach((light, i) => {
       const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.18;
-      light.intensity = tNorm * 0.55 * pulse;
+      light.intensity = tNorm * 1.4 * pulse;
     });
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
     if (this.lampConeGfx)    this.lampConeGfx.setAlpha(tNorm * 0.45);
-    if (this.neonGfx)        this.neonGfx.setAlpha(tNorm * 0.72);
+    if (this.neonGfx)        this.neonGfx.setAlpha(Math.min(1, tNorm * 1.6));
     if (this.flagLight)      this.flagLight.intensity = tNorm * 0.6;
   }
 
