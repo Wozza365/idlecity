@@ -66,19 +66,18 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const pentBx     = level >= 68 ? bx + Math.round((bw - pentBw) / 2) : bx;
 
     // ── Dark steel-frame curtain wall body ────────────────────────
+    // No setLighting — pedestrians also render without Phaser lighting,
+    // so structural elements must match to avoid brightness contrast.
     const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, 0x1a2230);
-    body.setLighting(true);
     this.add(body);
 
     // Penthouse (slightly lighter dark, inset)
     if (pentFloors > 0) {
       const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, 0x202a38);
-      pent.setLighting(true);
       this.add(pent);
     }
 
     const gfx = scene.add.graphics();
-    gfx.setLighting(true);
 
     // ── Foundation plinth ─────────────────────────────────────────
     gfx.fillStyle(0x2a3040, 1);
@@ -350,7 +349,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       const fpX    = bx + Math.round(bw * 0.22);
       const fpTop_ = top - 30;
       const poleGfx = scene.add.graphics();
-      poleGfx.setLighting(true);
+      poleGfx.setLighting(false);
       poleGfx.fillStyle(0xa0a0a8, 1);
       poleGfx.fillRect(fpX - 1, fpTop_, 2, 30);
       poleGfx.fillStyle(0xd0d0d8, 1);
@@ -358,7 +357,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       this.add(poleGfx);
 
       const flagGfx = scene.add.graphics();
-      flagGfx.setLighting(true);
+      flagGfx.setLighting(false);
       this.add(flagGfx);
       this.flagGfx   = flagGfx;
       this.flagPoleX = fpX;
@@ -401,7 +400,6 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     // ── Window glass overlay ──────────────────────────────────────
     const windowGlassGfx = scene.add.graphics();
-    windowGlassGfx.setLighting(true);
     this.drawWindowGlass(windowGlassGfx, 0);
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
@@ -409,7 +407,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // ── Lv 57+: hotel flag graphics — added after glass so flags render on top ──
     if (level >= 57) {
       const hotelFlagGfx = scene.add.graphics();
-      hotelFlagGfx.setLighting(true);
+      hotelFlagGfx.setLighting(false);
       this.add(hotelFlagGfx);
       this.hotelFlagGfx = hotelFlagGfx;
     }
