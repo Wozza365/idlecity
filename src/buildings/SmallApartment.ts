@@ -226,7 +226,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       // Neon light source
       const nc = NEON_COLORS[s % NEON_COLORS.length];
       this.neonLights.push(scene.lights.addLight(
-        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 35, nc, 0,
+        sx + 2 + Math.round((sw_ - doorW - 4) / 2), signY + Math.round(signH / 2), 55, nc, 0,
       ));
     }
 
@@ -447,35 +447,50 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         const nw  = sw_ - doorW - 7;
 
         // Neon tube border: tiny circles (1.5px) along sign perimeter, like the for-sale bulbs
-        neonGfx.fillStyle(nc, 1);
-        const step = 4;
-        for (let px = nx; px <= nx + nw; px += step) {
-          neonGfx.fillCircle(px, signY,          1.5);
-          neonGfx.fillCircle(px, signY + signH,  1.5);
-        }
-        for (let py = signY + step; py < signY + signH; py += step) {
-          neonGfx.fillCircle(nx,      py, 1.5);
-          neonGfx.fillCircle(nx + nw, py, 1.5);
+        // Tube border: draw each circle twice so ADD blend accumulates to near-white
+        const step = 3;
+        for (let pass = 0; pass < 2; pass++) {
+          neonGfx.fillStyle(nc, 1);
+          for (let px = nx; px <= nx + nw; px += step) {
+            neonGfx.fillCircle(px, signY,         2);
+            neonGfx.fillCircle(px, signY + signH, 2);
+          }
+          for (let py = signY + step; py < signY + signH; py += step) {
+            neonGfx.fillCircle(nx,      py, 2);
+            neonGfx.fillCircle(nx + nw, py, 2);
+          }
         }
 
-        // Unreadable pixel-art "text": white dots inside
+        // Concentrated corner glow (larger radius → blooms toward white)
+        neonGfx.fillStyle(nc, 1);
+        for (const [cx_, cy_] of [[nx, signY], [nx + nw, signY], [nx, signY + signH], [nx + nw, signY + signH]] as [number,number][]) {
+          neonGfx.fillCircle(cx_, cy_, 3.5);
+          neonGfx.fillCircle(cx_, cy_, 3.5); // double for bright corners
+        }
+
+        // White text dots inside
         neonGfx.fillStyle(0xffffff, 1);
         const segW_ = Math.round(nw / 4);
         for (let si = 0; si < 3; si++) {
           const lx_ = nx + segW_ * si + 2;
-          for (let px = lx_; px < lx_ + segW_ - 4; px += 3) neonGfx.fillCircle(px, signY + 2, 1);
-          for (let px = lx_; px < lx_ + Math.round((segW_ - 4) * 0.55); px += 3) neonGfx.fillCircle(px, signY + 5, 1);
+          for (let px = lx_; px < lx_ + segW_ - 4; px += 3) {
+            neonGfx.fillCircle(px, signY + 2, 1.5);
+            neonGfx.fillCircle(px, signY + 2, 1.5);
+          }
+          for (let px = lx_; px < lx_ + Math.round((segW_ - 4) * 0.55); px += 3) {
+            neonGfx.fillCircle(px, signY + 5, 1.5);
+          }
         }
 
         // Downward SoftSpotLight illuminating the shop face below the sign
         this.neonSpots.push(new SoftSpotLight({
           x:           nx + Math.round(nw / 2),
           y:           signY + signH,
-          radius:      58,
+          radius:      65,
           color:       nc,
           intensity:   0,
           angle:       Math.PI / 2,
-          coneAngle:   Math.PI / 2 * 0.6,
+          coneAngle:   Math.PI / 2 * 0.65,
           noOcclusion: true,
         }));
       }
@@ -564,13 +579,13 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     });
     this.neonLights.forEach((light, i) => {
       const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.12;
-      light.intensity = tNorm * 0.4 * pulse;
+      light.intensity = tNorm * 0.8 * pulse;
     });
-    for (const spot of this.neonSpots) spot.setIntensity(tNorm * 2.0);
+    for (const spot of this.neonSpots) spot.setIntensity(tNorm * 3.5);
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
     if (this.lampConeGfx)    this.lampConeGfx.setAlpha(tNorm * 0.45);
-    if (this.neonGfx)        this.neonGfx.setAlpha(tNorm * 0.9);
+    if (this.neonGfx)        this.neonGfx.setAlpha(Math.min(1, tNorm * 1.2));
     if (this.flagLight)      this.flagLight.intensity = tNorm * 0.6;
   }
 
