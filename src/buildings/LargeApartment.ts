@@ -48,6 +48,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private hotelFlagGfx:    Phaser.GameObjects.Graphics | null = null;
   private hotelFlags: Array<{ poleX: number; poleY: number; dir: 1 | -1; palette: readonly [number, number, number] }> = [];
   private hotelFlagPhases: number[] = [];
+  private hotelFlagLights: Phaser.GameObjects.Light[] = [];
   private lightPhases:   number[] = [];
   private windowRects:   Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
   private shadowGfx!:   Phaser.GameObjects.Graphics;
@@ -135,9 +136,6 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       const cx_ = bx + c * (bayW + colW) - colW;
       gfx.fillRect(cx_, bodyTop, colW, upperH);
     }
-    // Outer edge mullions
-    gfx.fillRect(bx,           bodyTop, colW, upperH);
-    gfx.fillRect(bx + bw - colW, bodyTop, colW, upperH);
 
     // ── Lv 62+: mid-building horizontal accent band ───────────────
     const midBandFloor = level >= 62 ? Math.round(nFloors * 0.5) : -1;
@@ -155,7 +153,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     // ── Floor glass panels (4 bays, near floor-to-ceiling) ────────
     const wh     = Math.round(actualFH * 0.93);
-    const panelW = bayW - colW;
+    const panelW = bayW;
 
     for (let f = 0; f < nFloors; f++) {
       const floorBot = lobbyTop - f * actualFH;
@@ -173,7 +171,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       }
 
       for (let c = 0; c < nCols; c++) {
-        const panelX = bx + c * (bayW + colW) + colW;
+        const panelX = bx + c * (bayW + colW);
 
         // Lv 64+: extra silver fin projection between upper bays
         if (level >= 64 && f >= finsFrom && c < nCols - 1) {
@@ -187,7 +185,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
       // One light per bay per floor
       for (let c = 0; c < nCols; c++) {
-        const panelX = bx + c * (bayW + colW) + colW;
+        const panelX = bx + c * (bayW + colW);
         this.windowLights.push(scene.lights.addLight(
           panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 80, 0xffaa44, 0,
         ));
@@ -348,15 +346,26 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // Pole positions are inset by (poleLen + fw) from each edge so flag
     // fabric never extends past the building boundary.
     if (level >= 57) {
-      const nFlags  = 6;
-      const margin  = HF_MARG + 8;         // inset further from edges
-      const span    = bw - 2 * margin;
-      const step    = Math.round(span / (nFlags - 1)) + 4;
-      for (let fi = 0; fi < nFlags; fi++) {
-        const poleX = bx + margin + fi * step;
-        const dir   = fi < 3 ? -1 : 1;    // left half flies left, right half flies right
-        this.hotelFlags.push({ poleX, poleY: lobbyTop, dir: dir as 1 | -1, palette: HOTEL_PALETTES[fi % HOTEL_PALETTES.length] });
+      // Left 3 flags fly left (dir=-1), right 3 fly right (dir=1).
+      // Groups are positioned symmetrically around the exact building centre.
+      const flagMargin = Math.ceil((HF_POLE + HF_FW) * Math.SQRT1_2) + 2; // ~29 px
+      const center     = bx + bw / 2;  // exact float centre — avoids floor() right-bias
+      const halfGap    = 5;            // half the gap between the two groups at centre
+      const step       = Math.round((bw / 2 - flagMargin - halfGap) / 2) + 2;
+
+      // fi=0 outermost (near edge), fi=2 innermost (near centre) — (2−fi) maps to offsets
+      for (let fi = 0; fi < 3; fi++) {
+        this.hotelFlags.push({ poleX: Math.round(center - halfGap - (2 - fi) * step), poleY: lobbyTop, dir: -1, palette: HOTEL_PALETTES[fi] });
         this.hotelFlagPhases.push(Math.random() * Math.PI * 2);
+      }
+      for (let fi = 0; fi < 3; fi++) {
+        this.hotelFlags.push({ poleX: Math.round(center + halfGap + (2 - fi) * step), poleY: lobbyTop, dir: 1, palette: HOTEL_PALETTES[3 + fi % 3] });
+        this.hotelFlagPhases.push(Math.random() * Math.PI * 2);
+      }
+
+      // Small upward spotlight below each pole (illuminates flag from below-outside).
+      for (const { poleX, poleY, dir } of this.hotelFlags) {
+        this.hotelFlagLights.push(scene.lights.addLight(poleX + dir * 3, poleY + 4, 38, 0xffe8aa, 0));
       }
     }
 
@@ -453,6 +462,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
+      for (const light of this.hotelFlagLights) scene.lights.removeLight(light);
       if (this.signLight) scene.lights.removeLight(this.signLight);
       if (this.flagLight) scene.lights.removeLight(this.flagLight);
       this.shadowGfx.destroy();
@@ -479,6 +489,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     if (this.signLight)   this.signLight.intensity = tNorm * 1.2;
     if (this.signSpot)    this.signSpot.setIntensity(tNorm * 2.8);
     if (this.flagLight)   this.flagLight.intensity = tNorm * 0.6;
+    for (const fl of this.hotelFlagLights) fl.intensity = tNorm * 0.45;
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
     if (this.accentGfx)      this.accentGfx.setAlpha(Math.min(1, tNorm * 0.9));
