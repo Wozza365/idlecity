@@ -614,22 +614,20 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const tx = sx + Math.sin(sweep) * length;
     const ty = sy - Math.cos(sweep) * length; // up = negative y
 
-    // Perpendicular to the beam direction for base width
+    // Perpendicular to beam direction — used for the far-end spread
     const px = Math.cos(sweep);
     const py = Math.sin(sweep);
 
-    // Outer soft halo
+    // Apex at building rooftop (origin), beam widens into sky — correct searchlight cone
     gfx.fillStyle(0x99bbff, 0.12);
-    gfx.fillTriangle(sx - px * 10, sy - py * 10, sx + px * 10, sy + py * 10, tx, ty);
-    // Mid glow
+    gfx.fillTriangle(sx, sy, tx - px * 18, ty - py * 18, tx + px * 18, ty + py * 18);
     gfx.fillStyle(0xccddff, 0.28);
-    gfx.fillTriangle(sx - px * 5, sy - py * 5, sx + px * 5, sy + py * 5, tx, ty);
-    // Bright core
+    gfx.fillTriangle(sx, sy, tx - px * 9,  ty - py * 9,  tx + px * 9,  ty + py * 9);
     gfx.fillStyle(0xeef4ff, 0.55);
-    gfx.fillTriangle(sx - px * 2, sy - py * 2, sx + px * 2, sy + py * 2, tx, ty);
-    // Tip flare
+    gfx.fillTriangle(sx, sy, tx - px * 4,  ty - py * 4,  tx + px * 4,  ty + py * 4);
+    // Source glow at the building origin
     gfx.fillStyle(0xffffff, 0.7);
-    gfx.fillCircle(tx, ty, 2.5);
+    gfx.fillCircle(sx, sy, 3);
   }
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
