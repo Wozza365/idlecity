@@ -115,7 +115,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // ── Curtain wall grid ─────────────────────────────────────────
     // Thin aluminium mullions dividing 5 glass bays
     const nCols    = 5;
-    const colW     = Math.max(3, Math.round(bw * 0.030)); // thin mullions
+    const colW     = Math.max(2, Math.round(bw * 0.018)); // thin mullions
     const bayW     = Math.round((bw - colW * (nCols - 1)) / nCols);
     const upperH   = lobbyTop - bodyTop;
     const nFloors  = Math.max(2, Math.floor(upperH / (FLOOR_H * 2)));
@@ -150,7 +150,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const finsFrom = level >= 64 ? Math.round(nFloors * 0.55) : nFloors + 1;
 
     // ── Floor glass panels (5 bays, near floor-to-ceiling) ────────
-    const wh     = Math.round(actualFH * 0.97);
+    const wh     = Math.round(actualFH * 0.93);
     const panelW = bayW;
 
     for (let f = 0; f < nFloors; f++) {
