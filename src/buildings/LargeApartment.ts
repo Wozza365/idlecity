@@ -445,6 +445,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     // ── Window glass overlay ──────────────────────────────────────
     const windowGlassGfx = scene.add.graphics();
+    windowGlassGfx.setLighting(true);
     this.drawWindowGlass(windowGlassGfx, 0);
     this.add(windowGlassGfx);
     this.windowGlassGfx = windowGlassGfx;
