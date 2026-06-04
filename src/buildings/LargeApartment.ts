@@ -47,6 +47,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private hotelFlags: Array<{ poleX: number; poleY: number; dir: 1 | -1; palette: readonly [number, number, number] }> = [];
   private hotelFlagPhases: number[] = [];
   private hotelFlagLights: Phaser.GameObjects.Light[] = [];
+  private lobbyLight:     Phaser.GameObjects.Light | null = null;
+  private searchlightGfx: Phaser.GameObjects.Graphics | null = null;
+  private searchlightX    = 0;
+  private searchlightY    = 0;
   private lightPhases:   number[] = [];
   private windowRects:   Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
   private shadowGfx!:   Phaser.GameObjects.Graphics;
@@ -185,23 +189,26 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       for (let c = 0; c < nCols; c++) {
         const panelX = bx + c * (bayW + colW);
         this.windowLights.push(scene.lights.addLight(
-          panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 80, 0xffaa44, 0,
+          panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 80, 0xffcc77, 0,
         ));
       }
     }
 
-    // ── Hotel lobby entrance — bright full-height glass ───────────
-    gfx.fillStyle(0x2a5878, 1);
+    // ── Hotel lobby entrance — bright shop-floor illumination ────────
+    gfx.fillStyle(0x3a6880, 1);
     gfx.fillRect(bx, lobbyTop, bw, LOBBY_H);
-    // Interior glow panels
-    gfx.fillStyle(0x3a7098, 0.5);
-    for (let lx = bx + 4; lx < bx + bw - 4; lx += 16) {
-      gfx.fillRect(lx, lobbyTop + 4, 12, LOBBY_H - 8);
+    // Overhead lighting strips — dense, bright
+    gfx.fillStyle(0x90cce8, 0.65);
+    for (let lx = bx + 4; lx < bx + bw - 4; lx += 12) {
+      gfx.fillRect(lx, lobbyTop + 4, 8, LOBBY_H - 8);
     }
+    // Ceiling light bar — near-white bloom at top of lobby interior
+    gfx.fillStyle(0xd8f0ff, 0.50);
+    gfx.fillRect(bx + 2, lobbyTop + 4, bw - 4, 4);
     // Lobby frame bar
     gfx.fillStyle(0x0e141e, 1);
     gfx.fillRect(bx, lobbyTop, bw, 3);
-    gfx.fillStyle(0x4a90b8, 0.4);
+    gfx.fillStyle(0x5aa8d0, 0.5);
     gfx.fillRect(bx, lobbyTop + 1, bw, 1);
 
     // Two symmetrical doors
@@ -421,6 +428,21 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       this.accentGfx = accentGfx;
     }
 
+    // ── Lobby Phaser light — wide warm-white, always-on commercial glow ──
+    this.lobbyLight = scene.lights.addLight(
+      bx + Math.round(bw / 2), lobbyTop + Math.round(LOBBY_H / 2), 160, 0xfff8f0, 0,
+    );
+
+    // ── Lv 63+: rooftop searchlight beam (ADD, animated each frame) ──
+    if (level >= 63) {
+      const slGfx = scene.add.graphics();
+      slGfx.setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      this.add(slGfx);
+      this.searchlightGfx = slGfx;
+      this.searchlightX   = bx + Math.round(bw / 2);
+      this.searchlightY   = top;
+    }
+
     // ── Window glass overlay ──────────────────────────────────────
     const windowGlassGfx = scene.add.graphics();
     this.drawWindowGlass(windowGlassGfx, 0);
@@ -461,6 +483,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
       for (const light of this.hotelFlagLights) scene.lights.removeLight(light);
+      if (this.lobbyLight) scene.lights.removeLight(this.lobbyLight);
       if (this.signLight) scene.lights.removeLight(this.signLight);
       if (this.flagLight) scene.lights.removeLight(this.flagLight);
       this.shadowGfx.destroy();
@@ -481,13 +504,15 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     this.windowLights.forEach((light, i) => {
       const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.08;
-      light.intensity = tNorm * 0.36 * flicker;
+      light.intensity = tNorm * 0.44 * flicker;
     });
 
-    if (this.signLight)   this.signLight.intensity = tNorm * 1.2;
+    if (this.lobbyLight)  this.lobbyLight.intensity  = 0.35 + tNorm * 1.6;
+    if (this.signLight)   this.signLight.intensity   = tNorm * 1.2;
     if (this.signSpot)    this.signSpot.setIntensity(tNorm * 2.8);
-    if (this.flagLight)   this.flagLight.intensity = tNorm * 0.6;
+    if (this.flagLight)   this.flagLight.intensity   = tNorm * 0.6;
     for (const fl of this.hotelFlagLights) fl.intensity = tNorm * 0.45;
+    if (this.searchlightGfx) this.searchlightGfx.setAlpha(Math.min(1, tNorm * 1.3));
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
     if (this.accentGfx)      this.accentGfx.setAlpha(Math.min(1, tNorm * 0.9));
@@ -497,6 +522,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const time = this.scene.time.now / 1000;
     if (this.flagGfx) this.drawRooftopFlag(this.flagGfx, time);
     if (this.hotelFlagGfx) this.drawHotelFlags(this.hotelFlagGfx, time);
+    if (this.searchlightGfx) this.drawSearchlight(this.searchlightGfx, time);
   }
 
   private drawRooftopFlag(gfx: Phaser.GameObjects.Graphics, time: number): void {
@@ -577,11 +603,40 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     }
   }
 
+  private drawSearchlight(gfx: Phaser.GameObjects.Graphics, time: number): void {
+    gfx.clear();
+    // Sweep angle oscillates ±60° from vertical; length pulses on a different cycle
+    const sweep  = Math.sin(time * 0.45) * 1.05;
+    const length = 95 + Math.cos(sweep) * 28 + Math.sin(time * 1.9) * 18;
+
+    const sx = this.searchlightX;
+    const sy = this.searchlightY;
+    const tx = sx + Math.sin(sweep) * length;
+    const ty = sy - Math.cos(sweep) * length; // up = negative y
+
+    // Perpendicular to the beam direction for base width
+    const px = Math.cos(sweep);
+    const py = Math.sin(sweep);
+
+    // Outer soft halo
+    gfx.fillStyle(0x99bbff, 0.12);
+    gfx.fillTriangle(sx - px * 10, sy - py * 10, sx + px * 10, sy + py * 10, tx, ty);
+    // Mid glow
+    gfx.fillStyle(0xccddff, 0.28);
+    gfx.fillTriangle(sx - px * 5, sy - py * 5, sx + px * 5, sy + py * 5, tx, ty);
+    // Bright core
+    gfx.fillStyle(0xeef4ff, 0.55);
+    gfx.fillTriangle(sx - px * 2, sy - py * 2, sx + px * 2, sy + py * 2, tx, ty);
+    // Tip flare
+    gfx.fillStyle(0xffffff, 0.7);
+    gfx.fillCircle(tx, ty, 2.5);
+  }
+
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
     gfx.clear();
     for (const { wx, wy, ww, wh } of this.windowRects) {
-      // Day: vibrant steel-blue reflection; night: warm amber interior
-      gfx.fillStyle(lerpColor(0x3a88c8, 0xffcc66, t), 1);
+      // Day: steel-blue reflection; night: warm golden interior
+      gfx.fillStyle(lerpColor(0x3a88c8, 0xffdd88, t), 1);
       gfx.fillRect(wx, wy, ww, wh);
       // Reflection highlight at top of each pane
       gfx.fillStyle(0xffffff, Math.max(0, 0.22 - t * 0.18));
