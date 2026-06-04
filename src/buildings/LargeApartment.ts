@@ -113,8 +113,8 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     }
 
     // ── Curtain wall grid ─────────────────────────────────────────
-    // Thin aluminium mullions dividing 4 glass bays
-    const nCols    = 4;
+    // Thin aluminium mullions dividing 5 glass bays
+    const nCols    = 5;
     const colW     = Math.max(3, Math.round(bw * 0.030)); // thin mullions
     const bayW     = Math.round((bw - colW * (nCols - 1)) / nCols);
     const upperH   = lobbyTop - bodyTop;
@@ -149,8 +149,8 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // ── Lv 64+: vertical fin accents ──────────────────────────────
     const finsFrom = level >= 64 ? Math.round(nFloors * 0.55) : nFloors + 1;
 
-    // ── Floor glass panels (4 bays, near floor-to-ceiling) ────────
-    const wh     = Math.round(actualFH * 0.93);
+    // ── Floor glass panels (5 bays, near floor-to-ceiling) ────────
+    const wh     = Math.round(actualFH * 0.97);
     const panelW = bayW;
 
     for (let f = 0; f < nFloors; f++) {
@@ -586,9 +586,6 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       // Reflection highlight at top of each pane
       gfx.fillStyle(0xffffff, Math.max(0, 0.22 - t * 0.18));
       gfx.fillRect(wx, wy, ww, Math.max(1, Math.round(wh * 0.22)));
-      // Horizontal mid-pane divider bar
-      gfx.fillStyle(0x0e141e, 0.4);
-      gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);
     }
   }
 }
