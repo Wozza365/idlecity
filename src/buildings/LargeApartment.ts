@@ -21,8 +21,6 @@ const PARAPET_H = 10;
 const HF_FW   = 20;  // flag length along pole direction
 const HF_FH   = 13;  // flag height perpendicular to pole
 const HF_POLE = 18;  // diagonal pole length
-// Horizontal footprint of one flag (pole tip + flag body projected onto x-axis at 45°)
-const HF_MARG = Math.ceil(HF_POLE + (HF_FW + HF_FH) * Math.SQRT1_2); // ≈ 42
 
 // Hotel flag: three distinct colour bands per flag [inner, mid, outer]
 const HOTEL_PALETTES: ReadonlyArray<readonly [number, number, number]> = [
