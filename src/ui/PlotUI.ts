@@ -6,7 +6,9 @@ interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
   getCost: () => number;
   drawNormal: () => void;
+  drawHover: () => void;
   drawDisabled: () => void;
+  drawPressed: () => void;
   isHovered: () => boolean;
 }
 
@@ -122,6 +124,13 @@ export class PlotUI {
       btnGfx.fillStyle(0x0e1420, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
     };
+    const drawPressed = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0a1424, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 5);
+      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 5, tr: 5, bl: 0, br: 0 });
+    };
 
     drawNormal();
     container.add(btnGfx);
@@ -149,9 +158,10 @@ export class PlotUI {
     let hovered = false;
     btn.on('pointerover', () => { hovered = true;  drawHover(); });
     btn.on('pointerout',  () => { hovered = false; drawNormal(); });
-    btn.on('pointerdown', onUpgrade);
+    btn.on('pointerdown', () => { drawPressed(); onUpgrade(); });
+    btn.on('pointerup',   () => { if (hovered) drawHover(); else drawNormal(); });
 
-    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
+    this.actionRef = { btn, getCost: () => cost, drawNormal, drawHover, drawDisabled, drawPressed, isHovered: () => hovered };
   }
 
   private buildUnlockSection(
@@ -201,6 +211,13 @@ export class PlotUI {
       btnGfx.fillStyle(0x0e1812, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
     };
+    const drawPressed = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0a1c10, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 5);
+      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 5, tr: 5, bl: 0, br: 0 });
+    };
 
     drawNormal();
     container.add(btnGfx);
@@ -228,9 +245,10 @@ export class PlotUI {
     let hovered = false;
     btn.on('pointerover', () => { hovered = true;  drawHover(); });
     btn.on('pointerout',  () => { hovered = false; drawNormal(); });
-    btn.on('pointerdown', onUnlock);
+    btn.on('pointerdown', () => { drawPressed(); onUnlock(); });
+    btn.on('pointerup',   () => { if (hovered) drawHover(); else drawNormal(); });
 
-    this.actionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
+    this.actionRef = { btn, getCost: () => cost, drawNormal, drawHover, drawDisabled, drawPressed, isHovered: () => hovered };
   }
 
   refresh(gold: number): void {

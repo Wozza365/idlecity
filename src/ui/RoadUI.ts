@@ -12,7 +12,9 @@ interface ActionRef {
   btn: Phaser.GameObjects.Rectangle;
   getCost: () => number;
   drawNormal: () => void;
+  drawHover: () => void;
   drawDisabled: () => void;
+  drawPressed: () => void;
   isHovered: () => boolean;
 }
 
@@ -104,6 +106,13 @@ export class RoadUI {
       btnGfx.fillStyle(0x0e1420, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
     };
+    const drawPressed = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0a1424, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 4);
+      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
 
     drawNormal();
     container.add(btnGfx);
@@ -124,9 +133,10 @@ export class RoadUI {
     let hovered = false;
     btn.on('pointerover', () => { hovered = true;  drawHover(); });
     btn.on('pointerout',  () => { hovered = false; drawNormal(); });
-    btn.on('pointerdown', onUpgrade);
+    btn.on('pointerdown', () => { drawPressed(); onUpgrade(); });
+    btn.on('pointerup',   () => { if (hovered) drawHover(); else drawNormal(); });
 
-    this.roadActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
+    this.roadActionRef = { btn, getCost: () => cost, drawNormal, drawHover, drawDisabled, drawPressed, isHovered: () => hovered };
   }
 
   private buildVergeSection(
@@ -183,6 +193,13 @@ export class RoadUI {
       btnGfx.fillStyle(0x0e1410, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
     };
+    const drawPressed = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x0a1a0c, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 4);
+      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
 
     drawNormal();
     container.add(btnGfx);
@@ -203,9 +220,10 @@ export class RoadUI {
     let hovered = false;
     btn.on('pointerover', () => { hovered = true;  drawHover(); });
     btn.on('pointerout',  () => { hovered = false; drawNormal(); });
-    btn.on('pointerdown', onUpgrade);
+    btn.on('pointerdown', () => { drawPressed(); onUpgrade(); });
+    btn.on('pointerup',   () => { if (hovered) drawHover(); else drawNormal(); });
 
-    this.vergeActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
+    this.vergeActionRef = { btn, getCost: () => cost, drawNormal, drawHover, drawDisabled, drawPressed, isHovered: () => hovered };
   }
 
   private buildWaterSection(
@@ -262,6 +280,13 @@ export class RoadUI {
       btnGfx.fillStyle(0x0e1820, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
     };
+    const drawPressed = () => {
+      btnGfx.clear();
+      btnGfx.fillStyle(0x081420, 1);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 4);
+      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
+    };
 
     drawNormal();
     container.add(btnGfx);
@@ -282,9 +307,10 @@ export class RoadUI {
     let hovered = false;
     btn.on('pointerover', () => { hovered = true;  drawHover(); });
     btn.on('pointerout',  () => { hovered = false; drawNormal(); });
-    btn.on('pointerdown', onUpgrade);
+    btn.on('pointerdown', () => { drawPressed(); onUpgrade(); });
+    btn.on('pointerup',   () => { if (hovered) drawHover(); else drawNormal(); });
 
-    this.waterActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
+    this.waterActionRef = { btn, getCost: () => cost, drawNormal, drawHover, drawDisabled, drawPressed, isHovered: () => hovered };
   }
 
   private roadTierName(level: number): string {
