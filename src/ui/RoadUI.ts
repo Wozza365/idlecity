@@ -23,6 +23,10 @@ export class RoadUI {
   private roadActionRef:  ActionRef | null = null;
   private vergeActionRef: ActionRef | null = null;
   private waterActionRef: ActionRef | null = null;
+  private readonly scene: Phaser.Scene;
+  private prevCanAffordRoad  = true;
+  private prevCanAffordVerge = true;
+  private prevCanAffordWater = true;
 
   constructor(
     scene: Phaser.Scene,
@@ -35,6 +39,7 @@ export class RoadUI {
     onVergeUpgrade: () => void,
     onWaterUpgrade: () => void,
   ) {
+    this.scene = scene;
     const container = scene.add.container(0, 0).setDepth(11);
     const sectionW  = width / 3;
 
@@ -347,16 +352,28 @@ export class RoadUI {
   }
 
   refresh(gold: number): void {
-    for (const ref of [this.roadActionRef, this.vergeActionRef, this.waterActionRef]) {
-      if (!ref) continue;
-      const canAfford = gold >= ref.getCost();
-      if (canAfford) {
-        ref.btn.setInteractive({ useHandCursor: true });
+    this.refreshRef(this.roadActionRef,  gold, 'road');
+    this.refreshRef(this.vergeActionRef, gold, 'verge');
+    this.refreshRef(this.waterActionRef, gold, 'water');
+  }
+
+  private refreshRef(ref: ActionRef | null, gold: number, key: 'road' | 'verge' | 'water'): void {
+    if (!ref) return;
+    const canAfford = gold >= ref.getCost();
+    const prevKey = key === 'road' ? 'prevCanAffordRoad' : key === 'verge' ? 'prevCanAffordVerge' : 'prevCanAffordWater';
+    if (canAfford && !this[prevKey]) {
+      ref.drawHover();
+      this.scene.time.delayedCall(350, () => {
         if (!ref.isHovered()) ref.drawNormal();
-      } else {
-        ref.btn.disableInteractive();
-        ref.drawDisabled();
-      }
+      });
+    }
+    this[prevKey] = canAfford;
+    if (canAfford) {
+      ref.btn.setInteractive({ useHandCursor: true });
+      if (!ref.isHovered()) ref.drawNormal();
+    } else {
+      ref.btn.disableInteractive();
+      ref.drawDisabled();
     }
   }
 

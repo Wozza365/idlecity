@@ -15,6 +15,8 @@ interface ActionRef {
 export class PlotUI {
   readonly container: Phaser.GameObjects.Container;
   actionRef: ActionRef | null = null;
+  private readonly scene: Phaser.Scene;
+  private prevCanAfford = true;
 
   constructor(
     scene: Phaser.Scene,
@@ -26,6 +28,7 @@ export class PlotUI {
     onUnlock: () => void,
     isNextUnlockable: boolean = false,
   ) {
+    this.scene = scene;
     const container = scene.add.container(0, 0).setDepth(11);
     const cx = index * sectionW + sectionW / 2;
 
@@ -270,6 +273,10 @@ export class PlotUI {
   refresh(gold: number): void {
     if (!this.actionRef) return;
     const canAfford = gold >= this.actionRef.getCost();
+    if (canAfford && !this.prevCanAfford) {
+      this.triggerAffordPulse();
+    }
+    this.prevCanAfford = canAfford;
     if (canAfford) {
       this.actionRef.btn.setInteractive({ useHandCursor: true });
       if (!this.actionRef.isHovered()) this.actionRef.drawNormal();
@@ -277,6 +284,15 @@ export class PlotUI {
       this.actionRef.btn.disableInteractive();
       this.actionRef.drawDisabled();
     }
+  }
+
+  private triggerAffordPulse(): void {
+    if (!this.actionRef) return;
+    const ref = this.actionRef;
+    ref.drawHover();
+    this.scene.time.delayedCall(350, () => {
+      if (!ref.isHovered()) ref.drawNormal();
+    });
   }
 
   destroy(): void {
