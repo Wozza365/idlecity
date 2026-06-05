@@ -28,6 +28,7 @@ import { WaterArea } from '../objects/WaterArea';
 import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
+import { Clouds } from '../objects/Clouds';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -63,6 +64,7 @@ export class GameScene extends Phaser.Scene {
   // Panel background — destroyed and recreated on resize
   private panelBg!: Phaser.GameObjects.Rectangle;
 
+  private clouds!: Clouds;
   private lightingSystem: LightingSystem | null = null;
   private carManager: CarManager | null = null;
   private pedestrianManager: PedestrianManager | null = null;
@@ -106,6 +108,7 @@ export class GameScene extends Phaser.Scene {
     this.panelChrome = new PanelChrome(this);
 
     // World-layer managers — each owns its own graphics/objects
+    this.clouds     = new Clouds(this);
     this.sky        = new Sky(this);
     this.road       = new Road(this);
     this.vergeRiver = new VergeRiver(this);
@@ -152,6 +155,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.clouds.update(delta, Math.sin(this.sunAngle));
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
@@ -174,6 +178,7 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     this.sky.rebuild();
+    this.clouds.rebuild(width, this.groundY);
 
     this.panelBg?.destroy();
     this.panelBg = this.add
