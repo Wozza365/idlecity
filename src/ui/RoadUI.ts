@@ -93,6 +93,10 @@ export class RoadUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
       btnGfx.fillStyle(0x2a65aa, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.06);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 3, tr: 3, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.28);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 4, br: 4 });
     };
     const drawHover = () => {
       btnGfx.clear();
@@ -100,6 +104,10 @@ export class RoadUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
       btnGfx.fillStyle(0x3a88cc, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.08);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 3, tr: 3, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.2);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 4, br: 4 });
     };
     const drawDisabled = () => {
       btnGfx.clear();
@@ -110,7 +118,7 @@ export class RoadUI {
       btnGfx.clear();
       btnGfx.fillStyle(0x0a1424, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 4);
-      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillStyle(0x000000, 0.35);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
     };
 
@@ -180,6 +188,10 @@ export class RoadUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
       btnGfx.fillStyle(0x2a7a2a, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.06);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 3, tr: 3, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.28);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 4, br: 4 });
     };
     const drawHover = () => {
       btnGfx.clear();
@@ -187,6 +199,10 @@ export class RoadUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
       btnGfx.fillStyle(0x3aaa3a, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.08);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 3, tr: 3, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.2);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 4, br: 4 });
     };
     const drawDisabled = () => {
       btnGfx.clear();
@@ -197,7 +213,7 @@ export class RoadUI {
       btnGfx.clear();
       btnGfx.fillStyle(0x0a1a0c, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 4);
-      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillStyle(0x000000, 0.35);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
     };
 
@@ -267,6 +283,10 @@ export class RoadUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
       btnGfx.fillStyle(0x2a7aaa, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.06);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 3, tr: 3, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.28);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 4, br: 4 });
     };
     const drawHover = () => {
       btnGfx.clear();
@@ -274,6 +294,10 @@ export class RoadUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 4);
       btnGfx.fillStyle(0x3aaace, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.08);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 3, tr: 3, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.2);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 4, br: 4 });
     };
     const drawDisabled = () => {
       btnGfx.clear();
@@ -284,7 +308,7 @@ export class RoadUI {
       btnGfx.clear();
       btnGfx.fillStyle(0x081420, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 4);
-      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillStyle(0x000000, 0.35);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
     };
 

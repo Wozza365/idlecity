@@ -111,6 +111,10 @@ export class PlotUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
       btnGfx.fillStyle(0x2a65aa, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.06);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.28);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 5, br: 5 });
     };
     const drawHover = () => {
       btnGfx.clear();
@@ -118,6 +122,10 @@ export class PlotUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
       btnGfx.fillStyle(0x3a88cc, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.08);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.2);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 5, br: 5 });
     };
     const drawDisabled = () => {
       btnGfx.clear();
@@ -128,7 +136,7 @@ export class PlotUI {
       btnGfx.clear();
       btnGfx.fillStyle(0x0a1424, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 5);
-      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillStyle(0x000000, 0.35);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 5, tr: 5, bl: 0, br: 0 });
     };
 
@@ -198,6 +206,10 @@ export class PlotUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
       btnGfx.fillStyle(0x2a9a50, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.06);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.28);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 5, br: 5 });
     };
     const drawHover = () => {
       btnGfx.clear();
@@ -205,6 +217,10 @@ export class PlotUI {
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, btnH, 5);
       btnGfx.fillStyle(0x3aba68, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY, btnW, 2, { tl: 5, tr: 5, bl: 0, br: 0 });
+      btnGfx.fillStyle(0xffffff, 0.08);
+      btnGfx.fillRoundedRect(cx - btnW / 2 + 1, btnY + 3, btnW - 2, Math.floor(btnH * 0.44), { tl: 4, tr: 4, bl: 0, br: 0 });
+      btnGfx.fillStyle(0x000000, 0.2);
+      btnGfx.fillRoundedRect(cx - btnW / 2, btnY + btnH - 3, btnW, 3, { tl: 0, tr: 0, bl: 5, br: 5 });
     };
     const drawDisabled = () => {
       btnGfx.clear();
@@ -215,7 +231,7 @@ export class PlotUI {
       btnGfx.clear();
       btnGfx.fillStyle(0x0a1c10, 1);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, btnH - 2, 5);
-      btnGfx.fillStyle(0x000000, 0.25);
+      btnGfx.fillStyle(0x000000, 0.35);
       btnGfx.fillRoundedRect(cx - btnW / 2, btnY + 2, btnW, 3, { tl: 5, tr: 5, bl: 0, br: 0 });
     };
 
