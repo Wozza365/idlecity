@@ -463,7 +463,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     // ── Shadow overlay ────────────────────────────────────────────
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
-    sg.fillRect(bx - 2, top, bw + 4, bodyBot - top);
+    sg.fillRect(bx - 2, top, bw + 4, groundY - top);
     if (level >= 59) {
       const prW = Math.round(bw * 0.40);
       sg.fillRect(bx + Math.round((bw - prW) / 2), top - 14, prW, 14);
