@@ -6,7 +6,7 @@ import {
   UNLOCK_COSTS,
   upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
   roadUpgradeCost, roadIncome, vergeIncome, waterIncome,
-  buildingHeight, fmt,
+  buildingHeight, fmt, MONO_FONT,
 } from '../constants';
 import { spawnFloatingText } from '../ui/FloatingText';
 import { createBuilding, EmptyPlot } from '../buildings';
@@ -145,6 +145,13 @@ export class GameScene extends Phaser.Scene {
 
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
+
+    // Particle dot texture for tier celebrations
+    const dotG = this.add.graphics();
+    dotG.fillStyle(0xffffff, 1);
+    dotG.fillCircle(4, 4, 4);
+    dotG.generateTexture('__particle', 8, 8);
+    dotG.destroy();
 
     // Master clock: 0→240_000 ms, linear, loops forever
     this.masterClock = this.tweens.addCounter({
@@ -288,11 +295,15 @@ export class GameScene extends Phaser.Scene {
     const cost = upgradeCost(plot.level);
     if (this.state.gold < cost) return;
 
+    const prevTier = this.buildingTier(plot.level);
     this.state.gold -= cost;
     plot.level = Math.min(plot.level + 1, MAX_LEVEL);
     this.plotContainers[index] = this.renderPlot(index);
     this.lightingSystem?.markSegmentsDirty();
     this.flashPlot(index, plot.level);
+
+    const newTier = this.buildingTier(plot.level);
+    if (newTier !== prevTier) this.celebrateTier(index, newTier, plot.level);
     this.plotUIs[index].destroy();
     this.plotUIs[index] = new PlotUI(
       this,
@@ -307,6 +318,73 @@ export class GameScene extends Phaser.Scene {
     this.add.existing(this.plotUIs[index].container);
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
+  }
+
+  private buildingTier(level: number): number {
+    if (level <= 15) return 1;
+    if (level <= 25) return 2;
+    if (level <= 40) return 3;
+    if (level <= 55) return 4;
+    if (level <= 70) return 5;
+    if (level <= 85) return 6;
+    return 7;
+  }
+
+  private celebrateTier(plotIndex: number, tier: number, level: number): void {
+    const TIER_NAMES = ['', 'Starter Home', 'Two-Storey House', 'Townhouse', 'Apartment Block', 'High-Rise', 'Office Block', 'Skyscraper'];
+    const plotW = this.scale.width / PLOT_COUNT;
+    const cx = (plotIndex + 0.5) * plotW;
+    const topY = this.groundY - buildingHeight(level) - YARD_H - 12;
+
+    // Banner
+    const banner = this.add
+      .text(cx, topY, `✦ ${TIER_NAMES[tier].toUpperCase()} ✦`, {
+        fontSize: '13px',
+        color: '#ffe066',
+        fontFamily: MONO_FONT,
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+        backgroundColor: '#0a1828cc',
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(201)
+      .setAlpha(0)
+      .setScale(0.6);
+
+    this.tweens.add({
+      targets: banner,
+      scale: 1,
+      alpha: 1,
+      duration: 280,
+      ease: 'Back.Out',
+      onComplete: () => {
+        this.tweens.add({
+          targets: banner,
+          alpha: 0,
+          y: topY - 55,
+          duration: 700,
+          delay: 1200,
+          ease: 'Quad.In',
+          onComplete: () => banner.destroy(),
+        });
+      },
+    });
+
+    // Particle burst
+    const emitter = this.add.particles(cx, topY, '__particle', {
+      speed: { min: 55, max: 140 },
+      angle: { min: 210, max: 330 },
+      scale: { start: 1.1, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: { min: 550, max: 950 },
+      tint: [0xffe066, 0xff8844, 0x44ddff, 0xff44cc, 0xaaffaa],
+      blendMode: 'ADD',
+    });
+    emitter.setDepth(202);
+    emitter.explode(22, cx, topY);
+    this.time.delayedCall(1100, () => emitter.destroy());
   }
 
   private flashPlot(index: number, level: number): void {
