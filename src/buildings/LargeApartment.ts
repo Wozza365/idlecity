@@ -495,7 +495,11 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
   updateWindowLights(elevation: number): void {
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
-    if (t < 0.01 && this.windowLights.every(l => l.intensity < 0.01)) return;
+    if (t < 0.01 && this.windowLights.every(l => l.intensity < 0.01)) {
+      if (this.lobbyLight)     this.lobbyLight.intensity = 0;
+      if (this.searchlightGfx) this.searchlightGfx.setAlpha(0);
+      return;
+    }
 
     const ambientIntensity = elevation >= 0.3 ? 1.0
       : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
@@ -508,7 +512,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       light.intensity = tNorm * 0.44 * flicker;
     });
 
-    if (this.lobbyLight)  this.lobbyLight.intensity  = 0.35 + tNorm * 1.6;
+    if (this.lobbyLight)  this.lobbyLight.intensity  = tNorm * 1.8;
     if (this.signLight)   this.signLight.intensity   = tNorm * 1.2;
     if (this.signSpot)    this.signSpot.setIntensity(tNorm * 2.8);
     if (this.flagLight)   this.flagLight.intensity   = tNorm * 0.6;
