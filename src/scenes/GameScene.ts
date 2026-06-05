@@ -2,11 +2,13 @@ import Phaser from 'phaser';
 import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
   PLOT_COUNT, MAX_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H,
-  ROAD_H, VERGE_H, WATER_H,
+  ROAD_H, VERGE_H, WATER_H, YARD_H,
   UNLOCK_COSTS,
   upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
   roadUpgradeCost, roadIncome, vergeIncome, waterIncome,
+  buildingHeight, fmt,
 } from '../constants';
+import { spawnFloatingText } from '../ui/FloatingText';
 import { createBuilding, EmptyPlot } from '../buildings';
 import { hasShadowOverlay, hasSmokeUpdate, hasFlagUpdate } from '../buildings/types';
 import { Sky } from '../objects/Sky';
@@ -73,6 +75,7 @@ export class GameScene extends Phaser.Scene {
 
   private sunAngle: number = Math.PI / 2;
   private lastWindowElev: number = 2; // out-of-range → forces first update
+  private _floatTickCount = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -531,6 +534,29 @@ export class GameScene extends Phaser.Scene {
     this.state.gold += this.taxRate / 4;
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
+
+    this._floatTickCount++;
+    if (this._floatTickCount >= 12) {
+      this._floatTickCount = 0;
+      this.spawnFloatingIncome();
+    }
+  }
+
+  private spawnFloatingIncome(): void {
+    const plots = this.state.plots;
+    const plotW = this.scale.width / PLOT_COUNT;
+    for (let i = 0; i < plots.length; i++) {
+      const plot = plots[i];
+      if (!plot.unlocked) continue;
+      const base = perBuildingIncome(plot.level);
+      const neighbours =
+        (i > 0 && plots[i - 1].unlocked ? 1 : 0) +
+        (i < plots.length - 1 && plots[i + 1].unlocked ? 1 : 0);
+      const incomeFor3s = base * (1 + neighbours * 0.15) * 3;
+      const cx = (i + 0.5) * plotW;
+      const topY = this.groundY - buildingHeight(plot.level) - YARD_H - 8;
+      spawnFloatingText(this, cx, topY, `+${fmt(incomeFor3s)}`);
+    }
   }
 
   // ── Save & notification ────────────────────────────────────────────────────
