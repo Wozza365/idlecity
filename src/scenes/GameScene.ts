@@ -320,6 +320,18 @@ export class GameScene extends Phaser.Scene {
     this.refreshButtons();
   }
 
+  private revealPlot(index: number): void {
+    const building = this.plotContainers[index];
+    if (!building) return;
+    building.setAlpha(0);
+    this.tweens.add({
+      targets: building,
+      alpha: 1,
+      duration: 650,
+      ease: 'Cubic.Out',
+    });
+  }
+
   private buildingTier(level: number): number {
     if (level <= 15) return 1;
     if (level <= 25) return 2;
@@ -412,6 +424,7 @@ export class GameScene extends Phaser.Scene {
     this.state.plots[index].level = 1;
     this.plotContainers[index] = this.renderPlot(index);
     this.lightingSystem?.markSegmentsDirty();
+    this.revealPlot(index);
     const nextUnlock = this.state.plots.findIndex(p => !p.unlocked);
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotUIs[i].destroy();
