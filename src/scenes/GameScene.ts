@@ -5,6 +5,7 @@ import {
   ROAD_H, VERGE_H, WATER_H,
   UNLOCK_COSTS,
   upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
+  roadUpgradeCost, roadIncome, vergeIncome, waterIncome,
 } from '../constants';
 import { createBuilding, EmptyPlot } from '../buildings';
 import { hasShadowOverlay, hasSmokeUpdate, hasFlagUpdate } from '../buildings/types';
@@ -325,7 +326,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onRoadUpgrade(): void {
-    const cost = this.state.road.level === 0 ? 200 : this.state.road.level * this.state.road.level * 50;
+    const cost = roadUpgradeCost(this.state.road.level);
     if (this.state.gold < cost) return;
 
     this.state.gold -= cost;
@@ -520,6 +521,9 @@ export class GameScene extends Phaser.Scene {
         (i < plots.length - 1 && plots[i + 1].unlocked ? 1 : 0);
       total += base * (1 + neighbours * 0.15);
     }
+    total += roadIncome(this.state.road.level);
+    total += vergeIncome(this.state.verge.level);
+    total += waterIncome(this.state.water.level);
     return total;
   }
 

@@ -1,3 +1,7 @@
+// ── Balance tuning ────────────────────────────────────────────────────────────
+// Single knob for overall income pace — applies to buildings and all area upgrades.
+export const BASE_INCOME_MULTIPLIER = 1;
+
 // ── Numeric constants ─────────────────────────────────────────────────────────
 
 export const PLOT_COUNT = 5;
@@ -54,15 +58,33 @@ const _t1Inc = _t1Base * 0.115 / 10, _t2Inc = _t2Base * 0.135 / 10, _t3Inc = _t3
 const _at15 = 5 + 14 * _t1Inc, _at35 = _at15 + 20 * _t2Inc, _at65 = _at35 + 30 * _t3Inc;
 
 export function perBuildingIncome(level: number): number {
-  if (level <= 15) return 5 + (level - 1) * _t1Inc;
-  if (level <= 35) return _at15 + (level - 15) * _t2Inc;
-  if (level <= 65) return _at35 + (level - 35) * _t3Inc;
-  return _at65 + (level - 65) * _t4Inc;
+  let raw: number;
+  if (level <= 15) raw = 5 + (level - 1) * _t1Inc;
+  else if (level <= 35) raw = _at15 + (level - 15) * _t2Inc;
+  else if (level <= 65) raw = _at35 + (level - 35) * _t3Inc;
+  else raw = _at65 + (level - 65) * _t4Inc;
+  return raw * BASE_INCOME_MULTIPLIER;
+}
+
+// Area income: quadratic per level so each upgrade is meaningfully more than the last.
+// Fewer levels than buildings → each level carries greater weight per step.
+export function roadIncome(level: number): number {
+  return BASE_INCOME_MULTIPLIER * level * level * 0.6;
+}
+export function vergeIncome(level: number): number {
+  return BASE_INCOME_MULTIPLIER * level * level * 0.4;
+}
+export function waterIncome(level: number): number {
+  return BASE_INCOME_MULTIPLIER * level * level * 0.52;
+}
+
+export function roadUpgradeCost(level: number): number {
+  return level === 0 ? 200 : level * level * 100;
 }
 
 export function waterUpgradeCost(level: number): number {
   if (level === 0) return 1_000;
-  return level * level * 350 + 600;
+  return level * level * 700 + 1_000;
 }
 
 export function waterTierName(level: number): string {
@@ -77,7 +99,7 @@ export function waterTierName(level: number): string {
 
 export function vergeUpgradeCost(level: number): number {
   if (level === 0) return 500;
-  return level * level * 200 + 400;
+  return level * level * 400 + 600;
 }
 
 export function vergeTierName(level: number): string {

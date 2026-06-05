@@ -3,6 +3,7 @@ import { type RoadState, type VergeState, type WaterState } from '../game/GameSt
 import {
   ROAD_BAR_H, MAX_VERGE_LEVEL, MAX_WATER_LEVEL,
   fmt, UI_FONT, MONO_FONT,
+  roadUpgradeCost,
   vergeTierName, vergeUpgradeCost,
   waterTierName, waterUpgradeCost,
 } from '../constants';
@@ -59,7 +60,7 @@ export class RoadUI {
     onUpgrade: () => void,
   ): void {
     const atMax = road.level >= 10;
-    const cost  = this.roadUpgradeCost(road.level);
+    const cost  = roadUpgradeCost(road.level);
     const btnW  = Math.min(sectionW - 24, 200);
     const btnH  = 34;
     const btnY  = rowTop + 24;
@@ -284,10 +285,6 @@ export class RoadUI {
     btn.on('pointerdown', onUpgrade);
 
     this.waterActionRef = { btn, getCost: () => cost, drawNormal, drawDisabled, isHovered: () => hovered };
-  }
-
-  private roadUpgradeCost(level: number): number {
-    return level === 0 ? 200 : level * level * 50;
   }
 
   private roadTierName(level: number): string {
