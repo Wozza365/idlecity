@@ -284,6 +284,7 @@ export class GameScene extends Phaser.Scene {
     plot.level = Math.min(plot.level + 1, MAX_LEVEL);
     this.plotContainers[index] = this.renderPlot(index);
     this.lightingSystem?.markSegmentsDirty();
+    this.flashPlot(index, plot.level);
     this.plotUIs[index].destroy();
     this.plotUIs[index] = new PlotUI(
       this,
@@ -298,6 +299,22 @@ export class GameScene extends Phaser.Scene {
     this.add.existing(this.plotUIs[index].container);
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
+  }
+
+  private flashPlot(index: number, level: number): void {
+    const plotW = this.scale.width / PLOT_COUNT;
+    const cx = (index + 0.5) * plotW;
+    const bh = buildingHeight(level) + YARD_H;
+    const flash = this.add
+      .rectangle(cx, this.groundY - bh / 2, plotW - 4, bh, 0xffffff, 0.28)
+      .setDepth(20);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 350,
+      ease: 'Cubic.Out',
+      onComplete: () => flash.destroy(),
+    });
   }
 
   private onPlotUnlock(index: number): void {
