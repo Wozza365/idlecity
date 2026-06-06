@@ -563,7 +563,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number): void {
+  updateWindowLights(elevation: number, time = 0): void {
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01 && this.windowLights.every(l => l.intensity < 0.01)) return;
 
@@ -571,19 +571,19 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
       : 0.5;
     const tNorm = t * (0.5 / ambientIntensity);
-    const time  = this.scene.time.now / 1000;
+    const now = time || this.scene.time.now / 1000;
 
     this.windowLights.forEach((light, i) => {
-      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.08;
+      const flicker = 1 + Math.sin(now * 1.7 + this.lightPhases[i]) * 0.08;
       light.intensity = tNorm * 0.42 * flicker;
     });
     this.neonLights.forEach((light, i) => {
-      const pulse = 1 + Math.sin(time * 2.3 + this.neonPhases[i]) * 0.12;
+      const pulse = 1 + Math.sin(now * 2.3 + this.neonPhases[i]) * 0.12;
       light.intensity = tNorm * 0.8 * pulse;
     });
     for (const spot of this.neonSpots) spot.setIntensity(tNorm * 3.5);
 
-    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
+    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm, now);
     if (this.lampConeGfx)    this.lampConeGfx.setAlpha(tNorm * 0.45);
     if (this.neonGfx)        this.neonGfx.setAlpha(Math.min(1, tNorm * 1.2));
     if (this.flagLight)      this.flagLight.intensity = tNorm * 0.6;
@@ -609,21 +609,19 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     gfx.fillTriangle(mcx, fy + mid, fx + fw, fy + fh + wave, fx + fw, fy + wave);
   }
 
-  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
+  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
     for (const { wx, wy, ww, wh, shop } of this.windowRects) {
       if (shop) {
-        // Shop display windows: larger glass, warm interior glow at night
         gfx.fillStyle(lerpColor(0x3a6888, 0xffdd88, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
-        // Subtle reflection highlight
         gfx.fillStyle(0xffffff, Math.max(0, 0.12 - t * 0.1));
         gfx.fillRect(wx, wy, ww, 2);
       } else {
-        // Upper floor curtain wall panels: tall glass, cool day / warm night
-        gfx.fillStyle(lerpColor(0x4a8aaa, 0xffcc66, t), 1);
+        const isTv    = t > 0.1 && ((wx | 0) * 7 + (wy | 0) * 13) % 4 === 0;
+        const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * 7.3 + wx)) : 1;
+        gfx.fillStyle(isTv ? lerpColor(0x4a8aaa, 0x334488, t * tvFlick) : lerpColor(0x4a8aaa, 0xffcc66, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
-        // Single horizontal mid-pane divider
         gfx.fillStyle(0xffffff, 0.18);
         gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);
       }

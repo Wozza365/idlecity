@@ -417,21 +417,21 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number): void {
+  updateWindowLights(elevation: number, time = 0): void {
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     const ambientIntensity = elevation >= 0.3 ? 1.0
       : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
       : 0.5;
     const tNorm = t * (0.5 / ambientIntensity);
-    const time = this.scene.time.now / 1000;
+    const now = time || this.scene.time.now / 1000;
 
     this.windowLights.forEach((light, i) => {
-      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.10;
+      const flicker = 1 + Math.sin(now * 1.7 + this.lightPhases[i]) * 0.10;
       light.intensity = tNorm * 0.45 * flicker;
     });
-    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
+    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm, now);
     if (this.lampConeGfx) {
-      const pulse = 1 + Math.sin(time * 1.8) * 0.08;
+      const pulse = 1 + Math.sin(now * 1.8) * 0.08;
       this.lampConeGfx.setAlpha(tNorm * 0.45 * pulse);
     }
     if (this.flagLight) this.flagLight.intensity = tNorm * 0.6;
@@ -464,10 +464,15 @@ export class Townhouse extends Phaser.GameObjects.Container {
     gfx.fillTriangle(mcx, mcy_t, brx, bry, trx, try_);
   }
 
-  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
+  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
     for (const { wx, wy, ww, wh } of this.windowRects) {
-      gfx.fillStyle(lerpColor(0x8ab4cc, 0xffcc66, t), 1);
+      const isTv    = t > 0.1 && ((wx | 0) * 7 + (wy | 0) * 13) % 4 === 0;
+      const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * 7.3 + wx)) : 1;
+      const color   = isTv
+        ? lerpColor(0x8ab4cc, 0x334488, t * tvFlick)
+        : lerpColor(0x8ab4cc, 0xffcc66, t);
+      gfx.fillStyle(color, 1);
       gfx.fillRect(wx, wy, ww, wh);
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(wx + Math.round(ww / 2) - 1, wy, 2, wh);

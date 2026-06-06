@@ -35,7 +35,7 @@ import { SeasonSystem } from '../game/SeasonSystem';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
 
-interface WindowLightable { updateWindowLights(elevation: number): void; }
+interface WindowLightable { updateWindowLights(elevation: number, time?: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
   o != null && typeof (o as WindowLightable).updateWindowLights === 'function';
 
@@ -685,10 +685,12 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.plotContainers) {
       if (hasShadowOverlay(c)) c.setShadowAlpha(shadowAlpha);
     }
-    if (Math.abs(elev - this.lastWindowElev) >= 0.003) {
+    const wTime = performance.now() / 1000;
+    // At night (elev < -0.1) force window redraw every frame for TV flicker
+    if (elev < -0.1 || Math.abs(elev - this.lastWindowElev) >= 0.003) {
       this.lastWindowElev = elev;
       for (const c of this.plotContainers) {
-        if (isWindowLightable(c)) c.updateWindowLights(elev);
+        if (isWindowLightable(c)) c.updateWindowLights(elev, wTime);
       }
     }
     this.carManager?.updateLighting(elev);

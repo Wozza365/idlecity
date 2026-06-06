@@ -493,7 +493,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number): void {
+  updateWindowLights(elevation: number, time = 0): void {
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01 && this.windowLights.every(l => l.intensity < 0.01)) {
       if (this.lobbyLight)     this.lobbyLight.intensity = 0;
@@ -505,10 +505,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
       : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
       : 0.5;
     const tNorm = t * (0.5 / ambientIntensity);
-    const time  = this.scene.time.now / 1000;
+    const now = time || this.scene.time.now / 1000;
 
     this.windowLights.forEach((light, i) => {
-      const flicker = 1 + Math.sin(time * 1.7 + this.lightPhases[i]) * 0.08;
+      const flicker = 1 + Math.sin(now * 1.7 + this.lightPhases[i]) * 0.08;
       light.intensity = tNorm * 0.44 * flicker;
     });
 
@@ -519,7 +519,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     for (const fl of this.hotelFlagLights) fl.intensity = tNorm * 0.45;
     if (this.searchlightGfx) this.searchlightGfx.setAlpha(Math.min(1, tNorm * 1.3));
 
-    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm);
+    if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm, now);
     if (this.accentGfx)      this.accentGfx.setAlpha(Math.min(1, tNorm * 0.9));
   }
 
@@ -635,13 +635,13 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     gfx.fillCircle(sx, sy, 3);
   }
 
-  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
+  private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
     for (const { wx, wy, ww, wh } of this.windowRects) {
-      // Day: steel-blue reflection; night: warm golden interior
-      gfx.fillStyle(lerpColor(0x3a88c8, 0xffdd88, t), 1);
+      const isTv    = t > 0.1 && ((wx | 0) * 7 + (wy | 0) * 13) % 4 === 0;
+      const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * 7.3 + wx)) : 1;
+      gfx.fillStyle(isTv ? lerpColor(0x3a88c8, 0x334488, t * tvFlick) : lerpColor(0x3a88c8, 0xffdd88, t), 1);
       gfx.fillRect(wx, wy, ww, wh);
-      // Reflection highlight at top of each pane
       gfx.fillStyle(0xffffff, Math.max(0, 0.22 - t * 0.18));
       gfx.fillRect(wx, wy, ww, Math.max(1, Math.round(wh * 0.22)));
     }
