@@ -1,3 +1,5 @@
+import type { SeasonSaveState } from './SeasonSystem';
+
 const SAVE_KEY = 'idlecity-save';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -27,6 +29,7 @@ export interface GameState {
   road: RoadState;
   verge: VergeState;
   water: WaterState;
+  season?: SeasonSaveState;
 }
 
 // ── Default state ──────────────────────────────────────────────────────────────

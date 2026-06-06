@@ -29,6 +29,7 @@ import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
+import { SeasonSystem } from '../game/SeasonSystem';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -78,6 +79,7 @@ export class GameScene extends Phaser.Scene {
   private sunAngle: number = Math.PI / 2;
   private lastWindowElev: number = 2; // out-of-range → forces first update
   private _floatTickCount = 0;
+  seasons!: SeasonSystem;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -104,6 +106,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.lights.enable();
     this.lights.setAmbientColor(0x888888);
+
+    this.seasons = new SeasonSystem(this.state.season);
 
     this.panelChrome = new PanelChrome(this);
 
@@ -162,6 +166,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.seasons.update(delta);
     this.clouds.update(delta, Math.sin(this.sunAngle));
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
@@ -555,6 +560,7 @@ export class GameScene extends Phaser.Scene {
   private resetGame(): void {
     clearSave();
     this.state = defaultState(PLOT_COUNT);
+    this.seasons = new SeasonSystem();
     this.buildLayout();
   }
 
@@ -675,6 +681,7 @@ export class GameScene extends Phaser.Scene {
   // ── Save & notification ────────────────────────────────────────────────────
 
   private onAutosave(): void {
+    this.state.season = this.seasons.toSaveState();
     saveGame(this.state);
     this.showSaveNotification();
   }
