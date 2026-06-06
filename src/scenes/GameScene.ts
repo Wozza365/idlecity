@@ -168,6 +168,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     this.seasons.update(delta);
     this.clouds.update(delta, Math.sin(this.sunAngle), this.seasons.summerWeight, this.seasons.weatherIntensity);
+    this.vergeRiver.updateSeasonalColors(this.seasons.autumnWeight, this.seasons.winterWeight, this.seasons.springWeight);
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);

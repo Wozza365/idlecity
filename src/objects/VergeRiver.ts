@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H, VERGE_H } from '../constants';
+import { ROAD_H, VERGE_H, lerpColor } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 
@@ -47,6 +47,13 @@ export class VergeRiver {
   private _groundY: number = 0;
   private _lastLightingElevation = NaN;
 
+  // Seasonal colour weights — updated once per game day, trigger tree/grass redraw
+  private _autumnWeight = 0;
+  private _winterWeight = 0;
+  private _springWeight = 0;
+  private _lastSeasonHash = -1;
+  private grassSeasonGfx: Phaser.GameObjects.Graphics;
+
   get extraLights(): LightSource[] { return [...this.lampLights, ...this.bollardLights]; }
 
   getTreeOccluders(): Array<{ x: number; y: number; r: number }> {
@@ -58,12 +65,13 @@ export class VergeRiver {
   }
 
   constructor(scene: Phaser.Scene) {
-    this.scene      = scene;
-    this.vergeGfx   = scene.add.graphics().setDepth(6).setLighting(true);
-    this.flowerGfx  = scene.add.graphics().setDepth(6.1); // no lighting — preserves true flower colours
-    this.cyclistGfx = scene.add.graphics().setDepth(6.5).setLighting(true);
-    this.shadowGfx  = scene.add.graphics().setDepth(7.1);
-    this.treeGfx    = scene.add.graphics().setDepth(8.5).setLighting(true);
+    this.scene         = scene;
+    this.vergeGfx      = scene.add.graphics().setDepth(6).setLighting(true);
+    this.flowerGfx     = scene.add.graphics().setDepth(6.1); // no lighting — preserves true flower colours
+    this.cyclistGfx    = scene.add.graphics().setDepth(6.5).setLighting(true);
+    this.shadowGfx     = scene.add.graphics().setDepth(7.1);
+    this.treeGfx       = scene.add.graphics().setDepth(8.5).setLighting(true);
+    this.grassSeasonGfx = scene.add.graphics().setDepth(6.02).setLighting(true);
   }
 
   render(level: number, width: number, groundY: number): void {
@@ -160,6 +168,53 @@ export class VergeRiver {
     } else {
       this.cyclists = [];
       this.cyclistGfx.clear();
+    }
+  }
+
+  // ── Seasonal colour update (called once per game day) ────────────
+
+  updateSeasonalColors(autumnWeight: number, winterWeight: number, springWeight: number): void {
+    // Hash to avoid redundant redraws — quantise to 0.01 steps
+    const hash = Math.round(autumnWeight * 100) * 10000
+               + Math.round(winterWeight * 100) * 100
+               + Math.round(springWeight * 100);
+    if (hash === this._lastSeasonHash) return;
+    this._lastSeasonHash = hash;
+
+    this._autumnWeight = autumnWeight;
+    this._winterWeight = winterWeight;
+    this._springWeight = springWeight;
+
+    if (this._level >= 4) {
+      const vergeY = this._groundY + ROAD_H;
+      this.treeGfx.clear();
+      this.drawTrees(this._level, vergeY);
+      if (this._level >= 10) this.drawLamps(this._level, vergeY);
+    }
+
+    // Grass seasonal overlay — a semi-transparent tint over the base grass
+    this.grassSeasonGfx.clear();
+    if (this._level === 0 || this._width === 0) return;
+
+    const vergeY = this._groundY + ROAD_H;
+    const aw = this._autumnWeight;
+    const ww = this._winterWeight;
+    const sw = this._springWeight;
+
+    if (ww > 0.02) {
+      // Winter: pale brownish-grey frost
+      this.grassSeasonGfx.fillStyle(0x9a8060, ww * 0.35);
+      this.grassSeasonGfx.fillRect(0, vergeY, this._width, VERGE_H);
+    }
+    if (aw > 0.02) {
+      // Autumn: warm amber-brown cast
+      this.grassSeasonGfx.fillStyle(0x8a4010, aw * 0.22);
+      this.grassSeasonGfx.fillRect(0, vergeY, this._width, VERGE_H);
+    }
+    if (sw > 0.02) {
+      // Spring: fresh yellow-green burst
+      this.grassSeasonGfx.fillStyle(0x88ee44, sw * 0.14);
+      this.grassSeasonGfx.fillRect(0, vergeY, this._width, VERGE_H);
     }
   }
 
@@ -379,16 +434,30 @@ export class VergeRiver {
 
   private drawTrees(level: number, vergeY: number): void {
     const gfx = this.treeGfx;
-    const { trunkH, canopyR } = treeGeom(level);
+    const aw  = this._autumnWeight;
+    const ww  = this._winterWeight;
+    const sw  = this._springWeight;
+
+    const { trunkH, canopyR: baseR } = treeGeom(level);
     const trunkBaseY = vergeY + 8;
     const trunkTopY  = trunkBaseY - trunkH;
     const canopyY    = trunkTopY;
+    // Trees thin slightly in winter (reduced canopy radius)
+    const canopyR    = Math.round(baseR * (1 - 0.22 * ww));
 
-    const trunkColor  = 0x5c3a1e;
-    const shadowRing  = level >= 14 ? 0x152808 : 0x1e4a1a;
-    const canopyDark  = level >= 14 ? 0x234e10 : 0x336622;
-    const canopyMid   = level >= 14 ? 0x347020 : 0x4a8c32;
-    const canopyLight = level >= 14 ? 0x4ea030 : 0x66cc44;
+    // Base green colours — lerped through autumn (orange) and winter (dark/muted) and spring (bright)
+    const baseShadow  = level >= 14 ? 0x152808 : 0x1e4a1a;
+    const baseDark    = level >= 14 ? 0x234e10 : 0x336622;
+    const baseMid     = level >= 14 ? 0x347020 : 0x4a8c32;
+    const baseLight   = level >= 14 ? 0x4ea030 : 0x66cc44;
+
+    // Autumn: green → orange/rust; Winter: darken toward near-black twigs
+    const shadowRing  = lerpColor(lerpColor(baseShadow, 0x6a2800, aw), 0x1a1000, ww * 0.5);
+    const canopyDark  = lerpColor(lerpColor(baseDark,   0x7a3a10, aw), 0x2a1800, ww * 0.5);
+    const canopyMid   = lerpColor(lerpColor(baseMid,    0xbb5500, aw), 0x3a2800, ww * 0.5);
+    const canopyLight = lerpColor(lerpColor(lerpColor(baseLight, 0xff8800, aw), 0x4a3818, ww * 0.5), 0x88ee44, sw * 0.55);
+
+    const trunkColor = 0x5c3a1e;
 
     for (const tx of this.treeXs) {
       gfx.fillStyle(trunkColor, 1);
