@@ -76,8 +76,7 @@ export class BirdFlock {
       if (i === 0) {
         this.birds.push({ offsetX: 0, offsetY: 0, phase: 0 });
       } else {
-        const row   = Math.ceil(i / 2);
-        const right = (i % 2 === 1) ? 1 : -1;
+        const row = Math.ceil(i / 2);
         this.birds.push({
           offsetX: -row * 12 * this.dir,
           offsetY:  row * 6,

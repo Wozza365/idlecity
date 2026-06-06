@@ -7,13 +7,11 @@ interface Streak {
 
 export class Rain {
   private readonly gfx: Phaser.GameObjects.Graphics;
-  private readonly scene: Phaser.Scene;
   private streaks: Streak[] = [];
   private sceneWidth = 800;
   private sceneHeight = 600;
 
   constructor(scene: Phaser.Scene) {
-    this.scene = scene;
     this.gfx = scene.add.graphics().setDepth(9.8);
   }
 

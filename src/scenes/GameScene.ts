@@ -210,6 +210,10 @@ export class GameScene extends Phaser.Scene {
     this.waterArea?.update(delta, elevation, this.sky.horizonColor);
     this.waterArea?.updateShadows(this.sunAngle);
     this.boatManager?.update(delta, elevation);
+    this.stars.update(delta, elevation, this.sunAngle, this.scale.width);
+    this.updateAirplane(delta);
+    this.balloon?.update(delta, elevation);
+    this.birdFlock?.update(delta, elevation);
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     for (const c of this.plotContainers) {
       if (hasSmokeUpdate(c)) c.updateSmoke(t);
@@ -629,7 +633,7 @@ export class GameScene extends Phaser.Scene {
     this.buildLayout();
   }
 
-  private updateAirplane(delta: number, elev: number): void {
+  private updateAirplane(delta: number): void {
     const w = this.scale.width;
     const h = this.groundY;
     this.planeGfx.clear();
@@ -705,10 +709,6 @@ export class GameScene extends Phaser.Scene {
     this.sky.updateGradient(elev, this.scale.width, this.groundY, this.seasons.winterWeight, this.seasons.springWeight, this.seasons.weatherIntensity);
 
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase, this.seasons.c1);
-    this.stars.update(delta, elev, this.sunAngle, this.scale.width);
-    this.updateAirplane(delta, elev);
-    this.balloon?.update(delta, elev);
-    this.birdFlock?.update(delta, elev);
     const shadowAlpha = this.sunMoon.shadowAlpha;
     for (const c of this.plotContainers) {
       if (hasShadowOverlay(c)) c.setShadowAlpha(shadowAlpha);
