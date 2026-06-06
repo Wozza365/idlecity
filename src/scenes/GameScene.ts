@@ -32,6 +32,8 @@ import { Clouds } from '../objects/Clouds';
 import { Rain } from '../objects/Rain';
 import { Snow } from '../objects/Snow';
 import { SeasonSystem } from '../game/SeasonSystem';
+import { Balloon } from '../objects/Balloon';
+import { BirdFlock } from '../objects/BirdFlock';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -90,6 +92,10 @@ export class GameScene extends Phaser.Scene {
   private plane: { x: number; y: number; vx: number; blinkTimer: number; blinkOn: boolean } | null = null;
   private planeIdleTimer = 70_000 + Math.random() * 50_000;
 
+  // ── Hot air balloon & birds ───────────────────────────────────────────────
+  private balloon!: Balloon;
+  private birdFlock!: BirdFlock;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -119,7 +125,9 @@ export class GameScene extends Phaser.Scene {
     this.seasons = new SeasonSystem(this.state.season);
     this.rain    = new Rain(this);
     this.snow    = new Snow(this);
-    this.planeGfx = this.add.graphics().setDepth(1.5);
+    this.planeGfx  = this.add.graphics().setDepth(1.5);
+    this.balloon   = new Balloon(this);
+    this.birdFlock = new BirdFlock(this);
 
     this.panelChrome = new PanelChrome(this);
 
@@ -214,6 +222,8 @@ export class GameScene extends Phaser.Scene {
     this.clouds.rebuild(width, this.groundY);
     this.rain?.rebuild(width, height);
     this.snow?.rebuild(width, height);
+    this.balloon?.rebuild(width, this.groundY);
+    this.birdFlock?.rebuild(width, this.groundY);
 
     this.panelBg?.destroy();
     this.panelBg = this.add
@@ -665,6 +675,8 @@ export class GameScene extends Phaser.Scene {
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase, this.seasons.c1);
     this.stars.update(delta, elev, this.sunAngle, this.scale.width);
     this.updateAirplane(delta, elev);
+    this.balloon?.update(delta, elev);
+    this.birdFlock?.update(delta, elev);
     const shadowAlpha = this.sunMoon.shadowAlpha;
     for (const c of this.plotContainers) {
       if (hasShadowOverlay(c)) c.setShadowAlpha(shadowAlpha);
