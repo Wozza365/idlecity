@@ -614,7 +614,7 @@ export class GameScene extends Phaser.Scene {
     this.sky.updateGradient(elev, this.scale.width, this.groundY, this.seasons.winterWeight, this.seasons.springWeight, this.seasons.weatherIntensity);
 
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase, this.seasons.c1);
-    this.stars.update(elev, this.sunAngle, this.scale.width);
+    this.stars.update(delta, elev, this.sunAngle, this.scale.width);
     const shadowAlpha = this.sunMoon.shadowAlpha;
     for (const c of this.plotContainers) {
       if (hasShadowOverlay(c)) c.setShadowAlpha(shadowAlpha);
