@@ -2,13 +2,48 @@ import Phaser from 'phaser';
 import { ROAD_H, ROAD_DIVIDER_H } from '../constants';
 
 export class Road {
-  private gfx: Phaser.GameObjects.Graphics;
+  private gfx:        Phaser.GameObjects.Graphics;
+  private weatherGfx: Phaser.GameObjects.Graphics;
+  private _level  = 0;
+  private _width  = 0;
+  private _groundY = 0;
 
   constructor(scene: Phaser.Scene) {
-    this.gfx = scene.add.graphics().setDepth(7).setLighting(true);
+    this.gfx        = scene.add.graphics().setDepth(7).setLighting(true);
+    this.weatherGfx = scene.add.graphics().setDepth(7.05);
+  }
+
+  /** Draw wet-road effects driven by weatherIntensity (0–1). */
+  updateWeather(intensity: number): void {
+    const gfx = this.weatherGfx;
+    gfx.clear();
+    if (intensity <= 0 || this._level === 0) return;
+
+    const gy = this._groundY;
+    const w  = this._width;
+
+    // Glossy wet sheen over the road surface
+    gfx.fillStyle(0xaaccee, 0.045 * intensity);
+    gfx.fillRect(0, gy, w, ROAD_H);
+
+    // 2–3 puddle ellipses on the road shoulders — alpha builds with intensity
+    const puddleAlpha = 0.20 * intensity;
+    const puddleColor = 0x4466aa;
+    const positions = [
+      { x: w * 0.12, y: gy + 8,         rx: 22, ry: 5 },
+      { x: w * 0.55, y: gy + ROAD_H - 9, rx: 18, ry: 4 },
+      { x: w * 0.78, y: gy + 10,         rx: 14, ry: 4 },
+    ];
+    for (const p of positions) {
+      gfx.fillStyle(puddleColor, puddleAlpha);
+      gfx.fillEllipse(p.x, p.y, p.rx * 2, p.ry * 2);
+    }
   }
 
   render(level: number, width: number, groundY: number): void {
+    this._level   = level;
+    this._width   = width;
+    this._groundY = groundY;
     const gfx = this.gfx;
     const gy  = groundY;
     gfx.clear();

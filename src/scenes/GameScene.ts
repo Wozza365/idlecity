@@ -29,6 +29,8 @@ import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
+import { Rain } from '../objects/Rain';
+import { Snow } from '../objects/Snow';
 import { SeasonSystem } from '../game/SeasonSystem';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
@@ -66,6 +68,8 @@ export class GameScene extends Phaser.Scene {
   private panelBg!: Phaser.GameObjects.Rectangle;
 
   private clouds!: Clouds;
+  private rain!: Rain;
+  private snow!: Snow;
   private lightingSystem: LightingSystem | null = null;
   private carManager: CarManager | null = null;
   private pedestrianManager: PedestrianManager | null = null;
@@ -108,6 +112,8 @@ export class GameScene extends Phaser.Scene {
     this.lights.setAmbientColor(0x888888);
 
     this.seasons = new SeasonSystem(this.state.season);
+    this.rain    = new Rain(this);
+    this.snow    = new Snow(this);
 
     this.panelChrome = new PanelChrome(this);
 
@@ -169,6 +175,14 @@ export class GameScene extends Phaser.Scene {
     this.seasons.update(delta);
     this.clouds.update(delta, Math.sin(this.sunAngle), this.seasons.summerWeight, this.seasons.weatherIntensity);
     this.vergeRiver.updateSeasonalColors(this.seasons.autumnWeight, this.seasons.winterWeight, this.seasons.springWeight);
+    const rainIntensity = this.seasons.weatherType === 'rain' ? this.seasons.weatherIntensity : 0;
+    const snowIntensity = this.seasons.weatherType === 'snow' ? this.seasons.weatherIntensity : 0;
+    this.rain.update(delta, rainIntensity);
+    this.snow.update(delta, snowIntensity);
+    this.road.updateWeather(rainIntensity + snowIntensity * 0.3);
+    if (this.pedestrianManager) {
+      this.pedestrianManager.weatherIntensity = this.seasons.weatherIntensity;
+    }
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
@@ -192,6 +206,8 @@ export class GameScene extends Phaser.Scene {
 
     this.sky.rebuild();
     this.clouds.rebuild(width, this.groundY);
+    this.rain?.rebuild(width, height);
+    this.snow?.rebuild(width, height);
 
     this.panelBg?.destroy();
     this.panelBg = this.add

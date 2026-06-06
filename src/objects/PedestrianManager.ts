@@ -62,6 +62,7 @@ export class PedestrianManager {
   private offscreenTimer: number;
   private doorTimer:  number;
   private elevation = 1.0;
+  weatherIntensity = 0;
 
   // Both Graphics so depth-sort composites correctly with shadow overlays (also Graphics).
   // Rectangle objects in Phaser 4 render in a separate pipeline pass that ignores depth
@@ -299,7 +300,7 @@ export class PedestrianManager {
   private calcOffscreenDelay(plots: PlotState[]): number {
     const totalLevel = plots.reduce((s, p) => s + (p.unlocked ? p.level : 0), 0);
     if (totalLevel === 0) return 8000;
-    const factor   = this.dayNightFactor();
+    const factor   = this.dayNightFactor() * (1 - 0.80 * this.weatherIntensity);
     const baseMs   = Math.max(300, 10000 / totalLevel);
     const adjusted = baseMs / Math.max(0.02, factor);
     return adjusted * (0.65 + Math.random() * 0.70);
