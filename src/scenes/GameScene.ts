@@ -309,6 +309,8 @@ export class GameScene extends Phaser.Scene {
       () => this.resetGame(),
       () => this.setMidnight(),
       () => this.skipToHighLevel(),
+      () => this.advanceDay(),
+      (season) => this.jumpToSeason(season),
     );
     this.add.existing(this.devPanel.container);
 
@@ -732,6 +734,16 @@ export class GameScene extends Phaser.Scene {
 
   private advanceTime(): void {
     this.timeOffsetMs = (this.timeOffsetMs + 240_000 / 24) % 240_000;
+  }
+
+  private advanceDay(): void {
+    this.seasons.gameDayCount++;
+  }
+
+  private jumpToSeason(season: string): void {
+    const offsets: Record<string, number> = { Summer: 0, Autumn: 10, Winter: 20, Spring: 30 };
+    const yearBase = Math.floor(this.seasons.gameDayCount / 40) * 40;
+    this.seasons.gameDayCount = yearBase + (offsets[season] ?? 0);
   }
 
   private setMidnight(): void {
