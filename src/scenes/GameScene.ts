@@ -29,7 +29,6 @@ import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
-import { NightGlow } from '../objects/NightGlow';
 
 interface WindowLightable { updateWindowLights(elevation: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -66,7 +65,6 @@ export class GameScene extends Phaser.Scene {
   private panelBg!: Phaser.GameObjects.Rectangle;
 
   private clouds!: Clouds;
-  private nightGlow!: NightGlow;
   private lightingSystem: LightingSystem | null = null;
   private carManager: CarManager | null = null;
   private pedestrianManager: PedestrianManager | null = null;
@@ -110,9 +108,8 @@ export class GameScene extends Phaser.Scene {
     this.panelChrome = new PanelChrome(this);
 
     // World-layer managers — each owns its own graphics/objects
-    this.clouds    = new Clouds(this);
-    this.nightGlow = new NightGlow(this);
-    this.sky       = new Sky(this);
+    this.clouds     = new Clouds(this);
+    this.sky        = new Sky(this);
     this.road       = new Road(this);
     this.vergeRiver = new VergeRiver(this);
     this.waterArea  = new WaterArea(this);
@@ -595,7 +592,6 @@ export class GameScene extends Phaser.Scene {
         if (isWindowLightable(c)) c.updateWindowLights(elev);
       }
     }
-    this.nightGlow.update(elev, this.state.plots, this.plotWidth, this.groundY);
     this.carManager?.updateLighting(elev);
     this.boatManager?.updateLighting(elev);
     this.vergeRiver.updateLighting(elev);
