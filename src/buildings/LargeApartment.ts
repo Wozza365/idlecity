@@ -54,6 +54,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private lightPhases:   number[] = [];
   private windowRects:   Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
   private shadowGfx!:   Phaser.GameObjects.Graphics;
+  private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
+  private _neonX = 0;
+  private _neonY = 0;
+  private _neonPhase = 0;
 
   get extraLights(): LightSource[] {
     return this.signSpot ? [...this.signSpot.beams] : [];
@@ -415,6 +419,17 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     }
     this.add(lampConeGfx);
 
+    // ── Neon sign (ADD blend, amber) ──────────────────────────────
+    {
+      const neonSignGfx = scene.add.graphics();
+      neonSignGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+      this.add(neonSignGfx);
+      this.neonSignGfx = neonSignGfx;
+      this._neonX     = bx + 10;
+      this._neonY     = lobbyTop + 8;
+      this._neonPhase = Math.random() * Math.PI * 2;
+    }
+
     // ── Lv 62+: LED accent band glow (ADD, animated) ──────────────
     if (level >= 62) {
       const accentGfx = scene.add.graphics();
@@ -521,6 +536,16 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm, now);
     if (this.accentGfx)      this.accentGfx.setAlpha(Math.min(1, tNorm * 0.9));
+    if (this.neonSignGfx) {
+      const nPulse = 0.6 + 0.4 * Math.abs(Math.sin(now * 2.1 + this._neonPhase));
+      this.neonSignGfx.clear();
+      if (tNorm > 0.05) {
+        this.neonSignGfx.fillStyle(0xffcc00, tNorm * nPulse);
+        this.neonSignGfx.fillRect(this._neonX, this._neonY, 22, 4);
+        this.neonSignGfx.fillRect(this._neonX + 2, this._neonY - 4, 18, 4);
+      }
+      this.neonSignGfx.setAlpha(1);
+    }
   }
 
   updateFlag(): void {

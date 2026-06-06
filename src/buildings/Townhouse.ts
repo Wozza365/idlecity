@@ -26,6 +26,10 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private lightPhases: number[] = [];
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
+  private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
+  private _neonX = 0;
+  private _neonY = 0;
+  private _neonPhase = 0;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -366,6 +370,15 @@ export class Townhouse extends Phaser.GameObjects.Container {
     this.add(lampConeGfx);
     this.lampConeGfx = lampConeGfx;
 
+    // ── Neon sign (ADD blend, pink) ───────────────────────────────
+    const neonSignGfx = scene.add.graphics();
+    neonSignGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+    this.add(neonSignGfx);
+    this.neonSignGfx = neonSignGfx;
+    this._neonX      = bx + 8;
+    this._neonY      = bodyBot - 22;
+    this._neonPhase  = Math.random() * Math.PI * 2;
+
     // ── Window glass overlay ──────────────────────────────────────
     const windowGlassGfx = scene.add.graphics();
     windowGlassGfx.setLighting(true);
@@ -435,6 +448,16 @@ export class Townhouse extends Phaser.GameObjects.Container {
       this.lampConeGfx.setAlpha(tNorm * 0.45 * pulse);
     }
     if (this.flagLight) this.flagLight.intensity = tNorm * 0.6;
+    if (this.neonSignGfx) {
+      const nPulse = 0.6 + 0.4 * Math.abs(Math.sin(now * 2.1 + this._neonPhase));
+      this.neonSignGfx.clear();
+      if (tNorm > 0.05) {
+        this.neonSignGfx.fillStyle(0xff3366, tNorm * nPulse);
+        this.neonSignGfx.fillRect(this._neonX, this._neonY, 18, 4);
+        this.neonSignGfx.fillRect(this._neonX + 4, this._neonY - 4, 10, 4);
+      }
+      this.neonSignGfx.setAlpha(1);
+    }
   }
 
   updateFlag(): void {

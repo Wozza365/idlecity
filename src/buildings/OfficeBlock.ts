@@ -19,6 +19,10 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; bright: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
+  private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
+  private _neonX = 0;
+  private _neonY = 0;
+  private _neonPhase = 0;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
     super(scene, 0, 0);
@@ -235,6 +239,17 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
 
     this.add(gfx);
 
+    // ── Neon sign (ADD blend, purple) ─────────────────────────────
+    {
+      const neonSignGfx = scene.add.graphics();
+      neonSignGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+      this.add(neonSignGfx);
+      this.neonSignGfx = neonSignGfx;
+      this._neonX     = x + 8;
+      this._neonY     = buildGY - lobbyH + 8;
+      this._neonPhase = Math.random() * Math.PI * 2;
+    }
+
     // ── Lamp cone ─────────────────────────────────────────────────
     const lampConeGfx = scene.add.graphics();
     lampConeGfx.setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
@@ -269,17 +284,29 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
     this.on(Phaser.GameObjects.Events.DESTROY, () => {
       for (const light of this.windowLights) scene.lights.removeLight(light);
       this.shadowGfx.destroy();
+      this.neonSignGfx?.destroy();
     });
   }
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number): void {
+  updateWindowLights(elevation: number, time = 0): void {
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
+    const now = time || this.scene.time.now / 1000;
     for (const light of this.windowLights) light.intensity = t * 0.25;
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, t);
     if (this.lampConeGfx) this.lampConeGfx.setAlpha(t * 0.55);
+    if (this.neonSignGfx) {
+      const nPulse = 0.6 + 0.4 * Math.abs(Math.sin(now * 2.1 + this._neonPhase));
+      this.neonSignGfx.clear();
+      if (t > 0.05) {
+        this.neonSignGfx.fillStyle(0x6633ff, t * nPulse);
+        this.neonSignGfx.fillRect(this._neonX, this._neonY, 20, 4);
+        this.neonSignGfx.fillRect(this._neonX + 3, this._neonY - 4, 14, 4);
+      }
+      this.neonSignGfx.setAlpha(1);
+    }
   }
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number): void {
