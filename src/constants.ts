@@ -24,11 +24,11 @@ export const UNLOCK_COSTS: readonly number[] = [0, 50_000, 250_000, 1_500_000, 1
 
 // ── Pure helper functions ─────────────────────────────────────────────────────
 
-// Exp-poly cost curve: 2_000 × exp(0.0601 × (L-1)^1.2)
-// A=2_000 gives ~80s for the first upgrade (5 plots × $5/s income), e=1.2 accelerates into endgame.
-// k=0.0601 targets ~$5B at level 99 with this base.
+// Exp-poly cost curve: 200 × exp(0.0695 × (L-1)^1.2)
+// A=200 gives ~8s for the first upgrade (5 plots × $5/s income) — fast early progression.
+// k=0.0695 targets ~$5B at level 99 with this base.
 export function upgradeCost(level: number): number {
-  return Math.round(2_000 * Math.exp(0.0601 * Math.pow(level - 1, 1.2)));
+  return Math.round(200 * Math.exp(0.0695 * Math.pow(level - 1, 1.2)));
 }
 
 export function buildingHeight(level: number): number {
@@ -62,11 +62,11 @@ export function waterIncome(level: number): number {
 }
 
 export function roadUpgradeCost(level: number): number {
-  return level === 0 ? 200 : level * level * 100;
+  return level === 0 ? 500 : level * level * 100;
 }
 
 export function waterUpgradeCost(level: number): number {
-  if (level === 0) return 1_000;
+  if (level === 0) return 2_500;
   return level * level * 700 + 1_000;
 }
 
@@ -81,7 +81,7 @@ export function waterTierName(level: number): string {
 }
 
 export function vergeUpgradeCost(level: number): number {
-  if (level === 0) return 500;
+  if (level === 0) return 1_500;
   return level * level * 400 + 600;
 }
 
