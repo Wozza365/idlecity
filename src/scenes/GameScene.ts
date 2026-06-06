@@ -340,6 +340,7 @@ export class GameScene extends Phaser.Scene {
     this.plotContainers[index] = this.renderPlot(index);
     this.lightingSystem?.markSegmentsDirty();
     this.flashPlot(index, plot.level);
+    this.showScaffolding(index, plot.level);
 
     const newTier = this.buildingTier(plot.level);
     if (newTier !== prevTier) this.celebrateTier(index, newTier, plot.level);
@@ -451,6 +452,33 @@ export class GameScene extends Phaser.Scene {
       duration: 350,
       ease: 'Cubic.Out',
       onComplete: () => flash.destroy(),
+    });
+  }
+
+  private showScaffolding(index: number, level: number): void {
+    const plotW = this.scale.width / PLOT_COUNT;
+    const x0    = index * plotW + 2;
+    const bh    = buildingHeight(level) + YARD_H;
+    const y0    = this.groundY - bh;
+    const w     = plotW - 4;
+
+    const gfx = this.add.graphics().setDepth(9.05).setAlpha(0.65);
+    gfx.lineStyle(1, 0x888888, 1);
+    // Vertical scaffold poles
+    for (let x = 0; x <= w; x += 12) {
+      gfx.lineBetween(x0 + x, y0, x0 + x, y0 + bh);
+    }
+    // Horizontal scaffold boards
+    for (let y = 0; y <= bh; y += 8) {
+      gfx.lineBetween(x0, y0 + y, x0 + w, y0 + y);
+    }
+
+    this.tweens.add({
+      targets: gfx,
+      alpha:   0,
+      duration: 1500,
+      ease: 'Cubic.Out',
+      onComplete: () => gfx.destroy(),
     });
   }
 
