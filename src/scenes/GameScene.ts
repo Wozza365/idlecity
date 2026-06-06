@@ -568,18 +568,28 @@ export class GameScene extends Phaser.Scene {
     if (!this.masterClock) return;
     const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
 
-    // Piecewise angle: sun rises at 4am (elapsed=160k), peaks at noon (0), sets at 8pm (80k).
-    // Day (160k ms) moves at half speed of night (80k ms) so day lasts 16 game-hours.
-    const SUNSET   = 100_000;  // elapsed at 10pm
-    const SUNRISE  = 160_000;  // elapsed at 4am
+    // Sunrise/sunset hours vary smoothly by season via the sinusoidal c1 oscillator.
+    // Summer (c1=+1): sunrise 4am, sunset 8pm (16h daylight).
+    // Winter (c1=−1): sunrise 7am, sunset 5pm (10h daylight).
+    const c1 = this.seasons.c1;
+    const sunriseHour = 5.5 - 1.5 * c1;   // 4.0 → 7.0
+    const sunsetHour  = 18.5 + 1.5 * c1;  // 20.0 → 17.0
+    const afterHours  = sunsetHour - 12;
+    const mornHours   = 12 - sunriseHour;
+    const nightHours  = 24 - (sunsetHour - sunriseHour);
+    const NC          = 0.667; // night compression — keeps night visually fast
+    const msPerDayHr  = 240_000 / (afterHours + mornHours + NC * nightHours);
+    const SUNSET      = afterHours * msPerDayHr;
+    const SUNRISE     = SUNSET + nightHours * msPerDayHr * NC;
+
     if (elapsed < SUNSET) {
-      // Noon→8pm: sunAngle π/2 → π
+      // Noon→sunset: sunAngle π/2 → π
       this.sunAngle = Math.PI / 2 + (elapsed / SUNSET) * (Math.PI / 2);
     } else if (elapsed < SUNRISE) {
-      // 8pm→4am (night): sunAngle π → 2π (fast)
+      // Sunset→sunrise (night): sunAngle π → 2π (fast)
       this.sunAngle = Math.PI + ((elapsed - SUNSET) / (SUNRISE - SUNSET)) * Math.PI;
     } else {
-      // 4am→noon: sunAngle 2π → 5π/2
+      // Sunrise→noon: sunAngle 2π → 5π/2
       this.sunAngle = 2 * Math.PI + ((elapsed - SUNRISE) / (240_000 - SUNRISE)) * (Math.PI / 2);
     }
 
