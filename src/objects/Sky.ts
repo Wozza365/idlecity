@@ -45,12 +45,18 @@ export class Sky {
       const t = (elev + 0.02) / 0.07;
       zenith  = lerpColor(0x160c2a, 0x1e3878, t);
       horizon = lerpColor(0x3a100a, 0xc85c14, t);
-    } else if (elev <= 0.20) {
-      const t = (elev - 0.05) / 0.15;
-      zenith  = lerpColor(0x1e3878, 0x2255aa, t);
-      horizon = lerpColor(0xc85c14, 0x78aac8, t);
-    } else if (elev <= 0.45) {
-      const t = (elev - 0.20) / 0.25;
+    } else if (elev <= 0.10) {
+      // Golden hour — horizon builds to deep amber as sun clears the horizon
+      const t = (elev - 0.05) / 0.05;
+      zenith  = lerpColor(0x1e3878, 0x4466aa, t);
+      horizon = lerpColor(0xc85c14, 0xff9933, t);
+    } else if (elev <= 0.25) {
+      // Post-golden morning — amber fades toward clear sky blue
+      const t = (elev - 0.10) / 0.15;
+      zenith  = lerpColor(0x4466aa, 0x2255aa, t);
+      horizon = lerpColor(0xff9933, 0x78aac8, t);
+    } else if (elev <= 0.50) {
+      const t = (elev - 0.25) / 0.25;
       zenith  = lerpColor(0x2255aa, 0x2a6aa0, t);
       horizon = lerpColor(0x78aac8, 0x6aaad0, t);
     } else {
