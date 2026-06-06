@@ -59,12 +59,13 @@ export class WaterArea {
   private readonly scene: Phaser.Scene;
 
   // Graphics layers (depth < 6.0 so they render behind verge)
-  private waterGfx:       Phaser.GameObjects.Graphics; // 5.5  – gradient water + coast (static)
-  private shadowGfx:      Phaser.GameObjects.Graphics; // 5.65 – structure shadows on water (sun-dep)
-  private structGfx:      Phaser.GameObjects.Graphics; // 5.7  – pier, dock, café, hut, lighthouse
-  private beachShadowGfx: Phaser.GameObjects.Graphics; // 5.76 – beach people shadows
-  private beachPeopleGfx: Phaser.GameObjects.Graphics; // 5.78 – moving beach people
-  private fxGfx:          Phaser.GameObjects.Graphics; // 5.85 – bonfire, sparkles, buoys (no lighting)
+  private waterGfx:        Phaser.GameObjects.Graphics; // 5.5  – gradient water + coast (static)
+  private skyReflectGfx:   Phaser.GameObjects.Graphics; // 5.51 – sky horizon colour tint on water top
+  private shadowGfx:       Phaser.GameObjects.Graphics; // 5.65 – structure shadows on water (sun-dep)
+  private structGfx:       Phaser.GameObjects.Graphics; // 5.7  – pier, dock, café, hut, lighthouse
+  private beachShadowGfx:  Phaser.GameObjects.Graphics; // 5.76 – beach people shadows
+  private beachPeopleGfx:  Phaser.GameObjects.Graphics; // 5.78 – moving beach people
+  private fxGfx:           Phaser.GameObjects.Graphics; // 5.85 – bonfire, sparkles, buoys (no lighting)
 
   // Layout
   private _level  = 0;
@@ -135,6 +136,7 @@ export class WaterArea {
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.waterGfx       = scene.add.graphics().setDepth(5.5).setLighting(true);
+    this.skyReflectGfx  = scene.add.graphics().setDepth(5.51);
     this.shadowGfx      = scene.add.graphics().setDepth(5.55);
     this.structGfx      = scene.add.graphics().setDepth(5.7).setLighting(true);
     this.beachShadowGfx = scene.add.graphics().setDepth(5.62);
@@ -809,8 +811,9 @@ export class WaterArea {
 
   // ── Per-frame update ──────────────────────────────────────────────────────
 
-  update(delta: number, elevation: number): void {
+  update(delta: number, elevation: number, horizonColor = 0x1a5c9e): void {
     if (this._level === 0) return;
+    this.updateSkyReflection(horizonColor);
     const dt = delta / 1000;
     this._waveTime    += dt * 0.12;
     this._bonfireTime += dt * 0.55; // slowed for more organic feel
@@ -1115,6 +1118,29 @@ export class WaterArea {
     gfx.fillCircle(ox, oy, 4);
   }
 
+  // ── Sky reflection ────────────────────────────────────────────────────────
+
+  private updateSkyReflection(horizonColor: number): void {
+    const gfx = this.skyReflectGfx;
+    gfx.clear();
+    if (this._width === 0) return;
+
+    // Fade out reflection at night (water looks dark, not reflective)
+    const alpha = 0.35 * Math.max(0, 1 - this._nightFactor * 2.0);
+    if (alpha < 0.01) return;
+
+    // Gradient overlay on the top 40% of the water band, fading to 0 at bottom
+    const reflH = Math.floor(WATER_H * 0.40);
+    const steps = 6;
+    for (let s = 0; s < steps; s++) {
+      const frac = s / steps;
+      gfx.fillStyle(horizonColor, alpha * (1 - frac));
+      const y0 = this._waterY + Math.floor(frac * reflH);
+      const y1 = this._waterY + Math.floor((s + 1) / steps * reflH);
+      gfx.fillRect(0, y0, this._width, Math.max(1, y1 - y0));
+    }
+  }
+
   // ── Lighting updates ──────────────────────────────────────────────────────
 
   updateLighting(elevation: number): void {
@@ -1158,6 +1184,7 @@ export class WaterArea {
     this._nativeLights = [];
     this.destroyFoamSprites();
     this.waterGfx.destroy();
+    this.skyReflectGfx.destroy();
     this.shadowGfx.destroy();
     this.structGfx.destroy();
     this.beachShadowGfx.destroy();

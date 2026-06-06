@@ -189,7 +189,7 @@ export class GameScene extends Phaser.Scene {
     this.vergeRiver.updateCyclists(delta);
     this.vergeRiver.updateShadows(this.sunAngle);
     const elevation = Math.sin(this.sunAngle);
-    this.waterArea?.update(delta, elevation);
+    this.waterArea?.update(delta, elevation, this.sky.horizonColor);
     this.waterArea?.updateShadows(this.sunAngle);
     this.boatManager?.update(delta, elevation);
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));

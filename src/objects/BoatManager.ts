@@ -10,10 +10,17 @@ const MIN_INTERVAL_MS  = 12_500;
 const DOCK_DURATION_MS = 7_000;
 const DOCK_VARY_MS     = 5_000;
 
+const WAKE_MAX_AGE    = 1.5;   // seconds before a wake point disappears
+const WAKE_SPREAD     = 5;     // px spread per second of age (half-width of V)
+const WAKE_SAMPLE_MS  = 45;    // how often to record a wake point (ms)
+
 interface LightSystem {
   addLight(l: LightSource): void;
   removeLight(l: LightSource): void;
 }
+
+interface WakePoint { x: number; age: number; }
+interface WakeTrail { points: WakePoint[]; y: number; sampleTimer: number; }
 
 function spawnInterval(level: number): number {
   return Math.max(MIN_INTERVAL_MS, BASE_INTERVAL_MS / (1 + level * 0.55));
@@ -33,9 +40,12 @@ export class BoatManager {
   private dockSlots: number[] = [];
   private occupiedSlots = new Set<number>();
   private lightSystem: LightSystem | null = null;
+  private wakeGfx: Phaser.GameObjects.Graphics;
+  private wakes = new Map<Boat, WakeTrail>();
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    this.wakeGfx = scene.add.graphics().setDepth(5.53);
   }
 
   rebuild(waterLevel: number, groundY: number): void {
@@ -65,7 +75,10 @@ export class BoatManager {
   }
 
   update(delta: number, elevation: number = 0): void {
-    if (this.waterLevel === 0) return;
+    if (this.waterLevel === 0) {
+      this.wakeGfx.clear();
+      return;
+    }
 
     // Move existing boats; remove off-screen ones
     const toRemove: number[] = [];
@@ -80,8 +93,43 @@ export class BoatManager {
       }
       const slotX = boat.assignedDockX;
       if (slotX !== null) this.occupiedSlots.delete(slotX);
+      this.wakes.delete(boat);
       boat.destroy();
       this.boats.splice(toRemove[i], 1);
+    }
+
+    // Sample wake points for each active boat
+    const dt = delta / 1000;
+    for (const boat of this.boats) {
+      let trail = this.wakes.get(boat);
+      if (!trail) {
+        trail = { points: [], y: boat.y, sampleTimer: 0 };
+        this.wakes.set(boat, trail);
+      }
+      trail.sampleTimer -= delta;
+      if (trail.sampleTimer <= 0) {
+        trail.points.push({ x: boat.posX, age: 0 });
+        trail.sampleTimer = WAKE_SAMPLE_MS;
+      }
+      // Age and cull
+      for (let j = trail.points.length - 1; j >= 0; j--) {
+        trail.points[j].age += dt;
+        if (trail.points[j].age >= WAKE_MAX_AGE) trail.points.splice(j, 1);
+      }
+    }
+
+    // Draw wakes
+    this.wakeGfx.clear();
+    for (const trail of this.wakes.values()) {
+      for (const pt of trail.points) {
+        const spread = pt.age * WAKE_SPREAD;
+        const alpha  = (1 - pt.age / WAKE_MAX_AGE) * 0.28;
+        if (alpha < 0.01 || spread < 0.5) continue;
+        this.wakeGfx.fillStyle(0xaaddff, alpha);
+        // Two side dots of the V — symmetric above and below boat y
+        this.wakeGfx.fillRect(Math.round(pt.x), Math.round(trail.y - spread), 2, 1);
+        this.wakeGfx.fillRect(Math.round(pt.x), Math.round(trail.y + spread), 2, 1);
+      }
     }
 
     // Spawn new boats — fewer at night
@@ -141,10 +189,13 @@ export class BoatManager {
       b.destroy();
     }
     this.boats = [];
+    this.wakes.clear();
     this.occupiedSlots.clear();
+    this.wakeGfx.clear();
   }
 
   destroy(): void {
     this.destroyBoats();
+    this.wakeGfx.destroy();
   }
 }
