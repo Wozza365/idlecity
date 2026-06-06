@@ -76,6 +76,7 @@ export class CarManager {
   private _lights: LightSource[] = [];
   private shadowGfx: Phaser.GameObjects.Graphics | null = null;
   private _lastCarShadowAngle = NaN;
+  private _rushFactor = 1.0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -196,6 +197,22 @@ export class CarManager {
 
   update(delta: number): void {
     for (const car of this.allCars) car.update(delta);
+  }
+
+  applyGameHour(hour: number): void {
+    let factor: number;
+    if      ((hour >= 8  && hour < 9)  || (hour >= 17 && hour < 18)) factor = 1.4;
+    else if  (hour >= 2  && hour < 5)                                 factor = 0.3;
+    else                                                              factor = 1.0;
+
+    if (Math.abs(factor - this._rushFactor) < 0.01) return;
+    this._rushFactor = factor;
+
+    const speed = baseSpeed(this.currentLevel);
+    for (let i = 0; i < this.lanes.length; i++) {
+      const laneSpeed = speed * this.lanes[i].speedMultiplier * factor;
+      for (const car of this.laneCars[i]) car.setSpeed(laneSpeed);
+    }
   }
 
   updateLighting(elevation: number): void {

@@ -194,9 +194,13 @@ export class GameScene extends Phaser.Scene {
     this.rain.update(delta, rainIntensity);
     this.snow.update(delta, snowIntensity);
     this.road.updateWeather(rainIntensity + snowIntensity * 0.3);
+    const elapsed   = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
+    const gameHour  = Math.floor((elapsed / 240_000) * 24 + 12) % 24;
     if (this.pedestrianManager) {
       this.pedestrianManager.weatherIntensity = this.seasons.weatherIntensity;
+      this.pedestrianManager.gameHour         = gameHour;
     }
+    this.carManager?.applyGameHour(gameHour);
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
