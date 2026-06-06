@@ -167,7 +167,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.seasons.update(delta);
-    this.clouds.update(delta, Math.sin(this.sunAngle));
+    this.clouds.update(delta, Math.sin(this.sunAngle), this.seasons.summerWeight, this.seasons.weatherIntensity);
     this.carManager?.update(delta);
     this.carManager?.updateShadow(this.sunAngle);
     this.pedestrianManager?.update(delta, this.state.plots, this.plotContainers, this.sunAngle);
@@ -273,7 +273,7 @@ export class GameScene extends Phaser.Scene {
 
     this.refreshButtons();
     this.statsBar.update(this.state.gold, this.taxRate);
-    this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY);
+    this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY, this.seasons?.winterWeight ?? 0, this.seasons?.springWeight ?? 0, this.seasons?.weatherIntensity ?? 0);
     this.sunMoon.update(this.sunAngle, width, this.groundY, this.panelTop, this.state.plots, this.plotWidth);
   }
 
@@ -594,9 +594,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     const elev = Math.sin(this.sunAngle);
-    this.sky.updateGradient(elev, this.scale.width, this.groundY);
+    this.sky.updateGradient(elev, this.scale.width, this.groundY, this.seasons.winterWeight, this.seasons.springWeight, this.seasons.weatherIntensity);
 
-    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase);
+    this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase, this.seasons.c1);
     this.stars.update(elev, this.sunAngle, this.scale.width);
     const shadowAlpha = this.sunMoon.shadowAlpha;
     for (const c of this.plotContainers) {

@@ -80,6 +80,7 @@ export class SunMoon {
     plots: PlotState[],
     plotWidth: number,
     moonPhase: number = 0,
+    seasonC1: number = 1,
   ): void {
     const a      = sunAngle;
     const cx     = width / 2;
@@ -115,6 +116,12 @@ export class SunMoon {
     this.sunLight.y         = sunY - 300;
     this.sunLight.height = Math.max(100, 500 * Math.max(0, elevation));
     this.sunLight.intensity = Math.max(0, Math.sqrt(Math.max(0, elevation)) * 3.2);
+
+    // Sun radius and glow shrink in winter, grow in summer
+    const sunRadius = Math.round(14 + 6 * seasonC1);   // 14px (winter) ↔ 20px (summer)
+    const glowSize  = Math.round(260 + 40 * seasonC1); // 260px ↔ 300px
+    this.sunCircle.setRadius(sunRadius);
+    this.sunGlowSprite.setDisplaySize(glowSize, glowSize);
 
     const sunColor = sunColorAtElevation(elevation);
     this.sunCircle.setFillStyle(sunColor);

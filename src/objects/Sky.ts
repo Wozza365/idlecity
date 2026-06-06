@@ -4,6 +4,8 @@ import { lerpColor } from '../constants';
 export class Sky {
   private skyGfx!: Phaser.GameObjects.Graphics;
   readonly nightOverlay: Phaser.GameObjects.Rectangle;
+  /** Current horizon colour — exposed for water reflection */
+  horizonColor: number = 0x6aaad0;
 
   constructor(private scene: Phaser.Scene) {
     const { width, height } = scene.scale;
@@ -24,7 +26,10 @@ export class Sky {
     this.createSkyGfx();
   }
 
-  updateGradient(elev: number, width: number, groundY: number): void {
+  updateGradient(
+    elev: number, width: number, groundY: number,
+    winterWeight = 0, springWeight = 0, weatherIntensity = 0,
+  ): void {
     if (!this.skyGfx) return;
 
     let zenith: number;
@@ -51,6 +56,22 @@ export class Sky {
     } else {
       zenith = 0x2a6aa0; horizon = 0x6aaad0;
     }
+
+    // Seasonal tints — applied via continuous weights, no branches
+    if (winterWeight > 0) {
+      zenith  = lerpColor(zenith,  0x6677aa, winterWeight * 0.22);
+      horizon = lerpColor(horizon, 0x8899aa, winterWeight * 0.25);
+    }
+    if (springWeight > 0) {
+      horizon = lerpColor(horizon, 0xffaacc, springWeight * 0.10);
+    }
+    // Overcast tint during rain/snow — blends toward grey-blue
+    if (weatherIntensity > 0) {
+      zenith  = lerpColor(zenith,  0x506070, weatherIntensity * 0.30);
+      horizon = lerpColor(horizon, 0x607888, weatherIntensity * 0.30);
+    }
+
+    this.horizonColor = horizon;
 
     this.skyGfx.clear();
     this.skyGfx.fillGradientStyle(zenith, zenith, horizon, horizon, 1);

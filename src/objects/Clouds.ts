@@ -47,9 +47,11 @@ export class Clouds {
     }
   }
 
-  update(delta: number, elevation: number): void {
-    // Fade in at dawn (elev > 0), max alpha at full day, invisible at night
-    const alpha = Math.max(0, Math.min(0.13, elevation * 0.6));
+  update(delta: number, elevation: number, summerWeight = 1, weatherIntensity = 0): void {
+    // Base cloud density: sparse in summer (α≈0.07), heavier in winter (α≈0.20)
+    const seasonBase = 0.07 + 0.13 * (1 - summerWeight);
+    const maxAlpha   = seasonBase + 0.10 * weatherIntensity;
+    const alpha      = Math.max(0, Math.min(maxAlpha, elevation * maxAlpha / 0.07));
     if (alpha <= 0) {
       this.gfx.clear();
       return;
@@ -60,12 +62,15 @@ export class Clouds {
       if (cloud.x < -cloud.w * 1.5) cloud.x += this.sceneWidth + cloud.w * 3;
     }
 
-    this.draw(alpha);
+    // Clouds grey slightly during weather events
+    const grey = Math.round(255 - weatherIntensity * 40);
+    const cloudColor = (grey << 16) | (grey << 8) | grey;
+    this.draw(alpha, cloudColor);
   }
 
-  private draw(alpha: number): void {
+  private draw(alpha: number, color = 0xffffff): void {
     this.gfx.clear();
-    this.gfx.fillStyle(0xffffff, alpha);
+    this.gfx.fillStyle(color, alpha);
     for (const c of this.clouds) {
       // Three overlapping ellipses per cloud for a natural shape
       this.gfx.fillEllipse(c.x,               c.y,           c.w,       c.h);
