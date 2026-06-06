@@ -140,6 +140,11 @@ export class SeasonSystem {
     };
   }
 
+  // ── Moon phase ────────────────────────────────────────────────────────────
+
+  /** 0 = full moon, 0.5 = new moon, 1 = full moon — 12-day cycle */
+  get moonPhase(): number { return (this.gameDayCount % 12) / 12; }
+
   // ── First-launch season detection ─────────────────────────────────────────
 
   private static defaultStartDay(): number {

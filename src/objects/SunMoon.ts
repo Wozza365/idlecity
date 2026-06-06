@@ -6,8 +6,10 @@ import {
 } from '../constants';
 
 export class SunMoon {
-  private sunCircle:    Phaser.GameObjects.Arc;
-  private moonCircle:   Phaser.GameObjects.Arc;
+  private sunCircle:     Phaser.GameObjects.Arc;
+  private moonRT:        Phaser.GameObjects.RenderTexture;
+  private moonDrawGfx:   Phaser.GameObjects.Graphics;
+  private lastMoonPhase: number = -1;
   private sunGlowSprite: Phaser.GameObjects.Image;
   private moonGlowSprite: Phaser.GameObjects.Image;
   private sunGroundGlow: Phaser.GameObjects.Ellipse;
@@ -45,7 +47,13 @@ export class SunMoon {
 
     this.shadowGfx    = scene.add.graphics().setDepth(9.5);
     this.debugGfx     = scene.add.graphics().setDepth(9.6);
-    this.moonCircle   = scene.add.arc(cx, groundY, 16, 0, 360, false, 0xd0d0e8, 1).setDepth(3);
+
+    // Moon drawn as a RenderTexture so phase (crescent/full) can be applied via erase blend
+    this.moonRT = scene.add.renderTexture(cx, groundY, 36, 36)
+      .setOrigin(0.5, 0.5)
+      .setDepth(3);
+    this.moonDrawGfx = scene.add.graphics().setVisible(false);
+
     this.moonGlowSprite = scene.add.image(cx, groundY, 'sun-glow')
       .setDisplaySize(180, 180)
       .setBlendMode(Phaser.BlendModes.ADD)
@@ -71,6 +79,7 @@ export class SunMoon {
     panelTop: number,
     plots: PlotState[],
     plotWidth: number,
+    moonPhase: number = 0,
   ): void {
     const a      = sunAngle;
     const cx     = width / 2;
@@ -85,10 +94,16 @@ export class SunMoon {
     const moonElev = Math.sin(a + Math.PI);
     const moonX    = cx - Math.cos(a + Math.PI) * orbitX;
     const moonY    = groundY - moonElev * orbitY;
+    const moonVisible = moonElev > 0.02;
 
     this.sunCircle.setPosition(sunX, sunY).setVisible(sunAbove);
-    this.moonCircle.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
-    this.moonGlowSprite.setPosition(moonX, moonY).setVisible(moonElev > 0.02);
+    this.moonRT.setPosition(moonX, moonY).setVisible(moonVisible);
+    this.moonGlowSprite.setPosition(moonX, moonY).setVisible(moonVisible);
+
+    if (moonVisible && Math.abs(moonPhase - this.lastMoonPhase) > 0.001) {
+      this.lastMoonPhase = moonPhase;
+      this.redrawMoonPhase(moonPhase);
+    }
     this.sunGlowSprite.setPosition(sunX, sunY).setVisible(sunAbove);
 
     this.sunGroundGlow
@@ -106,13 +121,14 @@ export class SunMoon {
     this.sunGlowSprite.setTint(sunColor);
     this.sunLight.setColor(sunColor);
 
-    // Moon glow and light
+    // Moon glow and light — scale with phase illumination so new moon is dark
+    const moonIllumination = (1 + Math.cos(2 * Math.PI * moonPhase)) / 2; // 1=full, 0=new
     this.moonGlowSprite.setTint(0xc8d8ff);
-    this.moonGlowSprite.setAlpha(Math.max(0, moonElev * 0.6));
+    this.moonGlowSprite.setAlpha(Math.max(0, moonElev * 0.6) * moonIllumination);
 
     this.moonLight.x         = moonX;
     this.moonLight.y         = moonY;
-    this.moonLight.intensity = Math.max(0, moonElev * 0.5);
+    this.moonLight.intensity = Math.max(0, moonElev * 0.5) * moonIllumination;
 
     const amb = elevation >= 0
       ? Math.max(0.20, elevation * 0.55 + 0.25)
@@ -124,6 +140,32 @@ export class SunMoon {
     this.scene.lights.setAmbientColor((ar << 16) | (ag << 8) | ab);
 
     this.drawShadows(sunAngle, elevation, groundY, panelTop, plots, plotWidth, sunX, sunY, width);
+  }
+
+  private redrawMoonPhase(phase: number): void {
+    const r = 14;   // moon radius in RT pixels
+    const c = 18;   // center of 36×36 RT
+
+    this.moonDrawGfx.clear();
+    this.moonDrawGfx.fillStyle(0xd0d0e8, 1);
+    this.moonDrawGfx.fillCircle(c, c, r);
+
+    this.moonRT.clear();
+    this.moonRT.draw(this.moonDrawGfx, 0, 0);
+
+    // illumination: 1=full moon, 0=new moon
+    const illumination = (1 + Math.cos(2 * Math.PI * phase)) / 2;
+    if (illumination < 0.98) {
+      // Erase a circle offset to create the crescent shadow.
+      // At illumination=0 (new): bite circle centered exactly over moon → fully dark.
+      // At illumination=0.5 (quarter): bite circle edge bisects moon → half moon.
+      // At illumination=1 (full): bite circle shifted fully away → no bite.
+      const biteOffsetX = r * 2 * illumination;
+      this.moonDrawGfx.clear();
+      this.moonDrawGfx.fillStyle(0xffffff, 1);
+      this.moonDrawGfx.fillCircle(c + biteOffsetX, c, r + 1);
+      this.moonRT.erase(this.moonDrawGfx, 0, 0);
+    }
   }
 
   private drawShadows(
