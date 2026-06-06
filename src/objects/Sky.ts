@@ -63,7 +63,12 @@ export class Sky {
       horizon = lerpColor(horizon, 0x8899aa, winterWeight * 0.25);
     }
     if (springWeight > 0) {
-      horizon = lerpColor(horizon, 0xffaacc, springWeight * 0.10);
+      // Dawn and dusk get a warm rose-pink bloom in spring
+      if (elev >= -0.05 && elev <= 0.20) {
+        const dawnT = 1 - Math.abs(elev - 0.075) / 0.125; // peaks at elev=0.075
+        horizon = lerpColor(horizon, 0xff99aa, springWeight * 0.14 * Math.max(0, dawnT));
+        zenith  = lerpColor(zenith,  0x9966aa, springWeight * 0.08 * Math.max(0, dawnT));
+      }
     }
     // Overcast tint during rain/snow — blends toward grey-blue
     if (weatherIntensity > 0) {
