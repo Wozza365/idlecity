@@ -24,21 +24,11 @@ export const UNLOCK_COSTS: readonly number[] = [0, 50_000, 250_000, 1_500_000, 1
 
 // ── Pure helper functions ─────────────────────────────────────────────────────
 
-// Deterministic XorShift RNG — produces consistent costs across runs
-const _upgradeCosts: number[] = (() => {
-  let s = 0xdeadbeef >>> 0;
-  const rng = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s = s >>> 0; return s / 0x100000000; };
-  const costs: number[] = [];
-  let cost = 250;
-  for (let i = 0; i < 99; i++) {
-    costs.push(Math.round(cost));
-    cost *= 1 + 0.25 + rng() * 0.10;
-  }
-  return costs;
-})();
-
+// Exp-poly cost curve: 10_000 × exp(0.05341 × (L-1)^1.2)
+// A=10_000 gives ~30s at Lv1, e=1.2 gives gentle early ramp accelerating into endgame.
+// k=0.05341 targets ~$5B at level 99 with this base.
 export function upgradeCost(level: number): number {
-  return _upgradeCosts[Math.min(level - 1, 98)];
+  return Math.round(10_000 * Math.exp(0.05341 * Math.pow(level - 1, 1.2)));
 }
 
 export function buildingHeight(level: number): number {
@@ -51,19 +41,12 @@ export function buildingHeight(level: number): number {
   return PLOT_BASE_HEIGHT + 85 * HEIGHT_PER_LEVEL;
 }
 
-// Tiered income: each tier has a fixed increment per level, with the rate and base compounding.
+// Exp-poly income curve: 5 × exp(0.06 × (L-1)^1.1) — starts at $50/hr, accelerates into endgame.
+// ki=0.06, ei=1.1 keeps early income modest so area upgrades matter early;
+// buildings dominate by level 70+ as intended.
 // All values in internal units (displayed $/hr = value × GAME_HOUR_FACTOR).
-const _t1Base = 50, _t2Base = _t1Base + 0.115 * 15, _t3Base = _t2Base + 0.135 * 20, _t4Base = _t3Base + 0.155 * 30;
-const _t1Inc = _t1Base * 0.115 / 10, _t2Inc = _t2Base * 0.135 / 10, _t3Inc = _t3Base * 0.155 / 10, _t4Inc = _t4Base * 0.175 / 10;
-const _at15 = 5 + 14 * _t1Inc, _at35 = _at15 + 20 * _t2Inc, _at65 = _at35 + 30 * _t3Inc;
-
 export function perBuildingIncome(level: number): number {
-  let raw: number;
-  if (level <= 15) raw = 5 + (level - 1) * _t1Inc;
-  else if (level <= 35) raw = _at15 + (level - 15) * _t2Inc;
-  else if (level <= 65) raw = _at35 + (level - 35) * _t3Inc;
-  else raw = _at65 + (level - 65) * _t4Inc;
-  return raw * BASE_INCOME_MULTIPLIER;
+  return 5 * Math.exp(0.06 * Math.pow(Math.max(0, level - 1), 1.1)) * BASE_INCOME_MULTIPLIER;
 }
 
 // Area income: quadratic per level so each upgrade is meaningfully more than the last.
