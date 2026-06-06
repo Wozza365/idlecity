@@ -85,6 +85,11 @@ export class GameScene extends Phaser.Scene {
   private _floatTickCount = 0;
   seasons!: SeasonSystem;
 
+  // ── Airplane ──────────────────────────────────────────────────────────────
+  private planeGfx!: Phaser.GameObjects.Graphics;
+  private plane: { x: number; y: number; vx: number; blinkTimer: number; blinkOn: boolean } | null = null;
+  private planeIdleTimer = 70_000 + Math.random() * 50_000;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -114,6 +119,7 @@ export class GameScene extends Phaser.Scene {
     this.seasons = new SeasonSystem(this.state.season);
     this.rain    = new Rain(this);
     this.snow    = new Snow(this);
+    this.planeGfx = this.add.graphics().setDepth(1.5);
 
     this.panelChrome = new PanelChrome(this);
 
@@ -581,6 +587,49 @@ export class GameScene extends Phaser.Scene {
     this.buildLayout();
   }
 
+  private updateAirplane(delta: number, elev: number): void {
+    const w = this.scale.width;
+    const h = this.groundY;
+    this.planeGfx.clear();
+
+    if (this.plane) {
+      const p = this.plane;
+      p.x += p.vx * delta / 1000;
+      p.blinkTimer -= delta;
+      if (p.blinkTimer <= 0) {
+        p.blinkOn     = !p.blinkOn;
+        p.blinkTimer  = p.blinkOn ? 600 : 400;
+      }
+
+      if (p.x < -20 || p.x > w + 20) {
+        this.plane = null;
+        this.planeIdleTimer = 70_000 + Math.random() * 50_000;
+      } else {
+        // White body dot + blinking red offset dot
+        this.planeGfx.fillStyle(0xffffff, 0.9);
+        this.planeGfx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
+        if (p.blinkOn) {
+          this.planeGfx.fillStyle(0xff2222, 0.85);
+          this.planeGfx.fillRect(Math.round(p.x) + (p.vx > 0 ? -3 : 2), Math.round(p.y), 1, 1);
+        }
+      }
+    } else {
+      this.planeIdleTimer -= delta;
+      if (this.planeIdleTimer <= 0) {
+        const fromLeft = Math.random() < 0.5;
+        const altY     = h * (0.08 + Math.random() * 0.17);
+        const speed    = 65 + Math.random() * 25;
+        this.plane = {
+          x:          fromLeft ? -10 : w + 10,
+          y:          altY,
+          vx:         fromLeft ? speed : -speed,
+          blinkTimer: 400,
+          blinkOn:    true,
+        };
+      }
+    }
+  }
+
   private onClockTick(): void {
     if (!this.masterClock) return;
     const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
@@ -615,6 +664,7 @@ export class GameScene extends Phaser.Scene {
 
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.panelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase, this.seasons.c1);
     this.stars.update(delta, elev, this.sunAngle, this.scale.width);
+    this.updateAirplane(delta, elev);
     const shadowAlpha = this.sunMoon.shadowAlpha;
     for (const c of this.plotContainers) {
       if (hasShadowOverlay(c)) c.setShadowAlpha(shadowAlpha);
