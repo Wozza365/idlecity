@@ -70,12 +70,31 @@ export class Clouds {
 
   private draw(alpha: number, color = 0xffffff): void {
     this.gfx.clear();
-    this.gfx.fillStyle(color, alpha);
+
+    const r = (color >> 16) & 0xff;
+    const g = (color >> 8) & 0xff;
+    const b = color & 0xff;
+    const shadowColor =
+      (Math.max(0, r - 32) << 16) | (Math.max(0, g - 28) << 8) | Math.min(255, b + 8);
+
     for (const c of this.clouds) {
-      // Three overlapping ellipses per cloud for a natural shape
-      this.gfx.fillEllipse(c.x,               c.y,           c.w,       c.h);
-      this.gfx.fillEllipse(c.x - c.w * 0.30,  c.y + c.h * 0.18, c.w * 0.62, c.h * 0.80);
-      this.gfx.fillEllipse(c.x + c.w * 0.28,  c.y + c.h * 0.14, c.w * 0.66, c.h * 0.78);
+      const { x, y, w, h } = c;
+
+      // Soft underside shadow — visible beneath the puffs
+      this.gfx.fillStyle(shadowColor, alpha * 0.85);
+      this.gfx.fillEllipse(x, y + h * 0.54, w * 0.82, h * 0.36);
+
+      this.gfx.fillStyle(color, alpha);
+
+      // Wide flat base
+      this.gfx.fillEllipse(x, y + h * 0.22, w * 0.90, h * 0.50);
+
+      // Five puffs arching highest in the centre
+      this.gfx.fillEllipse(x - w * 0.34, y + h * 0.06, w * 0.38, h * 0.70);
+      this.gfx.fillEllipse(x - w * 0.15, y - h * 0.08, w * 0.44, h * 0.88);
+      this.gfx.fillEllipse(x + w * 0.04, y - h * 0.17, w * 0.48, h * 1.00);
+      this.gfx.fillEllipse(x + w * 0.23, y - h * 0.07, w * 0.42, h * 0.83);
+      this.gfx.fillEllipse(x + w * 0.40, y + h * 0.09, w * 0.36, h * 0.66);
     }
   }
 
