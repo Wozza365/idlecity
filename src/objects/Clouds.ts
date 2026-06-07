@@ -1,14 +1,101 @@
 import Phaser from 'phaser';
 
-type Cloud = { x: number; y: number; w: number; h: number; speed: number };
+type Cloud = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  speed: number;
+  sprite: Phaser.GameObjects.Image;
+  textureKey: string;
+};
+
+const PAD = 50;
+
+// Three puff layouts for visual variety — [xOffFrac, yOffFrac, fullWidthFrac, fullHeightFrac]
+const LAYOUTS: ReadonlyArray<ReadonlyArray<[number, number, number, number]>> = [
+  [
+    [-0.32,  0.05, 0.52, 0.56],
+    [-0.13, -0.09, 0.68, 0.76],
+    [ 0.03, -0.20, 0.80, 0.90],
+    [ 0.20, -0.08, 0.66, 0.74],
+    [ 0.37,  0.07, 0.50, 0.52],
+  ],
+  [
+    [-0.28,  0.08, 0.48, 0.52],
+    [-0.11, -0.06, 0.64, 0.70],
+    [ 0.05, -0.18, 0.78, 0.86],
+    [ 0.22, -0.05, 0.60, 0.68],
+    [ 0.38,  0.10, 0.46, 0.48],
+  ],
+  [
+    [-0.30,  0.02, 0.50, 0.58],
+    [-0.14, -0.12, 0.70, 0.78],
+    [ 0.01, -0.22, 0.76, 0.88],
+    [ 0.17, -0.10, 0.62, 0.72],
+    [ 0.34,  0.05, 0.48, 0.54],
+  ],
+];
+
+function makeCloudCanvas(w: number, h: number, variant: number): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width  = w + PAD * 2;
+  canvas.height = h + PAD * 2;
+  const ctx = canvas.getContext('2d')!;
+
+  const puffs = LAYOUTS[variant % LAYOUTS.length].map(([ox, oy, fw, fh]) => ({
+    x:  PAD + w * (0.5 + ox),
+    y:  PAD + h * (0.5 + oy),
+    rx: (w * fw) / 2,
+    ry: (h * fh) / 2,
+  }));
+
+  // Shadow underside — drawn first so the cloud body covers its centre,
+  // leaving a blue-grey fringe only at the base
+  ctx.filter = 'blur(10px)';
+  ctx.fillStyle = 'rgba(130, 150, 195, 0.55)';
+  ctx.beginPath();
+  ctx.ellipse(PAD + w * 0.50, PAD + h * 0.70, w * 0.46, h * 0.24, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Broad outer haze — blurred glow that gives feathery soft edges around each puff
+  ctx.filter = 'blur(12px)';
+  ctx.fillStyle = 'rgba(215, 228, 255, 0.45)';
+  for (const p of puffs) {
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.rx * 1.4, p.ry * 1.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Main body — tight blur keeps puff silhouettes readable while edges stay soft
+  ctx.filter = 'blur(4px)';
+  ctx.fillStyle = 'rgba(242, 248, 255, 0.86)';
+  for (const p of puffs) {
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Bright cores — near-sharp top-lit highlights on the crown of each puff
+  ctx.filter = 'blur(2px)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  for (const p of puffs) {
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - p.ry * 0.18, p.rx * 0.65, p.ry * 0.68, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.filter = 'none';
+  return canvas;
+}
 
 export class Clouds {
-  private readonly gfx: Phaser.GameObjects.Graphics;
+  private readonly scene: Phaser.Scene;
   private clouds: Cloud[] = [];
   private sceneWidth = 800;
 
   constructor(scene: Phaser.Scene) {
-    this.gfx = scene.add.graphics().setDepth(1);
+    this.scene = scene;
   }
 
   rebuild(width: number, groundY: number): void {
@@ -16,7 +103,6 @@ export class Clouds {
     if (this.clouds.length === 0) {
       this.initClouds(width, groundY);
     } else {
-      // Rescale y positions proportionally when window resizes
       const oldWidth = this.sceneWidth;
       const scale = width / oldWidth;
       for (const c of this.clouds) c.x *= scale;
@@ -25,105 +111,64 @@ export class Clouds {
 
   private initClouds(width: number, groundY: number): void {
     const skyH = groundY;
-    // Slow high layer (5 clouds)
+
+    const addCloud = (x: number, y: number, w: number, h: number, speed: number, variant: number) => {
+      const textureKey = `__cloud_${this.clouds.length}`;
+      const canvas = makeCloudCanvas(Math.round(w), Math.round(h), variant);
+      if (this.scene.textures.exists(textureKey)) this.scene.textures.remove(textureKey);
+      this.scene.textures.addCanvas(textureKey, canvas);
+      const sprite = this.scene.add.image(x, y, textureKey).setDepth(1).setAlpha(0);
+      this.clouds.push({ x, y, w, h, speed, sprite, textureKey });
+    };
+
     for (let i = 0; i < 5; i++) {
-      this.clouds.push({
-        x: Math.random() * width * 1.4,
-        y: skyH * (0.08 + Math.random() * 0.22),
-        w: 100 + Math.random() * 90,
-        h: 46 + Math.random() * 28,
-        speed: 0.010 + Math.random() * 0.006,
-      });
+      addCloud(
+        Math.random() * width * 1.4,
+        skyH * (0.08 + Math.random() * 0.22),
+        100 + Math.random() * 90,
+        46  + Math.random() * 28,
+        0.010 + Math.random() * 0.006,
+        i % 3,
+      );
     }
-    // Faster low layer (4 clouds)
     for (let i = 0; i < 4; i++) {
-      this.clouds.push({
-        x: Math.random() * width * 1.4,
-        y: skyH * (0.32 + Math.random() * 0.22),
-        w: 70 + Math.random() * 60,
-        h: 34 + Math.random() * 22,
-        speed: 0.022 + Math.random() * 0.010,
-      });
+      addCloud(
+        Math.random() * width * 1.4,
+        skyH * (0.32 + Math.random() * 0.22),
+        70  + Math.random() * 60,
+        34  + Math.random() * 22,
+        0.022 + Math.random() * 0.010,
+        (i + 1) % 3,
+      );
     }
   }
 
   update(delta: number, elevation: number, summerWeight = 1, weatherIntensity = 0): void {
-    // Base cloud density: sparse in summer (α≈0.07), heavier in winter (α≈0.20)
     const seasonBase = 0.07 + 0.13 * (1 - summerWeight);
     const maxAlpha   = seasonBase + 0.10 * weatherIntensity;
     const alpha      = Math.max(0, Math.min(maxAlpha, elevation * maxAlpha / 0.07));
-    if (alpha <= 0) {
-      this.gfx.clear();
-      return;
-    }
+
+    const grey = Math.round(255 - weatherIntensity * 40);
+    const tint  = (grey << 16) | (grey << 8) | grey;
 
     for (const cloud of this.clouds) {
       cloud.x -= cloud.speed * delta;
-      if (cloud.x < -cloud.w * 1.5) cloud.x += this.sceneWidth + cloud.w * 3;
-    }
-
-    // Clouds grey slightly during weather events
-    const grey = Math.round(255 - weatherIntensity * 40);
-    const cloudColor = (grey << 16) | (grey << 8) | grey;
-    this.draw(alpha, cloudColor);
-  }
-
-  // Puff layout: [xFrac, yFrac, wFrac, hFrac] — offsets and full diameters relative to cloud w/h
-  private static readonly PUFFS: ReadonlyArray<[number, number, number, number]> = [
-    [-0.32,  0.05, 0.52, 0.56],
-    [-0.13, -0.09, 0.68, 0.76],
-    [ 0.03, -0.20, 0.80, 0.90],
-    [ 0.20, -0.08, 0.66, 0.74],
-    [ 0.37,  0.07, 0.50, 0.52],
-  ];
-
-  private draw(alpha: number, color = 0xffffff): void {
-    this.gfx.clear();
-
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-
-    // Blue-grey underside — cooler and slightly darker than the main body
-    const shadowColor =
-      (Math.round(r * 0.72) << 16) |
-      (Math.round(g * 0.76) << 8) |
-      Math.min(255, Math.round(b * 0.94 + 24));
-
-    for (const c of this.clouds) {
-      const { x, y, w, h } = c;
-
-      // 1. Shadow band along the base
-      this.gfx.fillStyle(shadowColor, alpha * 0.58);
-      this.gfx.fillEllipse(x, y + h * 0.52, w * 0.84, h * 0.38);
-
-      // 2. Each puff drawn with feathered soft edges (3 concentric passes)
-      for (const [ox, oy, fw, fh] of Clouds.PUFFS) {
-        const px = x + w * ox;
-        const py = y + h * oy;
-        const pw = w * fw;
-        const ph = h * fh;
-
-        this.gfx.fillStyle(color, alpha * 0.14);
-        this.gfx.fillEllipse(px, py, pw * 1.65, ph * 1.65);
-        this.gfx.fillStyle(color, alpha * 0.42);
-        this.gfx.fillEllipse(px, py, pw * 1.25, ph * 1.25);
-        this.gfx.fillStyle(color, alpha);
-        this.gfx.fillEllipse(px, py, pw, ph);
-      }
-
-      // 3. Top-lit highlight on the three central puffs
-      for (const [ox, oy, fw, fh] of Clouds.PUFFS.slice(1, 4)) {
-        const px = x + w * ox;
-        const py = y + h * oy;
-        const ph = h * fh;
-        this.gfx.fillStyle(0xffffff, alpha * 0.38);
-        this.gfx.fillEllipse(px, py - ph * 0.22, w * fw * 0.62, ph * 0.48);
+      if (cloud.x < -(cloud.w + PAD) * 1.5) cloud.x += this.sceneWidth + (cloud.w + PAD) * 3;
+      cloud.sprite.x = cloud.x;
+      cloud.sprite.setAlpha(alpha);
+      if (weatherIntensity > 0) {
+        cloud.sprite.setTint(tint);
+      } else {
+        cloud.sprite.clearTint();
       }
     }
   }
 
   destroy(): void {
-    this.gfx.destroy();
+    for (const c of this.clouds) {
+      c.sprite.destroy();
+      if (this.scene.textures.exists(c.textureKey)) this.scene.textures.remove(c.textureKey);
+    }
+    this.clouds = [];
   }
 }
