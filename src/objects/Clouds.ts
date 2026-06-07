@@ -31,7 +31,7 @@ export class Clouds {
         x: Math.random() * width * 1.4,
         y: skyH * (0.08 + Math.random() * 0.22),
         w: 100 + Math.random() * 90,
-        h: 22 + Math.random() * 14,
+        h: 46 + Math.random() * 28,
         speed: 0.010 + Math.random() * 0.006,
       });
     }
@@ -41,7 +41,7 @@ export class Clouds {
         x: Math.random() * width * 1.4,
         y: skyH * (0.32 + Math.random() * 0.22),
         w: 70 + Math.random() * 60,
-        h: 16 + Math.random() * 10,
+        h: 34 + Math.random() * 22,
         speed: 0.022 + Math.random() * 0.010,
       });
     }
@@ -68,33 +68,58 @@ export class Clouds {
     this.draw(alpha, cloudColor);
   }
 
+  // Puff layout: [xFrac, yFrac, wFrac, hFrac] — offsets and full diameters relative to cloud w/h
+  private static readonly PUFFS: ReadonlyArray<[number, number, number, number]> = [
+    [-0.32,  0.05, 0.52, 0.56],
+    [-0.13, -0.09, 0.68, 0.76],
+    [ 0.03, -0.20, 0.80, 0.90],
+    [ 0.20, -0.08, 0.66, 0.74],
+    [ 0.37,  0.07, 0.50, 0.52],
+  ];
+
   private draw(alpha: number, color = 0xffffff): void {
     this.gfx.clear();
 
     const r = (color >> 16) & 0xff;
     const g = (color >> 8) & 0xff;
     const b = color & 0xff;
+
+    // Blue-grey underside — cooler and slightly darker than the main body
     const shadowColor =
-      (Math.max(0, r - 32) << 16) | (Math.max(0, g - 28) << 8) | Math.min(255, b + 8);
+      (Math.round(r * 0.72) << 16) |
+      (Math.round(g * 0.76) << 8) |
+      Math.min(255, Math.round(b * 0.94 + 24));
 
     for (const c of this.clouds) {
       const { x, y, w, h } = c;
 
-      // Soft underside shadow — visible beneath the puffs
-      this.gfx.fillStyle(shadowColor, alpha * 0.85);
-      this.gfx.fillEllipse(x, y + h * 0.54, w * 0.82, h * 0.36);
+      // 1. Shadow band along the base
+      this.gfx.fillStyle(shadowColor, alpha * 0.58);
+      this.gfx.fillEllipse(x, y + h * 0.52, w * 0.84, h * 0.38);
 
-      this.gfx.fillStyle(color, alpha);
+      // 2. Each puff drawn with feathered soft edges (3 concentric passes)
+      for (const [ox, oy, fw, fh] of Clouds.PUFFS) {
+        const px = x + w * ox;
+        const py = y + h * oy;
+        const pw = w * fw;
+        const ph = h * fh;
 
-      // Wide flat base
-      this.gfx.fillEllipse(x, y + h * 0.22, w * 0.90, h * 0.50);
+        this.gfx.fillStyle(color, alpha * 0.14);
+        this.gfx.fillEllipse(px, py, pw * 1.65, ph * 1.65);
+        this.gfx.fillStyle(color, alpha * 0.42);
+        this.gfx.fillEllipse(px, py, pw * 1.25, ph * 1.25);
+        this.gfx.fillStyle(color, alpha);
+        this.gfx.fillEllipse(px, py, pw, ph);
+      }
 
-      // Five puffs arching highest in the centre
-      this.gfx.fillEllipse(x - w * 0.34, y + h * 0.06, w * 0.38, h * 0.70);
-      this.gfx.fillEllipse(x - w * 0.15, y - h * 0.08, w * 0.44, h * 0.88);
-      this.gfx.fillEllipse(x + w * 0.04, y - h * 0.17, w * 0.48, h * 1.00);
-      this.gfx.fillEllipse(x + w * 0.23, y - h * 0.07, w * 0.42, h * 0.83);
-      this.gfx.fillEllipse(x + w * 0.40, y + h * 0.09, w * 0.36, h * 0.66);
+      // 3. Top-lit highlight on the three central puffs
+      for (const [ox, oy, fw, fh] of Clouds.PUFFS.slice(1, 4)) {
+        const px = x + w * ox;
+        const py = y + h * oy;
+        const ph = h * fh;
+        this.gfx.fillStyle(0xffffff, alpha * 0.38);
+        this.gfx.fillEllipse(px, py - ph * 0.22, w * fw * 0.62, ph * 0.48);
+      }
     }
   }
 
