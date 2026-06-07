@@ -812,7 +812,7 @@ export class WaterArea {
     this.updateSkyReflection(horizonColor);
     const dt = delta / 1000;
     this._waveTime    += dt * 0.12;
-    this._waveRise    += dt * 0.010; // 10 px/s rise speed at riseM 1.0
+    this._waveRise    += dt * 0.015; // 15 px/s rise speed
     this._bonfireTime += dt * 0.55; // slowed for more organic feel
     this._lighthouseAngle  = (this._lighthouseAngle + dt * 0.75) % (Math.PI * 2);
 
@@ -857,70 +857,72 @@ export class WaterArea {
 
     const { _width: w, _waterY: wy } = this;
 
-    // ── Rising water waves — full width, upward animation ──
-    // Six strips at staggered depths, each scrolling upward at different speeds.
-    // Each strip fades out as it approaches its ceiling (verge, beach, rock, or dock top)
-    // and fades in as it emerges from the bottom. Covers the full water width dynamically.
+    // ── Full-width rising water waves ──
+    // 4 bands × 2 tiles (offset WATER_H/2 apart) so at least one tile per band is
+    // always visible regardless of where in the cycle we are. All tiles scroll upward
+    // together via a single drift offset. Per-column ceiling clips at the surface of
+    // whatever structure is unlocked at that x (beach, rock, dock, or open verge edge).
     {
-      const t    = this._waveTime;
-      const rise = this._waveRise;
-      const nf   = this._nightFactor;
-      const dayA = Math.max(0, 1 - nf * 1.1);
-      const FADE_TOP_PX = 18;
-      const FADE_BOT_PX = 12;
+      const t     = this._waveTime;
+      const drift = this._waveRise % WATER_H;
+      const nf    = this._nightFactor;
+      const dayA  = Math.max(0, 1 - nf * 1.1);
+      const FADE_TOP_PX = 20;
+      const FADE_BOT_PX = 10;
+      const TILE_OFF    = WATER_H / 2; // 50 px — two tiles always span the full height
       const { _beachEndX: bx, _dockX1: dkx1, _dockX2: dkx2, _transEndX: tx, _level: lv } = this;
 
-      // depth0: starting pixel depth from wy; riseM: rise-speed multiplier
-      const STRIPS = [
-        { depth0: 10, amp: 2.0, freq: 0.055, hSpeed: 0.55, riseM: 1.00, len: 22, gap: 56, alpha: 0.095 },
-        { depth0: 27, amp: 1.5, freq: 0.040, hSpeed: 0.40, riseM: 0.65, len: 18, gap: 48, alpha: 0.075 },
-        { depth0: 44, amp: 2.5, freq: 0.065, hSpeed: 0.65, riseM: 1.20, len: 14, gap: 44, alpha: 0.085 },
-        { depth0: 60, amp: 1.0, freq: 0.035, hSpeed: 0.30, riseM: 0.50, len: 20, gap: 60, alpha: 0.065 },
-        { depth0: 76, amp: 1.8, freq: 0.050, hSpeed: 0.50, riseM: 0.90, len: 16, gap: 52, alpha: 0.070 },
-        { depth0: 92, amp: 1.2, freq: 0.045, hSpeed: 0.45, riseM: 0.75, len: 24, gap: 64, alpha: 0.060 },
+      const BANDS = [
+        { baseD: 18, amp: 2.5, freq: 0.055, hSpeed: 0.60, len: 18, gap: 28, alpha: 0.11 },
+        { baseD: 36, amp: 2.0, freq: 0.040, hSpeed: 0.45, len: 22, gap: 36, alpha: 0.09 },
+        { baseD: 56, amp: 1.5, freq: 0.065, hSpeed: 0.70, len: 14, gap: 24, alpha: 0.10 },
+        { baseD: 76, amp: 1.0, freq: 0.035, hSpeed: 0.35, len: 20, gap: 32, alpha: 0.08 },
       ] as const;
 
-      for (const s of STRIPS) {
-        const rawDepth = ((s.depth0 + rise * s.riseM) % WATER_H + WATER_H) % WATER_H;
-        const stripA   = (s.alpha + 0.02 * Math.sin(t * 0.7)) * dayA;
-        if (stripA < 0.005) continue;
+      for (const b of BANDS) {
+        const bandA = (b.alpha + 0.02 * Math.sin(t * 0.7)) * dayA;
+        if (bandA < 0.005) continue;
 
-        for (let x = 4; x < w - 4; x += s.gap) {
-          const y = Math.round(wy + rawDepth + s.amp * Math.sin(s.freq * x + t * s.hSpeed));
-          if (y >= wy + WATER_H) continue;
+        for (const tileOff of [0, TILE_OFF]) {
+          const rawDepth = ((b.baseD + drift + tileOff) % WATER_H + WATER_H) % WATER_H;
 
-          // Per-x ceiling: topmost Y where waves are visible for this column
-          let ceilY = wy;
-          if (lv >= 1) {
-            if (x < bx) {
-              ceilY = wy + BEACH_SHORE_H;
-            } else if (lv >= 5 && x >= dkx1 && x < dkx2) {
-              ceilY = wy + BEACH_SHORE_H;
-            } else if (x >= tx) {
-              ceilY = wy + ROCK_SHORE_H;
-            } else {
-              // Beach-to-rock transition zone: smoothstep interpolated height
-              const tt = (x - bx) / Math.max(1, tx - bx);
-              const ts = tt * tt * (3 - 2 * tt);
-              ceilY = wy + Math.round(BEACH_SHORE_H * (1 - ts) + ROCK_SHORE_H * ts);
+          for (let x = 4; x < w - 4; x += b.gap) {
+            const y = Math.round(wy + rawDepth + b.amp * Math.sin(b.freq * x + t * b.hSpeed));
+            if (y >= wy + WATER_H) continue;
+
+            // Ceiling: topmost visible Y for this x-column based on unlocked structures
+            let ceilY = wy;
+            if (lv >= 1) {
+              if (x < bx) {
+                ceilY = wy + BEACH_SHORE_H;
+              } else if (lv >= 5 && x >= dkx1 && x < dkx2) {
+                ceilY = wy + BEACH_SHORE_H;
+              } else if (x >= tx) {
+                ceilY = wy + ROCK_SHORE_H;
+              } else {
+                // Transition zone: smoothstep from beach to rock shore height
+                const tt = (x - bx) / Math.max(1, tx - bx);
+                const ts = tt * tt * (3 - 2 * tt);
+                ceilY = wy + Math.round(BEACH_SHORE_H * (1 - ts) + ROCK_SHORE_H * ts);
+              }
             }
+
+            if (y < ceilY) continue;
+
+            // Fade toward ceiling and toward bottom
+            const topFade = Math.min(1, (y - ceilY)       / FADE_TOP_PX);
+            if (topFade < 0.01) continue;
+            const botFade = Math.min(1, (wy + WATER_H - y) / FADE_BOT_PX);
+
+            const a = bandA * topFade * botFade;
+            if (a < 0.005) continue;
+
+            gfx.fillStyle(0xFFFFFF, a);
+            gfx.fillRect(x, y, b.len, 1);
+            // Brighter leading edge
+            gfx.fillStyle(0xFFFFFF, Math.min(1, a * 1.8));
+            gfx.fillRect(x, y, 4, 1);
           }
-
-          if (y < ceilY) continue;
-
-          // Fade as wave nears its ceiling from below
-          const topFade = Math.min(1, (y - ceilY) / FADE_TOP_PX);
-          if (topFade < 0.01) continue;
-          // Fade as wave enters from bottom
-          const botFade = Math.min(1, (wy + WATER_H - y) / FADE_BOT_PX);
-
-          const a = stripA * topFade * botFade;
-          if (a < 0.005) continue;
-
-          gfx.fillStyle(0xFFFFFF, a);
-          gfx.fillRect(x, y, s.len, 1);
-          gfx.fillStyle(0xFFFFFF, Math.min(1, a * 1.8));
-          gfx.fillRect(x, y, 4, 1);
         }
       }
 
