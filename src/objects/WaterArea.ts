@@ -913,8 +913,8 @@ export class WaterArea {
           //   Pass A — primary body:  stride 6, seg 10-13 px,  noise ±1.6 px
           //   Pass B — fringe layer:  stride 9, seg  8-11 px,  noise ±2.3 px, shifted 4 px
           const passes = [
-            { stride: 6, segBase: 11, noiseAmp: 1.6, xOff: 0, aScale: 1.00 },
-            { stride: 9, segBase:  9, noiseAmp: 2.3, xOff: 4, aScale: 0.58 },
+            { stride: 12, segBase: 22, noiseAmp: 1.6, xOff: 0, aScale: 1.00 },
+            { stride: 18, segBase: 18, noiseAmp: 2.3, xOff: 7, aScale: 0.58 },
           ] as const;
 
           for (const pd of passes) {
