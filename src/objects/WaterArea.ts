@@ -811,7 +811,7 @@ export class WaterArea {
     if (this._width === 0) return; // not yet rendered
     this.updateSkyReflection(horizonColor);
     const dt = delta / 1000;
-    this._waveTime    += dt * 0.8;
+    this._waveTime    += dt * 0.5;
     this._waveRise    += dt * 15; // 15 px/s rise speed
     this._bonfireTime += dt * 0.55; // slowed for more organic feel
     this._lighthouseAngle  = (this._lighthouseAngle + dt * 0.75) % (Math.PI * 2);
