@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene {
   private sunAngle: number = Math.PI / 2;
   private lastWindowElev: number = 2; // out-of-range → forces first update
   private _floatTickCount = 0;
+  private _lastTaxTimestamp = 0;
   seasons!: SeasonSystem;
 
   // ── Airplane ──────────────────────────────────────────────────────────────
@@ -161,8 +162,14 @@ export class GameScene extends Phaser.Scene {
     // Resize listener
     this.scale.on('resize', this.onResize, this);
 
-    // Tax tick — every 250 ms
+    // Tax tick — every 250 ms; use real timestamps so background throttling doesn't slow income
+    this._lastTaxTimestamp = Date.now();
     this.time.addEvent({ delay: 250, loop: true, callback: this.onTaxTick, callbackScope: this });
+
+    // Catch up when a throttled/paused background tab becomes visible again
+    const onVisible = () => { if (document.visibilityState === 'visible') this.onTaxTick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    this.events.once('shutdown', () => document.removeEventListener('visibilitychange', onVisible));
 
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
@@ -785,7 +792,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onTaxTick(): void {
-    this.state.gold += this.taxRate / 4;
+    const now = Date.now();
+    const elapsed = now - this._lastTaxTimestamp;
+    this._lastTaxTimestamp = now;
+    this.state.gold += this.taxRate * (elapsed / 1000);
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
 
