@@ -808,7 +808,7 @@ export class WaterArea {
   // ── Per-frame update ──────────────────────────────────────────────────────
 
   update(delta: number, elevation: number, horizonColor = 0x1a5c9e): void {
-    if (this._level === 0) return;
+    if (this._width === 0) return; // not yet rendered
     this.updateSkyReflection(horizonColor);
     const dt = delta / 1000;
     this._waveTime    += dt * 0.12;
@@ -858,9 +858,8 @@ export class WaterArea {
     const { _width: w, _waterY: wy } = this;
 
     // ── Full-width rising water waves ──
-    // Continuous sinusoidal wave lines drawn as paths, scrolling upward.
-    // 6 evenly-spaced crests traverse the full water height, each with slightly
-    // different frequency, speed and phase for a natural look.
+    // Drawn as short fillRect segments so each column can apply a per-column
+    // shore-proximity fade. Multi-harmonic shape gives a rough, organic look.
     {
       const t    = this._waveTime;
       const rise = this._waveRise % WATER_H;
@@ -869,38 +868,38 @@ export class WaterArea {
       const { _beachEndX: bx, _dockX1: dkx1, _dockX2: dkx2, _transEndX: tx, _level: lv } = this;
 
       if (dayA > 0.01) {
-        const NUM_WAVES = 6;
-        const SPACING   = WATER_H / NUM_WAVES; // ~16.7 px between crests
+        const NUM_WAVES  = 7;
+        const SPACING    = WATER_H / NUM_WAVES;
+        const SHORE_FADE = 30; // px below shore ceiling over which each wave fades in
 
         for (let wi = 0; wi < NUM_WAVES; wi++) {
-          // Scroll upward: as rise increases, rawDepth decreases, wave moves toward surface
           const rawDepth = ((wi * SPACING - rise) % WATER_H + WATER_H) % WATER_H;
 
-          const topFade = Math.min(1, rawDepth / 10);
+          // Fade near cycle edges to prevent hard pop-in at top/bottom wrap
+          const topFade = Math.min(1, rawDepth / 8);
           const botFade = Math.min(1, (WATER_H - rawDepth) / 8);
           if (topFade < 0.05 || botFade < 0.05) continue;
 
-          const depthFade = 0.65 + 0.35 * (1 - rawDepth / WATER_H);
-          const lineAlpha = dayA * 0.22 * depthFade * topFade * botFade;
-          if (lineAlpha < 0.01) continue;
+          const baseAlpha = dayA * 0.26 * topFade * botFade;
+          if (baseAlpha < 0.01) continue;
 
-          const freq  = 0.026 + wi * 0.005;
-          const amp   = 2.8  - wi * 0.22;
-          const speed = 0.38 + wi * 0.07;
-          const phase = wi * 1.4;
+          // Multi-harmonic shape: primary wave + roughness overtone + fine chop
+          const f1 = 0.024 + wi * 0.004;
+          const a1 = 2.5  - wi * 0.16;
+          const s1 = 0.36 + wi * 0.06;
+          const ph = wi   * 1.4;
 
-          gfx.lineStyle(2, 0xFFFFFF, lineAlpha);
-          let inPath = false;
+          const STEP = 4;
+          for (let x = 0; x < w; x += STEP) {
+            const y = Math.round(wy + rawDepth
+              + Math.sin(x * f1       + t * s1       + ph)        * a1
+              + Math.sin(x * f1 * 2.3 + t * s1 * 1.7 + ph * 0.8) * (a1 * 0.40)
+              + Math.sin(x * f1 * 5.7 + t * s1 * 2.5 + ph * 1.5) * (a1 * 0.18)
+            );
 
-          for (let x = 0; x < w; x += 3) {
-            const y = Math.round(wy + rawDepth + Math.sin(x * freq + t * speed + phase) * amp);
+            if (y >= wy + WATER_H) continue;
 
-            if (y >= wy + WATER_H) {
-              if (inPath) { gfx.strokePath(); inPath = false; }
-              continue;
-            }
-
-            // Per-column ceiling based on unlocked structures
+            // Dynamic shore ceiling at this x-column
             let ceilY = wy;
             if (lv >= 1) {
               if (x < bx) {
@@ -916,20 +915,21 @@ export class WaterArea {
               }
             }
 
-            if (y < ceilY) {
-              if (inPath) { gfx.strokePath(); inPath = false; }
-              continue;
-            }
+            if (y < ceilY) continue;
 
-            if (!inPath) {
-              gfx.beginPath();
-              gfx.moveTo(x, y);
-              inPath = true;
-            } else {
-              gfx.lineTo(x, y);
+            // Fade as wave approaches the shore surface — key visual
+            const shoreFade = Math.min(1, (y - ceilY) / SHORE_FADE);
+            const a = baseAlpha * shoreFade;
+            if (a < 0.005) continue;
+
+            gfx.fillStyle(0xFFFFFF, a);
+            gfx.fillRect(x, y, STEP - 1, 1);
+            // Brighter leading edge on foreground waves
+            if (wi < 4 && a > 0.04) {
+              gfx.fillStyle(0xFFFFFF, Math.min(1, a * 1.6));
+              gfx.fillRect(x, y, 2, 1);
             }
           }
-          if (inPath) gfx.strokePath();
         }
       }
 
