@@ -942,16 +942,34 @@ export class WaterArea {
               const segLen = Math.min(pd.segBase + lenVar, w - x);
               if (segLen <= 0) continue;
 
-              // ~30% of strokes are 2 px tall — mimics chunkier foam patches
-              const h = Math.sin(x * 0.91 + wi * 4.7) > 0.45 ? 2 : 1;
+              // Line width varies — ~30% of strokes are 3 px, rest 2 px
+              const lineW = Math.sin(x * 0.91 + wi * 4.7) > 0.45 ? 3 : 2;
 
-              gfx.fillStyle(0xFFFFFF, a);
-              gfx.fillRect(x, y0, segLen, h);
+              // Draw stroke as a curved polyline (5 pts) following the wave envelope
+              // so the stroke itself tilts and bends with the wave rather than
+              // being a flat horizontal bar.
+              gfx.lineStyle(lineW, 0xFFFFFF, a);
+              gfx.beginPath();
+              const PTS = 5;
+              for (let ci = 0; ci <= PTS; ci++) {
+                const px = x + segLen * ci / PTS;
+                const pn = Math.sin(px * 0.38 + wi * 6.1) * pd.noiseAmp
+                         + Math.sin(px * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+                const py = envY(px) + pn;
+                ci === 0 ? gfx.moveTo(px, py) : gfx.lineTo(px, py);
+              }
+              gfx.strokePath();
 
-              // Bright leading 3 px on primary pass — crest highlight
+              // Bright crest highlight — short high-alpha segment at stroke start
               if (pd.aScale >= 1.0 && a > 0.05) {
-                gfx.fillStyle(0xFFFFFF, Math.min(1, a * 1.8));
-                gfx.fillRect(x, y0, 3, 1);
+                const px4 = x + 5;
+                const pn0 = Math.sin(x   * 0.38 + wi * 6.1) * pd.noiseAmp + Math.sin(x   * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+                const pn4 = Math.sin(px4 * 0.38 + wi * 6.1) * pd.noiseAmp + Math.sin(px4 * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+                gfx.lineStyle(lineW, 0xFFFFFF, Math.min(1, a * 1.8));
+                gfx.beginPath();
+                gfx.moveTo(x,   envY(x)   + pn0);
+                gfx.lineTo(px4, envY(px4) + pn4);
+                gfx.strokePath();
               }
             }
           }
