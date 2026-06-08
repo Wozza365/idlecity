@@ -811,7 +811,7 @@ export class WaterArea {
     if (this._width === 0) return; // not yet rendered
     this.updateSkyReflection(horizonColor);
     const dt = delta / 1000;
-    this._waveTime    += dt * 0.12;
+    this._waveTime    += dt * 0.8;
     this._waveRise    += dt * 15; // 15 px/s rise speed
     this._bonfireTime += dt * 0.55; // slowed for more organic feel
     this._lighthouseAngle  = (this._lighthouseAngle + dt * 0.75) % (Math.PI * 2);
@@ -905,7 +905,8 @@ export class WaterArea {
             wy + rawDepth
             + Math.sin(x * f1       + t * s1       + ph)        * a1
             + Math.sin(x * f1 * 2.3 + t * s1 * 1.7 + ph * 0.8) * (a1 * 0.40)
-            + Math.sin(x * f1 * 5.7 + t * s1 * 2.5 + ph * 1.5) * (a1 * 0.18);
+            + Math.sin(x * f1 * 5.7 + t * s1 * 2.5 + ph * 1.5) * (a1 * 0.18)
+            + Math.sin(x * f1 * 0.5 + t * s1 * 2.0 + ph * 1.7) * (a1 * 0.70);
 
           // Two passes with distinct strides / x-offsets so their stroke-start
           // positions never coincide — this guarantees the overlap zones sit at
@@ -926,8 +927,8 @@ export class WaterArea {
               // These shift each stroke's y by a small unique amount so adjacent
               // strokes meet at different heights — that is the ragged-edge mechanism.
               const noise =
-                Math.sin(x * 0.38 + wi * 6.1) * pd.noiseAmp
-              + Math.sin(x * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+                Math.sin(x * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp
+              + Math.sin(x * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
 
               const y0    = Math.round(envY(x) + noise);
               const ceilY = ceilAt(x);
@@ -953,8 +954,8 @@ export class WaterArea {
               const PTS = 5;
               for (let ci = 0; ci <= PTS; ci++) {
                 const px = x + segLen * ci / PTS;
-                const pn = Math.sin(px * 0.38 + wi * 6.1) * pd.noiseAmp
-                         + Math.sin(px * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+                const pn = Math.sin(px * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp
+                         + Math.sin(px * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
                 const py = envY(px) + pn;
                 if (ci === 0) { gfx.moveTo(px, py); } else { gfx.lineTo(px, py); }
               }
@@ -963,8 +964,8 @@ export class WaterArea {
               // Bright crest highlight — short high-alpha segment at stroke start
               if (pd.aScale >= 1.0 && a > 0.05) {
                 const px4 = x + 5;
-                const pn0 = Math.sin(x   * 0.38 + wi * 6.1) * pd.noiseAmp + Math.sin(x   * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
-                const pn4 = Math.sin(px4 * 0.38 + wi * 6.1) * pd.noiseAmp + Math.sin(px4 * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+                const pn0 = Math.sin(x   * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp + Math.sin(x   * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
+                const pn4 = Math.sin(px4 * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp + Math.sin(px4 * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
                 gfx.lineStyle(lineW, 0xFFFFFF, Math.min(1, a * 1.8));
                 gfx.beginPath();
                 gfx.moveTo(x,   envY(x)   + pn0);
