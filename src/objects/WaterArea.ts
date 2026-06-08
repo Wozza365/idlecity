@@ -858,8 +858,12 @@ export class WaterArea {
     const { _width: w, _waterY: wy } = this;
 
     // ── Full-width rising water waves ──
-    // Drawn as short fillRect segments so each column can apply a per-column
-    // shore-proximity fade. Multi-harmonic shape gives a rough, organic look.
+    // Each wave crest is rendered as two overlapping passes of short strokes.
+    // Both passes use deterministic per-position y-noise so adjacent strokes land
+    // at slightly different y-values — where they meet the edges are ragged and
+    // organic, not a clean geometric line.  The two passes have different strides
+    // and x-offsets so their stroke boundaries never align, which fills out the
+    // crest with irregular overlaps.  Shore-proximity fade is per-stroke.
     {
       const t    = this._waveTime;
       const rise = this._waveRise % WATER_H;
@@ -867,67 +871,88 @@ export class WaterArea {
       const dayA = Math.max(0, 1 - nf * 1.1);
       const { _beachEndX: bx, _dockX1: dkx1, _dockX2: dkx2, _transEndX: tx, _level: lv } = this;
 
+      // Shore ceiling at column x — same logic reused by both passes
+      const ceilAt = (x: number): number => {
+        if (lv < 1) return wy;
+        if (x < bx) return wy + BEACH_SHORE_H;
+        if (lv >= 5 && x >= dkx1 && x < dkx2) return wy + BEACH_SHORE_H;
+        if (x >= tx) return wy + ROCK_SHORE_H;
+        const r = (x - bx) / Math.max(1, tx - bx);
+        const s = r * r * (3 - 2 * r);
+        return wy + Math.round(BEACH_SHORE_H * (1 - s) + ROCK_SHORE_H * s);
+      };
+
       if (dayA > 0.01) {
+        const SHORE_FADE = 30;
         const NUM_WAVES  = 7;
         const SPACING    = WATER_H / NUM_WAVES;
-        const SHORE_FADE = 30; // px below shore ceiling over which each wave fades in
 
         for (let wi = 0; wi < NUM_WAVES; wi++) {
           const rawDepth = ((wi * SPACING - rise) % WATER_H + WATER_H) % WATER_H;
-
-          // Fade near cycle edges to prevent hard pop-in at top/bottom wrap
-          const topFade = Math.min(1, rawDepth / 8);
-          const botFade = Math.min(1, (WATER_H - rawDepth) / 8);
+          const topFade  = Math.min(1, rawDepth / 8);
+          const botFade  = Math.min(1, (WATER_H - rawDepth) / 8);
           if (topFade < 0.05 || botFade < 0.05) continue;
 
-          const baseAlpha = dayA * 0.26 * topFade * botFade;
+          const baseAlpha = dayA * 0.27 * topFade * botFade;
           if (baseAlpha < 0.01) continue;
 
-          // Multi-harmonic shape: primary wave + roughness overtone + fine chop
+          // Multi-harmonic smooth envelope — determines the y-centre for each crest
           const f1 = 0.024 + wi * 0.004;
-          const a1 = 2.5  - wi * 0.16;
-          const s1 = 0.36 + wi * 0.06;
-          const ph = wi   * 1.4;
+          const a1 = 2.5   - wi * 0.16;
+          const s1 = 0.36  + wi * 0.06;
+          const ph = wi    * 1.4;
+          const envY = (x: number) =>
+            wy + rawDepth
+            + Math.sin(x * f1       + t * s1       + ph)        * a1
+            + Math.sin(x * f1 * 2.3 + t * s1 * 1.7 + ph * 0.8) * (a1 * 0.40)
+            + Math.sin(x * f1 * 5.7 + t * s1 * 2.5 + ph * 1.5) * (a1 * 0.18);
 
-          const STEP = 4;
-          for (let x = 0; x < w; x += STEP) {
-            const y = Math.round(wy + rawDepth
-              + Math.sin(x * f1       + t * s1       + ph)        * a1
-              + Math.sin(x * f1 * 2.3 + t * s1 * 1.7 + ph * 0.8) * (a1 * 0.40)
-              + Math.sin(x * f1 * 5.7 + t * s1 * 2.5 + ph * 1.5) * (a1 * 0.18)
-            );
+          // Two passes with distinct strides / x-offsets so their stroke-start
+          // positions never coincide — this guarantees the overlap zones sit at
+          // different y-values and give genuinely ragged edges.
+          //   Pass A — primary body:  stride 6, seg 10-13 px,  noise ±1.6 px
+          //   Pass B — fringe layer:  stride 9, seg  8-11 px,  noise ±2.3 px, shifted 4 px
+          const passes = [
+            { stride: 6, segBase: 11, noiseAmp: 1.6, xOff: 0, aScale: 1.00 },
+            { stride: 9, segBase:  9, noiseAmp: 2.3, xOff: 4, aScale: 0.58 },
+          ] as const;
 
-            if (y >= wy + WATER_H) continue;
+          for (const pd of passes) {
+            for (let sx = 0; sx < w; sx += pd.stride) {
+              const x = sx + pd.xOff;
+              if (x >= w) continue;
 
-            // Dynamic shore ceiling at this x-column
-            let ceilY = wy;
-            if (lv >= 1) {
-              if (x < bx) {
-                ceilY = wy + BEACH_SHORE_H;
-              } else if (lv >= 5 && x >= dkx1 && x < dkx2) {
-                ceilY = wy + BEACH_SHORE_H;
-              } else if (x >= tx) {
-                ceilY = wy + ROCK_SHORE_H;
-              } else {
-                const ttt = (x - bx) / Math.max(1, tx - bx);
-                const ts  = ttt * ttt * (3 - 2 * ttt);
-                ceilY = wy + Math.round(BEACH_SHORE_H * (1 - ts) + ROCK_SHORE_H * ts);
+              // Deterministic y-noise: two spatial frequencies, stable over time.
+              // These shift each stroke's y by a small unique amount so adjacent
+              // strokes meet at different heights — that is the ragged-edge mechanism.
+              const noise =
+                Math.sin(x * 0.38 + wi * 6.1) * pd.noiseAmp
+              + Math.sin(x * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
+
+              const y0    = Math.round(envY(x) + noise);
+              const ceilY = ceilAt(x);
+              if (y0 < ceilY || y0 >= wy + WATER_H) continue;
+
+              const shoreFade = Math.min(1, (y0 - ceilY) / SHORE_FADE);
+              const a = baseAlpha * pd.aScale * shoreFade;
+              if (a < 0.005) continue;
+
+              // Segment length varies per position (±2 px around base)
+              const lenVar = Math.round(Math.sin(x * 0.77 + wi * 3.9) * 2);
+              const segLen = Math.min(pd.segBase + lenVar, w - x);
+              if (segLen <= 0) continue;
+
+              // ~30% of strokes are 2 px tall — mimics chunkier foam patches
+              const h = Math.sin(x * 0.91 + wi * 4.7) > 0.45 ? 2 : 1;
+
+              gfx.fillStyle(0xFFFFFF, a);
+              gfx.fillRect(x, y0, segLen, h);
+
+              // Bright leading 3 px on primary pass — crest highlight
+              if (pd.aScale >= 1.0 && a > 0.05) {
+                gfx.fillStyle(0xFFFFFF, Math.min(1, a * 1.8));
+                gfx.fillRect(x, y0, 3, 1);
               }
-            }
-
-            if (y < ceilY) continue;
-
-            // Fade as wave approaches the shore surface — key visual
-            const shoreFade = Math.min(1, (y - ceilY) / SHORE_FADE);
-            const a = baseAlpha * shoreFade;
-            if (a < 0.005) continue;
-
-            gfx.fillStyle(0xFFFFFF, a);
-            gfx.fillRect(x, y, STEP - 1, 1);
-            // Brighter leading edge on foreground waves
-            if (wi < 4 && a > 0.04) {
-              gfx.fillStyle(0xFFFFFF, Math.min(1, a * 1.6));
-              gfx.fillRect(x, y, 2, 1);
             }
           }
         }
