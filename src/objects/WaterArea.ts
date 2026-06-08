@@ -956,7 +956,7 @@ export class WaterArea {
                 const pn = Math.sin(px * 0.38 + wi * 6.1) * pd.noiseAmp
                          + Math.sin(px * 1.19 + wi * 2.7) * pd.noiseAmp * 0.5;
                 const py = envY(px) + pn;
-                ci === 0 ? gfx.moveTo(px, py) : gfx.lineTo(px, py);
+                if (ci === 0) { gfx.moveTo(px, py); } else { gfx.lineTo(px, py); }
               }
               gfx.strokePath();
 
