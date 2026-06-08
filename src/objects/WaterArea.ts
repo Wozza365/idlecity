@@ -946,10 +946,14 @@ export class WaterArea {
               // Line width varies — ~30% of strokes are 3 px, rest 2 px
               const lineW = Math.sin(x * 0.91 + wi * 4.7) > 0.45 ? 3 : 2;
 
+              // Subtle colour variation: pale blue-white → pure white
+              const colorT    = (Math.sin(x * 0.17 + wi * 4.3 + t * 1.8) + 1) * 0.5;
+              const waveColor = lerpColor(0xBED8F5, 0xFFFFFF, colorT);
+
               // Draw stroke as a curved polyline (5 pts) following the wave envelope
               // so the stroke itself tilts and bends with the wave rather than
               // being a flat horizontal bar.
-              gfx.lineStyle(lineW, 0xFFFFFF, a);
+              gfx.lineStyle(lineW, waveColor, a);
               gfx.beginPath();
               const PTS = 5;
               for (let ci = 0; ci <= PTS; ci++) {
@@ -966,7 +970,7 @@ export class WaterArea {
                 const px4 = x + 5;
                 const pn0 = Math.sin(x   * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp + Math.sin(x   * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
                 const pn4 = Math.sin(px4 * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp + Math.sin(px4 * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
-                gfx.lineStyle(lineW, 0xFFFFFF, Math.min(1, a * 1.8));
+                gfx.lineStyle(lineW, waveColor, Math.min(1, a * 1.8));
                 gfx.beginPath();
                 gfx.moveTo(x,   envY(x)   + pn0);
                 gfx.lineTo(px4, envY(px4) + pn4);
