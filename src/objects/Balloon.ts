@@ -5,8 +5,8 @@ const BALLOON_H   = 32;
 const GONDOLA_W   = 6;
 const GONDOLA_H   = 4;
 const ROPE_LEN    = 5;
-const MIN_SPEED   = 15;
-const MAX_SPEED   = 25;
+const MIN_SPEED   = 8;
+const MAX_SPEED   = 13;
 const MIN_WAIT_MS = 180_000;
 const MAX_WAIT_MS = 360_000;
 
@@ -66,7 +66,7 @@ export class Balloon {
     const fromLeft  = Math.random() < 0.5;
     const speed     = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
     this.x          = fromLeft ? -(BALLOON_W + 10) : this.sceneWidth + BALLOON_W + 10;
-    this.y          = this.skyH * (0.35 + Math.random() * 0.20);
+    this.y          = this.skyH * (0.35 + Math.random() * 0.30);
     this.vx         = fromLeft ? speed : -speed;
     this.bobPhase   = Math.random() * Math.PI * 2;
     this.stripeIdx  = Math.floor(Math.random() * STRIPE_COLORS.length);
@@ -77,7 +77,7 @@ export class Balloon {
     const fromLeft  = Math.random() < 0.5;
     const speed     = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
     this.x          = fromLeft ? this.sceneWidth * 0.15 : this.sceneWidth * 0.85;
-    this.y          = this.skyH * (0.35 + Math.random() * 0.20);
+    this.y          = this.skyH * (0.35 + Math.random() * 0.30);
     this.vx         = fromLeft ? speed : -speed;
     this.bobPhase   = Math.random() * Math.PI * 2;
     this.stripeIdx  = (this.stripeIdx + 1 + Math.floor(Math.random() * (STRIPE_COLORS.length - 1))) % STRIPE_COLORS.length;
