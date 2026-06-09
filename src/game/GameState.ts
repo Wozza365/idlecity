@@ -36,11 +36,11 @@ export interface GameState {
 
 export function defaultState(plotCount: number): GameState {
   return {
-    gold: 0,
+    gold: 500,
     plots: Array.from({ length: plotCount }, (_, i) => ({
       id: i,
-      unlocked: i === 0,
-      level: i === 0 ? 1 : 0,
+      unlocked: false,
+      level: 0,
     })),
     road: { level: 0 },
     verge: { level: 0 },
