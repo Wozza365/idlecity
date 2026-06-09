@@ -198,13 +198,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
         this.windowRects.push({ wx: panelX, wy: panelY, ww: panelW, wh, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       }
 
-      // One light per bay per floor
-      for (let c = 0; c < nCols; c++) {
-        const panelX = bx + c * (bayW + colW);
-        this.windowLights.push(scene.lights.addLight(
-          panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 80, 0xffcc77, 0,
-        ));
-      }
+      // One centred light per floor — covers full building width evenly
+      this.windowLights.push(scene.lights.addLight(
+        bx + Math.round(bw / 2), floorBot - Math.round(actualFH / 2), Math.round(bw * 0.7), 0xffcc77, 0,
+      ));
     }
 
     // ── Hotel lobby entrance — bright shop-floor illumination ────────

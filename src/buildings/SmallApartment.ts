@@ -171,13 +171,10 @@ export class SmallApartment extends Phaser.GameObjects.Container {
         this.windowRects.push({ wx: panelX, wy: panelY, ww: panelW, wh: panelH, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       }
 
-      // One light per glass panel column
-      for (let c = 0; c < nCols; c++) {
-        const panelX = bx + pierW * (c + 1) + panelW * c;
-        this.windowLights.push(scene.lights.addLight(
-          panelX + Math.round(panelW / 2), floorBot - Math.round(actualFH / 2), 72, 0xffaa44, 0,
-        ));
-      }
+      // One centred light per floor — covers full building width evenly
+      this.windowLights.push(scene.lights.addLight(
+        bx + Math.round(bw / 2), floorBot - Math.round(actualFH / 2), Math.round(bw * 0.7), 0xffaa44, 0,
+      ));
     }
 
     // ── Shop fronts ground floor ───────────────────────────────────
