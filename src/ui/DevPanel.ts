@@ -5,6 +5,7 @@ export const DEV_PANEL_OFFSET = 0;
 export const DEV_PANEL_H = 0;
 
 const PANEL_W = 280;
+const BTN_W = 32;
 
 export class DevPanel {
   readonly container: Phaser.GameObjects.Container;
@@ -26,22 +27,22 @@ export class DevPanel {
     onJumpSeason: (season: string) => void,
     onSpawnBalloon: () => void,
   ) {
-    const container = scene.add.container(width - PANEL_W - 4, 0).setDepth(100);
+    const container = scene.add.container(width - BTN_W - 4, 0).setDepth(100);
 
-    // --- Burger button (always visible) ---
+    // --- Burger button (always visible, small icon in corner) ---
     const burgerH = 28;
     const burgerMid = 8 + burgerH / 2;
     const burger = scene.add
-      .rectangle(PANEL_W / 2, burgerMid, PANEL_W, burgerH, 0x0d1520, 0.90)
+      .rectangle(BTN_W / 2, burgerMid, BTN_W, burgerH, 0x0d1520, 0.90)
       .setInteractive({ useHandCursor: true });
     container.add(burger);
     this.burgerLabel = scene.add
-      .text(PANEL_W / 2, burgerMid, '≡  DEV', { fontSize: '12px', color: '#667788', fontFamily: UI_FONT })
+      .text(BTN_W / 2, burgerMid, '≡', { fontSize: '14px', color: '#667788', fontFamily: UI_FONT })
       .setOrigin(0.5);
     container.add(this.burgerLabel);
 
-    // --- Collapsible panel (nested container, toggled visible) ---
-    this.panel = scene.add.container(0, 8 + burgerH);
+    // --- Collapsible panel (nested container, extends left from button) ---
+    this.panel = scene.add.container(-(PANEL_W - BTN_W), 8 + burgerH);
     container.add(this.panel);
 
     const panelH = 154;
@@ -110,7 +111,7 @@ export class DevPanel {
     burger.on('pointerdown', () => {
       this.isOpen = !this.isOpen;
       this.panel.setVisible(this.isOpen);
-      this.burgerLabel.setText(this.isOpen ? '✕  DEV' : '≡  DEV');
+      this.burgerLabel.setText(this.isOpen ? '✕' : '≡');
     });
 
     this.container = container;
