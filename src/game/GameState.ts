@@ -30,6 +30,7 @@ export interface GameState {
   verge: VergeState;
   water: WaterState;
   season?: SeasonSaveState;
+  townName: string;
 }
 
 // ── Default state ──────────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ export interface GameState {
 export function defaultState(plotCount: number): GameState {
   return {
     gold: 500,
+    townName: 'Idleville',
     plots: Array.from({ length: plotCount }, (_, i) => ({
       id: i,
       unlocked: false,
@@ -74,9 +76,10 @@ export function loadGame(plotCount: number): GameState {
       Array.isArray(parsed.plots) &&
       parsed.plots.length === plotCount
     ) {
-      if (!parsed.road)  parsed.road  = { level: 0 };
-      if (!parsed.verge) parsed.verge = { level: 0 };
-      if (!parsed.water) parsed.water = { level: 0 };
+      if (!parsed.road)     parsed.road     = { level: 0 };
+      if (!parsed.verge)    parsed.verge    = { level: 0 };
+      if (!parsed.water)    parsed.water    = { level: 0 };
+      if (!parsed.townName) parsed.townName = 'Idleville';
       return parsed as GameState;
     }
   } catch {
