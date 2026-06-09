@@ -172,6 +172,11 @@ export class GameScene extends Phaser.Scene {
     document.addEventListener('visibilitychange', onVisible);
     this.events.once('shutdown', () => document.removeEventListener('visibilitychange', onVisible));
 
+    // Save on tab close / navigation away
+    const onBeforeUnload = () => { this.state.season = this.seasons.toSaveState(); saveGame(this.state); };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    this.events.once('shutdown', () => window.removeEventListener('beforeunload', onBeforeUnload));
+
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
 

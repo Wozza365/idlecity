@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { type RoadState, type VergeState, type WaterState } from '../game/GameState';
 import {
   ROAD_BAR_H, MAX_VERGE_LEVEL, MAX_WATER_LEVEL,
-  fmt, UI_FONT, MONO_FONT,
-  roadUpgradeCost,
-  vergeTierName, vergeUpgradeCost,
-  waterTierName, waterUpgradeCost,
+  fmt, fmtRate, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR,
+  roadUpgradeCost, roadIncome,
+  vergeTierName, vergeUpgradeCost, vergeIncome,
+  waterTierName, waterUpgradeCost, waterIncome,
 } from '../constants';
 
 interface ActionRef {
@@ -70,11 +70,19 @@ export class RoadUI {
     const cost  = roadUpgradeCost(road.level);
     const btnW  = Math.min(sectionW - 24, 200);
     const btnH  = 34;
-    const btnY  = rowTop + 24;
+    const btnY  = rowTop + 38;
 
     container.add(
       scene.add
         .text(cx, rowTop + 13, this.roadTierName(road.level), { fontSize: '11px', color: '#88aacc', fontFamily: UI_FONT })
+        .setOrigin(0.5)
+    );
+
+    container.add(
+      scene.add
+        .text(cx, rowTop + 26, `↑  ${fmtRate(roadIncome(road.level) * GAME_HOUR_FACTOR)}`, {
+          fontSize: '11px', color: '#44bb88', fontFamily: MONO_FONT,
+        })
         .setOrigin(0.5)
     );
 
@@ -165,11 +173,19 @@ export class RoadUI {
     const cost  = vergeUpgradeCost(verge.level);
     const btnW  = Math.min(sectionW - 24, 200);
     const btnH  = 34;
-    const btnY  = rowTop + 24;
+    const btnY  = rowTop + 38;
 
     container.add(
       scene.add
         .text(cx, rowTop + 13, vergeTierName(verge.level), { fontSize: '11px', color: '#88cc88', fontFamily: UI_FONT })
+        .setOrigin(0.5)
+    );
+
+    container.add(
+      scene.add
+        .text(cx, rowTop + 26, `↑  ${fmtRate(vergeIncome(verge.level) * GAME_HOUR_FACTOR)}`, {
+          fontSize: '11px', color: '#44bb88', fontFamily: MONO_FONT,
+        })
         .setOrigin(0.5)
     );
 
@@ -260,11 +276,19 @@ export class RoadUI {
     const cost  = waterUpgradeCost(water.level);
     const btnW  = Math.min(sectionW - 24, 200);
     const btnH  = 34;
-    const btnY  = rowTop + 24;
+    const btnY  = rowTop + 38;
 
     container.add(
       scene.add
         .text(cx, rowTop + 13, waterTierName(water.level), { fontSize: '11px', color: '#88ccee', fontFamily: UI_FONT })
+        .setOrigin(0.5)
+    );
+
+    container.add(
+      scene.add
+        .text(cx, rowTop + 26, `↑  ${fmtRate(waterIncome(water.level) * GAME_HOUR_FACTOR)}`, {
+          fontSize: '11px', color: '#44bb88', fontFamily: MONO_FONT,
+        })
         .setOrigin(0.5)
     );
 
