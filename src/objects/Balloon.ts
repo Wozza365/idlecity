@@ -10,6 +10,13 @@ const MAX_SPEED   = 13;
 const MIN_WAIT_MS = 180_000;
 const MAX_WAIT_MS = 360_000;
 
+function lerpColor(a: number, b: number, t: number): number {
+  const r  = ((a >> 16) & 0xff) + (((b >> 16) & 0xff) - ((a >> 16) & 0xff)) * t;
+  const g  = ((a >> 8)  & 0xff) + (((b >> 8)  & 0xff) - ((a >> 8)  & 0xff)) * t;
+  const bl = (a & 0xff) + ((b & 0xff) - (a & 0xff)) * t;
+  return ((r | 0) << 16 | (g | 0) << 8 | (bl | 0)) >>> 0;
+}
+
 const STRIPE_COLORS: [number, number][] = [
   [0xff2200, 0xffdd00],  // Red / Golden yellow
   [0x0044ee, 0xffffff],  // Cobalt blue / White
@@ -140,13 +147,31 @@ export class Balloon {
       gfx.fillRect(bx - GONDOLA_W / 2 + sox, gondolaY + soy, GONDOLA_W, GONDOLA_H);
     }
 
-    // ── Balloon envelope stripes ──────────────────────────────────────────────
-    const stripeColW = BALLOON_W / 8;  // 3 px per stripe at half size
+    // ── Balloon envelope stripes (sub-pixel AA) ───────────────────────────────
+    // Each stripe boundary is positioned using cx's fractional part so boundaries
+    // slide continuously rather than jumping 1px at a time with bx snaps.
+    // A 0.5px blend zone at each boundary prevents the per-column colour flash.
+    const stripeColW = BALLOON_W / 8;
+    const subPx = cx - Math.round(cx);                // fractional pixel offset [-0.5, 0.5]
+    const AA    = 0.5 / stripeColW;                   // blend zone ≈ 0.5px per boundary side
+    const colorOf = (i: number): number => (((i % 2) + 2) % 2) === 0 ? col1 : col2;
+
     for (let col = 0; col < BALLOON_W; col++) {
       if (y1s[col] < 0) continue;
       const h = y2s[col] - y1s[col];
       if (h < 1) continue;
-      gfx.fillStyle(Math.floor(col / stripeColW) % 2 === 0 ? col1 : col2, 1);
+      const sp = (col - subPx) / stripeColW;
+      const si = Math.floor(sp);
+      const t  = sp - si;
+      let c: number;
+      if (t < AA) {
+        c = lerpColor(colorOf(si - 1), colorOf(si), t / AA);
+      } else if (t > 1 - AA) {
+        c = lerpColor(colorOf(si), colorOf(si + 1), (t - (1 - AA)) / AA);
+      } else {
+        c = colorOf(si);
+      }
+      gfx.fillStyle(c, 1);
       gfx.fillRect(bx - rx + col, y1s[col], 1, h);
     }
 
