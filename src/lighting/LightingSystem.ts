@@ -44,12 +44,12 @@ function ambientFromElevation(elevation: number): AmbientState {
       r: lerp(0.55, 1.0, t),
       g: lerp(0.65, 0.95, t),
       b: lerp(0.95, 0.85, t),
-      intensity: lerp(0.875, 1.0, t),
+      intensity: lerp(1.09, 1.0, t),
       nightWeight: lerp(1.0, 0.0, t),
     };
   } else {
     // Night: vivid moonlit blue ambient with a raised floor
-    return { r: 0.55, g: 0.65, b: 0.95, intensity: 0.875, nightWeight: 1.0 };
+    return { r: 0.55, g: 0.65, b: 0.95, intensity: 1.09, nightWeight: 1.0 };
   }
 }
 

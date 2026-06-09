@@ -93,13 +93,8 @@ export class Sky {
     this.nightOverlay.setFillStyle(0x000022);
     if (elev > 0.05) {
       this.nightOverlay.setAlpha(0);
-    } else if (elev > 0) {
-      this.nightOverlay.setAlpha(0.03 * (1 - elev / 0.05));
-    } else if (elev > -0.15) {
-      const t = -elev / 0.15;
-      this.nightOverlay.setAlpha(0.03 + t * 0.02);
     } else {
-      this.nightOverlay.setAlpha(0.05);
+      this.nightOverlay.setAlpha(0);
     }
   }
 
