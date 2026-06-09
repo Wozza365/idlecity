@@ -89,6 +89,9 @@ export class GameScene extends Phaser.Scene {
   private _lastTaxTimestamp = 0;
   seasons!: SeasonSystem;
 
+  private cursorLight: LightSource | null = null;
+  private cursorOverCanvas = false;
+
   // ── Airplane ──────────────────────────────────────────────────────────────
   private planeGfx!: Phaser.GameObjects.Graphics;
   private plane: { x: number; y: number; vx: number; blinkTimer: number; blinkOn: boolean } | null = null;
@@ -177,6 +180,16 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('beforeunload', onBeforeUnload);
     this.events.once('shutdown', () => window.removeEventListener('beforeunload', onBeforeUnload));
 
+    // Cursor spotlight — track whether pointer is over the game canvas
+    const onMouseEnter = () => { this.cursorOverCanvas = true; };
+    const onMouseLeave = () => { this.cursorOverCanvas = false; };
+    this.game.canvas.addEventListener('mouseenter', onMouseEnter);
+    this.game.canvas.addEventListener('mouseleave', onMouseLeave);
+    this.events.once('shutdown', () => {
+      this.game.canvas.removeEventListener('mouseenter', onMouseEnter);
+      this.game.canvas.removeEventListener('mouseleave', onMouseLeave);
+    });
+
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
 
@@ -233,6 +246,17 @@ export class GameScene extends Phaser.Scene {
       if (hasSmokeUpdate(c)) c.updateSmoke(t);
       if (hasFlagUpdate(c)) c.updateFlag();
     }
+
+    if (this.cursorLight) {
+      if (this.cursorOverCanvas) {
+        const ptr = this.input.activePointer;
+        this.cursorLight.x = ptr.x;
+        this.cursorLight.y = ptr.y;
+      } else {
+        this.cursorLight.x = -9999;
+        this.cursorLight.y = -9999;
+      }
+    }
   }
 
   // ── Layout build / rebuild ─────────────────────────────────────────────────
@@ -271,6 +295,12 @@ export class GameScene extends Phaser.Scene {
     for (const l of this.vergeRiver.extraLights) this.lightingSystem.addLight(l);
     for (const l of this.waterArea!.extraLights)  this.lightingSystem.addLight(l);
     this.lightingSystem.setTreeOccluders(this.vergeRiver.getTreeOccluders());
+
+    // Cursor spotlight — lazy-create once, then re-add to each rebuilt lightingSystem
+    if (!this.cursorLight) {
+      this.cursorLight = { x: -9999, y: -9999, radius: 380, color: 0xfff5e8, intensity: 0.45 };
+    }
+    this.lightingSystem.addLight(this.cursorLight);
 
     this.boatManager!.rebuild(this.state.water.level, this.groundY);
     this.boatManager!.setDockSlots(this.waterArea!.getDockSlots());
