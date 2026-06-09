@@ -346,7 +346,7 @@ export class GameScene extends Phaser.Scene {
 
   private onPlotUpgrade(index: number): void {
     const plot = this.state.plots[index];
-    const cost = upgradeCost(plot.level);
+    const cost = upgradeCost(plot.level, index);
     if (this.state.gold < cost) return;
 
     const prevTier = this.buildingTier(plot.level);

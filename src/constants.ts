@@ -24,11 +24,12 @@ export const UNLOCK_COSTS: readonly number[] = [0, 50_000, 250_000, 1_500_000, 1
 
 // ── Pure helper functions ─────────────────────────────────────────────────────
 
-// Exp-poly cost curve: 200 × exp(0.0695 × (L-1)^1.2)
+// Exp-poly cost curve: 200 × exp(0.0695 × (L-1)^1.2) × 1.05^buildingIndex
 // A=200 gives ~8s for the first upgrade (5 plots × $5/s income) — fast early progression.
 // k=0.0695 targets ~$5B at level 99 with this base.
-export function upgradeCost(level: number): number {
-  return Math.round(200 * Math.exp(0.0695 * Math.pow(level - 1, 1.2)));
+// Each successive building costs 5% more than the previous one at the same level.
+export function upgradeCost(level: number, buildingIndex: number = 0): number {
+  return Math.round(200 * Math.exp(0.0695 * Math.pow(level - 1, 1.2)) * Math.pow(1.05, buildingIndex));
 }
 
 export function buildingHeight(level: number): number {

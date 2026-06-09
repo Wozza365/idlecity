@@ -42,7 +42,7 @@ export class PlotUI {
     );
 
     if (plot.unlocked) {
-      this.buildUpgradeSection(scene, container, cx, colTop, sectionW, plot, onUpgrade);
+      this.buildUpgradeSection(scene, container, cx, colTop, sectionW, index, plot, onUpgrade);
     } else {
       this.buildUnlockSection(scene, container, cx, colTop, sectionW, index, onUnlock, isNextUnlockable);
     }
@@ -56,11 +56,12 @@ export class PlotUI {
     cx: number,
     colTop: number,
     sectionW: number,
+    buildingIndex: number,
     plot: PlotState,
     onUpgrade: () => void,
   ): void {
     const atMax = plot.level >= MAX_LEVEL;
-    const cost  = upgradeCost(plot.level);
+    const cost  = upgradeCost(plot.level, buildingIndex);
     const btnW  = sectionW - 12;
     const btnH  = 50;
     const btnY  = colTop + 78;
