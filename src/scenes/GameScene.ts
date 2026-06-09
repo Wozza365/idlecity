@@ -17,6 +17,7 @@ import { Stars } from '../objects/Stars';
 import { Road } from '../objects/Road';
 import { VergeRiver } from '../objects/VergeRiver';
 import { StatsBar } from '../ui/StatsBar';
+import { TownNameSign, TOWN_RENAME_COST } from '../ui/TownNameSign';
 import { PanelChrome } from '../ui/PanelChrome';
 import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
@@ -55,6 +56,7 @@ export class GameScene extends Phaser.Scene {
   private panelChrome!: PanelChrome;
 
   private statsBar!: StatsBar;
+  private townSign!: TownNameSign;
   private roadUI!: RoadUI;
   private devPanel!: DevPanel;
   private saveNotification!: Phaser.GameObjects.Text;
@@ -314,6 +316,20 @@ export class GameScene extends Phaser.Scene {
     this.statsBar?.destroy();
     this.statsBar = new StatsBar(this, this.panelTop, width);
 
+    this.townSign?.destroy();
+    this.townSign = new TownNameSign(
+      this,
+      width,
+      () => this.state.townName,
+      (newName) => {
+        if (this.state.gold < TOWN_RENAME_COST) return false;
+        this.state.gold -= TOWN_RENAME_COST;
+        this.state.townName = newName;
+        this.statsBar.update(this.state.gold, this.taxRate);
+        return true;
+      },
+    );
+
     const nextUnlock = this.state.plots.findIndex(p => !p.unlocked);
     for (let i = 0; i < PLOT_COUNT; i++) {
       this.plotUIs[i]?.destroy();
@@ -355,6 +371,7 @@ export class GameScene extends Phaser.Scene {
       () => this.skipToHighLevel(),
       () => this.advanceDay(),
       (season) => this.jumpToSeason(season),
+      () => this.balloon?.forceSpawn(),
     );
     this.add.existing(this.devPanel.container);
 

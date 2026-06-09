@@ -1,21 +1,23 @@
 import Phaser from 'phaser';
 
-const BALLOON_W   = 40;
-const BALLOON_H   = 50;
-const GONDOLA_W   = 8;
-const GONDOLA_H   = 6;
-const ROPE_LEN    = 8;
+const BALLOON_W   = 48;
+const BALLOON_H   = 64;
+const GONDOLA_W   = 10;
+const GONDOLA_H   = 8;
+const ROPE_LEN    = 10;
 const MIN_SPEED   = 15;
 const MAX_SPEED   = 25;
 const MIN_WAIT_MS = 180_000;
 const MAX_WAIT_MS = 360_000;
-const FADE_DIST   = 40;   // px to fade in/out near screen edges
+const FADE_DIST   = 40;
 
-const STRIPE_COLORS = [
-  [0xff4422, 0xffbb00],
-  [0x2244ff, 0xffffff],
-  [0x22aa44, 0xffee00],
-  [0xcc22aa, 0xffeebb],
+// Pairs of bright, contrasting colours for the 8 alternating envelope gores
+const STRIPE_COLORS: [number, number][] = [
+  [0xff2200, 0xffdd00],  // Red / Golden yellow
+  [0x0044ee, 0xffffff],  // Cobalt blue / White
+  [0xcc00cc, 0x00ffee],  // Magenta / Cyan
+  [0xff6600, 0x0066ff],  // Orange / Sky blue
+  [0x00cc44, 0xffee00],  // Lime green / Yellow
 ];
 
 export class Balloon {
@@ -48,7 +50,6 @@ export class Balloon {
       this.bobPhase += delta / 1000 * 0.6;
       const bobY     = this.y + Math.sin(this.bobPhase) * 3;
 
-      // Fade near edges
       const edgeDist = Math.min(this.x, this.sceneWidth - this.x);
       const alpha    = Math.min(1, edgeDist / FADE_DIST);
 
@@ -58,7 +59,7 @@ export class Balloon {
       } else {
         this.draw(this.x, bobY, alpha);
       }
-    } else if (elevation > 0.05) {  // only daytime balloons
+    } else if (elevation > 0.05) {
       this.idleTimer -= delta;
       if (this.idleTimer <= 0) this.spawn();
     }
@@ -75,51 +76,98 @@ export class Balloon {
     this.active     = true;
   }
 
+  // Spawn immediately at a visible position (for the dev panel button)
+  forceSpawn(): void {
+    const fromLeft  = Math.random() < 0.5;
+    const speed     = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
+    this.x          = fromLeft ? this.sceneWidth * 0.15 : this.sceneWidth * 0.85;
+    this.y          = this.skyH * (0.35 + Math.random() * 0.20);
+    this.vx         = fromLeft ? speed : -speed;
+    this.bobPhase   = Math.random() * Math.PI * 2;
+    // Always pick a different colour scheme when force-spawned
+    this.stripeIdx  = (this.stripeIdx + 1 + Math.floor(Math.random() * (STRIPE_COLORS.length - 1))) % STRIPE_COLORS.length;
+    this.active     = true;
+  }
+
   private draw(cx: number, cy: number, alpha: number): void {
-    const gfx       = this.gfx;
-    const [top, bot] = STRIPE_COLORS[this.stripeIdx];
-    const rx        = BALLOON_W / 2;
-    const ry        = BALLOON_H / 2;
-    const bx        = Math.round(cx);
-    const by        = Math.round(cy);
+    const gfx = this.gfx;
+    const [col1, col2] = STRIPE_COLORS[this.stripeIdx];
+    const rx   = BALLOON_W / 2;
+    const bh   = BALLOON_H;
+    const bx   = Math.round(cx);
+    const by   = Math.round(cy);
+    const topY = by - bh / 2;
 
-    // Balloon envelope — 6 vertical stripes
-    const stripes = 6;
-    for (let s = 0; s < stripes; s++) {
-      const frac  = s / stripes;
-      const color = s % 2 === 0 ? top : bot;
-      // Approximate stripe as a fillRect clipped to the ellipse shape
-      const xLeft  = Math.round(bx - rx + frac * BALLOON_W);
-      const sWidth = Math.round(BALLOON_W / stripes);
-      // Height at this horizontal position (ellipse formula)
-      const normalX = (xLeft + sWidth / 2 - bx) / rx;
-      const stripeH = Math.round(ry * 2 * Math.sqrt(Math.max(0, 1 - normalX * normalX)));
-      if (stripeH < 2) continue;
-      gfx.fillStyle(color, alpha);
-      gfx.fillRect(xLeft, by - Math.round(stripeH / 2), sWidth, stripeH);
-    }
+    // Balloon envelope profile (teardrop shape):
+    //   Upper (t=0..0.45): half-width = rx * sin(t/0.45 * π/2)  — dome from point to max
+    //   Lower (t=0.45..1): half-width = rx * (0.25 + 0.75 * cos((t-0.45)/0.55 * π/2)) — tapers to neck
+    // For each x column, invert to find vertical extent.
+    const nStripes  = 8;
+    const stripeColW = BALLOON_W / nStripes;
 
-    // Dark outline at top and bottom curves
-    gfx.fillStyle(0x000000, alpha * 0.25);
     for (let col = 0; col < BALLOON_W; col++) {
-      const nx  = (col - rx) / rx;
-      const hw  = ry * Math.sqrt(Math.max(0, 1 - nx * nx));
-      const top2 = Math.round(by - hw);
-      const bot2 = Math.round(by + hw);
-      gfx.fillRect(bx - rx + col, top2, 1, 2);
-      gfx.fillRect(bx - rx + col, bot2 - 2, 1, 2);
+      const nx = Math.abs(col + 0.5 - rx) / rx;  // 0 = centre, 1 = edge
+      if (nx >= 1) continue;
+
+      // y extent: top boundary
+      const tTop = 0.45 * (2 / Math.PI) * Math.asin(nx);
+
+      // y extent: bottom boundary
+      let tBot: number;
+      if (nx <= 0.25) {
+        tBot = 1.0;  // this column reaches the full bottom neck
+      } else {
+        tBot = 0.45 + 0.55 * (2 / Math.PI) * Math.acos((nx - 0.25) / 0.75);
+      }
+
+      const y1 = Math.round(topY + tTop * bh);
+      const y2 = Math.round(topY + tBot * bh);
+      const h  = y2 - y1;
+      if (h < 1) continue;
+
+      const color = Math.floor(col / stripeColW) % 2 === 0 ? col1 : col2;
+      gfx.fillStyle(color, alpha);
+      gfx.fillRect(bx - rx + col, y1, 1, h);
     }
 
-    // Ropes from balloon bottom to gondola
-    const gondolaY = by + ry + ROPE_LEN;
-    gfx.fillStyle(0x886644, alpha * 0.8);
-    gfx.fillRect(bx - 3, by + ry - 1, 1, ROPE_LEN + 2);
-    gfx.fillRect(bx + 2, by + ry - 1, 1, ROPE_LEN + 2);
+    // Dark silhouette outline (top + bottom rim of each column)
+    gfx.fillStyle(0x000000, alpha * 0.35);
+    for (let col = 0; col < BALLOON_W; col++) {
+      const nx = Math.abs(col + 0.5 - rx) / rx;
+      if (nx >= 1) continue;
+      const tTop = 0.45 * (2 / Math.PI) * Math.asin(nx);
+      let tBot: number;
+      if (nx <= 0.25) {
+        tBot = 1.0;
+      } else {
+        tBot = 0.45 + 0.55 * (2 / Math.PI) * Math.acos((nx - 0.25) / 0.75);
+      }
+      const y1 = Math.round(topY + tTop * bh);
+      const y2 = Math.round(topY + tBot * bh);
+      gfx.fillRect(bx - rx + col, y1, 1, 2);
+      gfx.fillRect(bx - rx + col, y2 - 1, 1, 2);
+    }
 
-    // Gondola
-    gfx.fillStyle(0x554422, alpha);
+    // Tiny burner glow at the throat (bottom of envelope)
+    const envBottomY = by + bh / 2;
+    gfx.fillStyle(0xff9900, alpha * 0.75);
+    gfx.fillRect(bx - 2, envBottomY - 3, 5, 4);
+    gfx.fillStyle(0xffee88, alpha * 0.9);
+    gfx.fillRect(bx - 1, envBottomY - 4, 3, 2);
+
+    // Ropes from throat to gondola
+    const ropeSpread = Math.round(rx * 0.3);  // slightly spread
+    gfx.fillStyle(0x886644, alpha * 0.9);
+    gfx.fillRect(bx - ropeSpread, envBottomY,     1, ROPE_LEN + 1);
+    gfx.fillRect(bx + ropeSpread, envBottomY,     1, ROPE_LEN + 1);
+
+    // Gondola (wicker basket)
+    const gondolaY = envBottomY + ROPE_LEN;
+    gfx.fillStyle(0x8B5E3C, alpha);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, GONDOLA_H);
-    gfx.fillStyle(0x000000, alpha * 0.2);
+    gfx.fillStyle(0x5C3A1A, alpha);  // darker top rim
+    gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, 2);
+    gfx.fillStyle(0x000000, alpha * 0.25);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY + GONDOLA_H - 1, GONDOLA_W, 1);
   }
 
