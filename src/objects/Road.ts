@@ -19,25 +19,9 @@ export class Road {
     gfx.clear();
     if (intensity <= 0 || this._level === 0) return;
 
-    const gy = this._groundY;
-    const w  = this._width;
-
     // Glossy wet sheen over the road surface
     gfx.fillStyle(0xaaccee, 0.045 * intensity);
-    gfx.fillRect(0, gy, w, ROAD_H);
-
-    // 2–3 puddle ellipses on the road shoulders — alpha builds with intensity
-    const puddleAlpha = 0.20 * intensity;
-    const puddleColor = 0x4466aa;
-    const positions = [
-      { x: w * 0.12, y: gy + 8,         rx: 22, ry: 5 },
-      { x: w * 0.55, y: gy + ROAD_H - 9, rx: 18, ry: 4 },
-      { x: w * 0.78, y: gy + 10,         rx: 14, ry: 4 },
-    ];
-    for (const p of positions) {
-      gfx.fillStyle(puddleColor, puddleAlpha);
-      gfx.fillEllipse(p.x, p.y, p.rx * 2, p.ry * 2);
-    }
+    gfx.fillRect(0, this._groundY, this._width, ROAD_H);
   }
 
   render(level: number, width: number, groundY: number): void {

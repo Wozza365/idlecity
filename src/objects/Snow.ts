@@ -15,15 +15,17 @@ export class Snow {
   private flakes: Flake[] = [];
   private sceneWidth  = 800;
   private sceneHeight = 600;
+  private clipY = Infinity;
   private time = 0;
 
   constructor(scene: Phaser.Scene) {
     this.gfx = scene.add.graphics().setDepth(9.82);
   }
 
-  rebuild(width: number, height: number): void {
+  rebuild(width: number, height: number, clipY?: number): void {
     this.sceneWidth  = width;
     this.sceneHeight = height;
+    this.clipY       = clipY ?? Infinity;
     this.flakes = [];
     for (let i = 0; i < 200; i++) {
       this.flakes.push(this.makeFlake(Math.random() * width, Math.random() * height));
@@ -67,6 +69,7 @@ export class Snow {
     this.gfx.clear();
     for (let i = 0; i < activeCount; i++) {
       const f = this.flakes[i];
+      if (f.y + f.r > this.clipY) continue; // don't draw into UI panel
       this.gfx.fillStyle(0xeeeeff, f.alpha * intensity);
       this.gfx.fillCircle(Math.round(f.x), Math.round(f.y), Math.round(f.r));
     }

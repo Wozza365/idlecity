@@ -10,14 +10,16 @@ export class Rain {
   private streaks: Streak[] = [];
   private sceneWidth = 800;
   private sceneHeight = 600;
+  private clipY = Infinity;
 
   constructor(scene: Phaser.Scene) {
     this.gfx = scene.add.graphics().setDepth(9.8);
   }
 
-  rebuild(width: number, height: number): void {
+  rebuild(width: number, height: number, clipY?: number): void {
     this.sceneWidth  = width;
     this.sceneHeight = height;
+    this.clipY       = clipY ?? Infinity;
     this.streaks = [];
     for (let i = 0; i < 220; i++) {
       this.streaks.push({
@@ -66,6 +68,7 @@ export class Rain {
       const y1 = s.y - cosA * streakLen / 2;
       const x2 = s.x + sinA * streakLen / 2;
       const y2 = s.y + cosA * streakLen / 2;
+      if (y2 > this.clipY) continue; // don't draw into UI panel
       this.gfx.lineBetween(x1, y1, x2, y2);
     }
   }
