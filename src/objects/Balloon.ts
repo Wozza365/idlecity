@@ -119,19 +119,22 @@ export class Balloon {
       y2s[col] = Math.round(topY + tBot * bh);
     }
 
-    // ── Drop shadow — drawn first so it sits behind the balloon ──────────────
-    // Simple offset silhouette; 50% opacity, fades with edge alpha.
-    const SOX = 3, SOY = 4;
-    gfx.fillStyle(0x000000, alpha * 0.5);
-    for (let col = 0; col < BALLOON_W; col++) {
-      if (y1s[col] < 0) continue;
-      const h = y2s[col] - y1s[col];
-      if (h < 1) continue;
-      gfx.fillRect(bx - rx + col + SOX, y1s[col] + SOY, 1, h);
-    }
+    // ── Drop shadow — two passes simulate a soft gaussian blur ───────────────
+    // Inner (closer, darker) + outer (further, faint) → feathered penumbra.
+    // Phaser's Graphics doesn't expose ctx.shadowBlur directly, so we fake it
+    // with layered transparent fills — same visual result at pixel-art scale.
     const envBottomY = by + bh / 2;
     const gondolaY   = envBottomY + ROPE_LEN;
-    gfx.fillRect(bx - GONDOLA_W / 2 + SOX, gondolaY + SOY, GONDOLA_W, GONDOLA_H);
+    for (const [sox, soy, sa] of [[2, 3, 0.22], [4, 5, 0.09]] as [number, number, number][]) {
+      gfx.fillStyle(0x000000, alpha * sa);
+      for (let col = 0; col < BALLOON_W; col++) {
+        if (y1s[col] < 0) continue;
+        const h = y2s[col] - y1s[col];
+        if (h < 1) continue;
+        gfx.fillRect(bx - rx + col + sox, y1s[col] + soy, 1, h);
+      }
+      gfx.fillRect(bx - GONDOLA_W / 2 + sox, gondolaY + soy, GONDOLA_W, GONDOLA_H);
+    }
 
     // ── Balloon envelope stripes ──────────────────────────────────────────────
     const nStripes   = 8;
