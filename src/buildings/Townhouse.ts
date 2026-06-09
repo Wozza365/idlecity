@@ -10,6 +10,12 @@ function lerpColor(a: number, b: number, t: number): number {
            Math.round(ab + (bb - ab) * t));
 }
 
+function randTvColor(): number {
+  return ((30 + Math.floor(Math.random() * 40)) << 16) |
+         ((40 + Math.floor(Math.random() * 40)) << 8)  |
+          (110 + Math.floor(Math.random() * 70));
+}
+
 const FOUND_H   = 8;
 const PARAPET_H = 10;
 const FLOOR_H   = 36;
@@ -25,8 +31,8 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private flagTop   = 0;
   private lightPhases:  number[] = [];
   private flickerFreqs: number[] = [];
-  private lastSleepHour = -1;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; isTv: boolean; flickerFreq: number; asleep: boolean }> = [];
+  private nextSleepTime = Infinity;
+  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
   private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
   private _neonX = 0;
@@ -143,7 +149,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
           gfx.fillRect(wxx - 3, wy + wh + 5, ww + 6, 1);
         }
 
-        this.windowRects.push({ wx: wxx, wy, ww, wh, isTv: Math.random() < 0.2, flickerFreq: 4 + Math.random() * 8, asleep: false });
+        this.windowRects.push({ wx: wxx, wy, ww, wh, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
         this.windowLights.push(
           scene.lights.addLight(wxx + Math.round(ww * 0.25), wy + wh / 2, 92, 0xffaa44, 0),
           scene.lights.addLight(wxx + Math.round(ww * 0.75), wy + wh / 2, 92, 0xffaa44, 0),
@@ -168,7 +174,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
           gfx.fillStyle(0xb0a080, 1);
           gfx.fillRect(gfWx - 3, gfWy + wh + 5, ww + 6, 1);
         }
-        this.windowRects.push({ wx: gfWx, wy: gfWy, ww, wh, isTv: Math.random() < 0.2, flickerFreq: 4 + Math.random() * 8, asleep: false });
+        this.windowRects.push({ wx: gfWx, wy: gfWy, ww, wh, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
         this.windowLights.push(
           scene.lights.addLight(gfWx + Math.round(ww * 0.25), gfWy + wh / 2, 92, 0xffaa44, 0),
           scene.lights.addLight(gfWx + Math.round(ww * 0.75), gfWy + wh / 2, 92, 0xffaa44, 0),
@@ -389,7 +395,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     this.windowGlassGfx = windowGlassGfx;
 
     this.lightPhases  = this.windowLights.map(() => Math.random() * Math.PI * 2);
-    this.flickerFreqs = this.windowLights.map(() => 0.8 + Math.random() * 2.5);
+    this.flickerFreqs = this.windowLights.map(() => 0.2 + Math.random() * 0.8);
 
     const sg = scene.add.graphics();
     sg.fillStyle(0x000022, 1);
@@ -433,7 +439,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
+  updateWindowLights(elevation: number, time = 0, _gameHour = -1): void {
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     const ambientIntensity = elevation >= 0.3 ? 1.0
       : elevation >= 0 ? 0.5 + (elevation / 0.3) * 0.5
@@ -441,16 +447,17 @@ export class Townhouse extends Phaser.GameObjects.Container {
     const tNorm = t * (0.5 / ambientIntensity);
     const now = time || this.scene.time.now / 1000;
 
-    if (t >= 0.8 && gameHour >= 0 && gameHour !== this.lastSleepHour) {
-      const awake = this.windowRects.filter(r => !r.asleep);
-      if (awake.length > 0) {
-        awake[Math.floor(Math.random() * awake.length)].asleep = true;
-        this.lastSleepHour = gameHour;
+    if (t >= 0.8) {
+      if (this.nextSleepTime === Infinity) this.nextSleepTime = now + Math.random() * 10;
+      if (now >= this.nextSleepTime) {
+        const awake = this.windowRects.filter(r => !r.asleep);
+        if (awake.length > 0) awake[Math.floor(Math.random() * awake.length)].asleep = true;
+        this.nextSleepTime = now + 8 + Math.random() * 8;
       }
     }
     if (t < 0.1) {
       for (const r of this.windowRects) r.asleep = false;
-      this.lastSleepHour = -1;
+      this.nextSleepTime = Infinity;
     }
 
     this.windowLights.forEach((light, i) => {
@@ -504,7 +511,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
-    for (const { wx, wy, ww, wh, isTv, flickerFreq, asleep } of this.windowRects) {
+    for (const { wx, wy, ww, wh, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
       if (asleep) {
         gfx.fillStyle(lerpColor(0x8ab4cc, 0x0a0f18, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
@@ -514,7 +521,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
       }
       const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
       const color   = isTv
-        ? lerpColor(0x8ab4cc, 0x334488, t * tvFlick)
+        ? lerpColor(0x8ab4cc, tvColor, t * tvFlick)
         : lerpColor(0x8ab4cc, 0xffcc66, t);
       gfx.fillStyle(color, 1);
       gfx.fillRect(wx, wy, ww, wh);

@@ -10,6 +10,12 @@ function lerpColor(a: number, b: number, t: number): number {
            Math.round(ab + (bb - ab) * t));
 }
 
+function randTvColor(): number {
+  return ((30 + Math.floor(Math.random() * 40)) << 16) |
+         ((40 + Math.floor(Math.random() * 40)) << 8)  |
+          (110 + Math.floor(Math.random() * 70));
+}
+
 const BODY_H = 88;
 
 type SmokeParticle = { x: number; y: number; alpha: number; dx: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
@@ -23,7 +29,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private windowRects: Array<{
     wx: number; wy: number; ww: number; wh: number;
     sashH: number; halfWw: number; upperDay: number; lowerDay: number;
-    isTv: boolean; flickerFreq: number; asleep: boolean;
+    isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean;
   }> = [];
   private smokeParticles: SmokeParticle[] = [];
   private chimneyX    = 0;
@@ -31,7 +37,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private nextSmoke   = 0;
   private lightPhases:  number[] = [];
   private flickerFreqs: number[] = [];
-  private lastSleepHour = -1;
+  private nextSleepTime = Infinity;
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
   getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
@@ -356,7 +362,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const halfWw = Math.round(ww / 2);
 
     for (const [wxx, wy] of [[wx1, wyUp], [wx2, wyUp], [wx1, wyLo], [wx2, wyLo]] as [number, number][]) {
-      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: 0x8ab4cc, lowerDay: 0x9ec2d8, isTv: Math.random() < 0.2, flickerFreq: 4 + Math.random() * 8, asleep: false });
+      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: 0x8ab4cc, lowerDay: 0x9ec2d8, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       for (const [offX, offY, pw, ph] of [
         [0,          0,          halfWw - 1,      sashH],
         [halfWw + 1, 0,          ww - halfWw - 1, sashH],
@@ -371,7 +377,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       const { gpx, gpy, gpw, gph } = gableRect;
       const gSashH  = Math.round(gph / 2);
       const gHalfWw = Math.round(gpw / 2);
-      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: 0x8ab4cc, lowerDay: 0x8ab4cc, isTv: Math.random() < 0.2, flickerFreq: 4 + Math.random() * 8, asleep: false });
+      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: 0x8ab4cc, lowerDay: 0x8ab4cc, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       for (const [offX, offY, pw, ph] of [
         [0,           0,          gHalfWw - 1,       gSashH],
         [gHalfWw + 1, 0,          gpw - gHalfWw - 1, gSashH],
@@ -393,7 +399,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     this.smokeGfx = smokeGfx;
 
     this.lightPhases  = this.windowLights.map(() => Math.random() * Math.PI * 2);
-    this.flickerFreqs = this.windowLights.map(() => 0.8 + Math.random() * 2.5);
+    this.flickerFreqs = this.windowLights.map(() => 0.2 + Math.random() * 0.8);
 
     if (initialParticles?.length) this.smokeParticles = [...initialParticles];
 
@@ -414,7 +420,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
+  updateWindowLights(elevation: number, time = 0, _gameHour = -1): void {
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
     const ambientIntensity = elevation >= 0.3 ? 1.0
@@ -423,16 +429,17 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const tNorm = t * (0.5 / ambientIntensity);
     const now = time || this.scene.time.now / 1000;
 
-    if (t >= 0.8 && gameHour >= 0 && gameHour !== this.lastSleepHour) {
-      const awake = this.windowRects.filter(r => !r.asleep);
-      if (awake.length > 0) {
-        awake[Math.floor(Math.random() * awake.length)].asleep = true;
-        this.lastSleepHour = gameHour;
+    if (t >= 0.8) {
+      if (this.nextSleepTime === Infinity) this.nextSleepTime = now + Math.random() * 10;
+      if (now >= this.nextSleepTime) {
+        const awake = this.windowRects.filter(r => !r.asleep);
+        if (awake.length > 0) awake[Math.floor(Math.random() * awake.length)].asleep = true;
+        this.nextSleepTime = now + 8 + Math.random() * 8;
       }
     }
     if (t < 0.1) {
       for (const r of this.windowRects) r.asleep = false;
-      this.lastSleepHour = -1;
+      this.nextSleepTime = Infinity;
     }
 
     this.windowLights.forEach((light, i) => {
@@ -478,7 +485,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
-    for (const { wx, wy: winY, ww, wh, sashH, halfWw, upperDay, lowerDay, isTv, flickerFreq, asleep } of this.windowRects) {
+    for (const { wx, wy: winY, ww, wh, sashH, halfWw, upperDay, lowerDay, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
       if (asleep) {
         gfx.fillStyle(lerpColor(upperDay, 0x0a0f18, t), 1);
         gfx.fillRect(wx, winY, ww, sashH);
@@ -490,8 +497,8 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
         continue;
       }
       const tvFlick  = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
-      const nightTop = isTv ? lerpColor(upperDay, 0x334488, t * tvFlick) : lerpColor(upperDay, 0xffcc66, t);
-      const nightBot = isTv ? lerpColor(lowerDay, 0x334488, t * tvFlick) : lerpColor(lowerDay, 0xffcc66, t);
+      const nightTop = isTv ? lerpColor(upperDay, tvColor, t * tvFlick) : lerpColor(upperDay, 0xffcc66, t);
+      const nightBot = isTv ? lerpColor(lowerDay, tvColor, t * tvFlick) : lerpColor(lowerDay, 0xffcc66, t);
       gfx.fillStyle(nightTop, 1);
       gfx.fillRect(wx, winY, ww, sashH);
       gfx.fillStyle(nightBot, 1);
