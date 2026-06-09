@@ -28,7 +28,7 @@ export class LightingComposite {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly renderNodes: any;
 
-  constructor(scene: Phaser.Scene, shadowMap: ShadowMap, gameFraction: number, topFraction: number = 0) {
+  constructor(scene: Phaser.Scene, shadowMap: ShadowMap, cursorMap: ShadowMap, gameFraction: number, topFraction: number = 0) {
     this.camera = scene.cameras.main;
     const renderer = scene.renderer as AnyObj;
     this.renderNodes = renderer.renderNodes;
@@ -59,6 +59,7 @@ export class LightingComposite {
       _drawingContext: AnyObj,
     ) => {
       textures[1] = shadowMap.textureWrapper;
+      textures[2] = cursorMap.textureWrapper;
     };
 
     // Set shader uniforms from controller's ambient state.
@@ -68,6 +69,7 @@ export class LightingComposite {
     ) => {
       const pm = node.programManager;
       pm.setUniform('uShadowSampler', 1);
+      pm.setUniform('uCursorSampler', 2);
       pm.setUniform('uAmbientColor', [controller.ambientR, controller.ambientG, controller.ambientB]);
       pm.setUniform('uAmbientIntensity', controller.ambientIntensity);
       pm.setUniform('uNightWeight', controller.nightWeight);

@@ -95,6 +95,9 @@ export class ShadowMapRenderer {
   private depthStencilRbo: WebGLRenderbuffer;
   readonly shadowMap: ShadowMap;
 
+  private cursorFbo: WebGLFramebuffer;
+  readonly cursorMap: ShadowMap;
+
   constructor(scene: Phaser.Scene, width: number, height: number) {
     const renderer = scene.renderer as Phaser.Renderer.WebGL.WebGLRenderer;
     this.renderer = renderer;
@@ -190,6 +193,31 @@ export class ShadowMapRenderer {
 
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
       throw new Error('Shadow map FBO is incomplete');
+    }
+
+    // ── Cursor light FBO ────────────────────────────────────────────────────
+    // A separate accumulation buffer for the cursor light only. No stencil needed
+    // since cursor rendering never uses the visibility-polygon stencil pass.
+    const cursorTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, cursorTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internalFmt, width, height, 0, gl.RGBA, pixelType, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.cursorMap = {
+      texture: cursorTex,
+      textureWrapper: { webGLTexture: cursorTex, needsMipmapRegeneration: false },
+      width,
+      height,
+    };
+
+    this.cursorFbo = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.cursorFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, cursorTex, 0);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error('Cursor light FBO is incomplete');
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -384,6 +412,31 @@ export class ShadowMapRenderer {
     (renderer as any).glWrapper.updateBindingsProgram({ bindings: { program: null } });
   }
 
+  // Cursor light pass — same setup as beginFrame but targets the cursor FBO.
+  // No stencil attachment on this FBO so only COLOR_BUFFER_BIT is cleared.
+  beginCursorFrame(): void {
+    const { gl, renderer } = this;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (renderer as any).glWrapper.updateVAO({ vao: null });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.cursorFbo);
+    gl.viewport(0, 0, this.cursorMap.width, this.cursorMap.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+  }
+
+  endCursorFrame(): void {
+    const { gl, renderer } = this;
+    gl.disable(gl.STENCIL_TEST);
+    gl.colorMask(true, true, true, true);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, renderer.width, renderer.height);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (renderer as any).glWrapper.updateBindingsProgram({ bindings: { program: null } });
+  }
+
   destroy(): void {
     const { gl } = this;
     gl.deleteProgram(this.discProg.program);
@@ -395,6 +448,8 @@ export class ShadowMapRenderer {
     gl.deleteTexture(this.shadowMap.texture);
     gl.deleteRenderbuffer(this.depthStencilRbo);
     gl.deleteFramebuffer(this.fbo);
+    gl.deleteTexture(this.cursorMap.texture);
+    gl.deleteFramebuffer(this.cursorFbo);
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────

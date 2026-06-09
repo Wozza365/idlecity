@@ -147,6 +147,7 @@ precision mediump float;
 
 uniform sampler2D uMainSampler;
 uniform sampler2D uShadowSampler;
+uniform sampler2D uCursorSampler;
 uniform vec3      uAmbientColor;
 uniform float     uAmbientIntensity;
 uniform float     uNightWeight;
@@ -174,7 +175,17 @@ void main() {
     // on near-black surfaces like road asphalt or dark sign backgrounds.
     vec3 ambient = scene.rgb * uAmbientColor * uAmbientIntensity;
     vec3 lit     = max(scene.rgb, vec3(0.2)) * lmap.rgb;
-    gl_FragColor = vec4(clamp(ambient + lit, 0.0, 1.5), scene.a);
+
+    // Cursor light: rendered into a separate FBO so it can use a different floor.
+    // Uses the ambient hue as the minimum reflectance rather than a fixed grey 0.2,
+    // so dark shadow areas glow with the scene's ambient colour (warm/blue) instead
+    // of appearing as a neutral grey disc.
+    vec4 cursor = texture2D(uCursorSampler, outTexCoord);
+    vec3 ambientFloor = uAmbientColor * uAmbientIntensity * 0.25;
+    vec3 cursorBase = max(scene.rgb, ambientFloor);
+    vec3 cursorLit  = cursorBase * cursor.rgb;
+
+    gl_FragColor = vec4(clamp(ambient + lit + cursorLit, 0.0, 1.5), scene.a);
 }
 `;
 

@@ -32,6 +32,7 @@ import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
 import { Rain } from '../objects/Rain';
 import { Snow } from '../objects/Snow';
+import { WeatherAccumulation } from '../objects/WeatherAccumulation';
 import { SeasonSystem } from '../game/SeasonSystem';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
@@ -74,6 +75,7 @@ export class GameScene extends Phaser.Scene {
   private clouds!: Clouds;
   private rain!: Rain;
   private snow!: Snow;
+  private weatherAccumulation!: WeatherAccumulation;
   private lightingSystem: LightingSystem | null = null;
   private carManager: CarManager | null = null;
   private pedestrianManager: PedestrianManager | null = null;
@@ -129,9 +131,10 @@ export class GameScene extends Phaser.Scene {
     this.lights.enable();
     this.lights.setAmbientColor(0x888888);
 
-    this.seasons = new SeasonSystem(this.state.season);
-    this.rain    = new Rain(this);
-    this.snow    = new Snow(this);
+    this.seasons             = new SeasonSystem(this.state.season);
+    this.rain                = new Rain(this);
+    this.snow                = new Snow(this);
+    this.weatherAccumulation = new WeatherAccumulation(this);
     this.planeGfx  = this.add.graphics().setDepth(1.5);
     this.balloon   = new Balloon(this);
     this.birdFlock = new BirdFlock(this);
@@ -222,6 +225,7 @@ export class GameScene extends Phaser.Scene {
     this.rain.update(delta, rainIntensity);
     this.snow.update(delta, snowIntensity);
     this.road.updateWeather(rainIntensity + snowIntensity * 0.3);
+    this.weatherAccumulation.update(delta, rainIntensity, snowIntensity);
     const elapsed   = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
     const gameHour  = Math.floor((elapsed / 240_000) * 24 + 12) % 24;
     this.gameHour = gameHour;
@@ -268,8 +272,9 @@ export class GameScene extends Phaser.Scene {
 
     this.sky.rebuild();
     this.clouds.rebuild(width, this.groundY);
-    this.rain?.rebuild(width, height);
-    this.snow?.rebuild(width, height);
+    this.rain?.rebuild(width, height, this.panelTop);
+    this.snow?.rebuild(width, height, this.panelTop);
+    this.weatherAccumulation?.rebuild(width, this.groundY);
     this.balloon?.rebuild(width, this.groundY);
     this.birdFlock?.rebuild(width, this.groundY);
 
@@ -300,7 +305,7 @@ export class GameScene extends Phaser.Scene {
 
     // Cursor spotlight — lazy-create once, then re-add to each rebuilt lightingSystem
     if (!this.cursorLight) {
-      this.cursorLight = { x: -9999, y: -9999, radius: 380, color: 0xfff5e8, intensity: 0.45 };
+      this.cursorLight = { x: -9999, y: -9999, radius: 380, color: 0xfff5e8, intensity: 0.45, cursorLight: true };
     }
     this.lightingSystem.addLight(this.cursorLight);
 
@@ -744,11 +749,11 @@ export class GameScene extends Phaser.Scene {
     const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
 
     // Sunrise/sunset hours vary smoothly by season via the sinusoidal c1 oscillator.
-    // Summer (c1=+1): sunrise 4am, sunset 8pm (16h daylight).
-    // Winter (c1=−1): sunrise 7am, sunset 5pm (10h daylight).
+    // Summer (c1=+1): sunrise 3am, sunset 9pm (18h daylight).
+    // Winter (c1=−1): sunrise 6am, sunset 6pm (12h daylight).
     const c1 = this.seasons.c1;
-    const sunriseHour = 5.5 - 1.5 * c1;   // 4.0 → 7.0
-    const sunsetHour  = 18.5 + 1.5 * c1;  // 20.0 → 17.0
+    const sunriseHour = 4.5 - 1.5 * c1;   // 3.0 → 6.0
+    const sunsetHour  = 19.5 + 1.5 * c1;  // 21.0 → 18.0
     const afterHours  = sunsetHour - 12;
     const mornHours   = 12 - sunriseHour;
     const nightHours  = 24 - (sunsetHour - sunriseHour);

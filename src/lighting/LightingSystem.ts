@@ -15,10 +15,10 @@ import { LightingComposite, type AmbientState } from './LightingComposite';
 // ── Light source types ─────────────────────────────────────────────────────
 
 export type LightSource =
-  | { type?: 'point'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean }
+  | { type?: 'point'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean; cursorLight?: boolean }
   | { type: 'spot';   x: number; y: number; radius: number; color: number;
-      angle: number; coneAngle: number; penumbraAngle?: number; intensity?: number; noOcclusion?: boolean }
-  | { type: 'window'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean };
+      angle: number; coneAngle: number; penumbraAngle?: number; intensity?: number; noOcclusion?: boolean; cursorLight?: boolean }
+  | { type: 'window'; x: number; y: number; radius: number; color: number; intensity?: number; noOcclusion?: boolean; cursorLight?: boolean };
 
 interface HasOutlinePoints {
   getOutlinePoints(): Array<{ x: number; y: number }>;
@@ -82,6 +82,7 @@ export class LightingSystem {
     this.composite = new LightingComposite(
       scene,
       this.shadowRenderer.shadowMap,
+      this.shadowRenderer.cursorMap,
       gameH / height,      // fraction of screen that is game area (not bottom UI)
       topUIPx / height,    // fraction occupied by the top dev panel
     );
@@ -127,6 +128,7 @@ export class LightingSystem {
 
     this.shadowRenderer.beginFrame();
     for (const light of this.lights) {
+      if (light.cursorLight) continue;
       if (light.noOcclusion) {
         if (light.type === 'spot') {
           this.shadowRenderer.renderSpotLightNoOcclusion(light);
@@ -148,6 +150,16 @@ export class LightingSystem {
     }
     this.shadowRenderer.renderTreeMasks(this._treeOccluders);
     this.shadowRenderer.endFrame();
+
+    // Cursor lights go into a separate FBO so the composite shader can apply them
+    // with an ambient-tinted floor instead of the hard 0.2 reflectance floor used
+    // for regular lights. This prevents the grey-circle artefact on dark surfaces.
+    this.shadowRenderer.beginCursorFrame();
+    for (const light of this.lights) {
+      if (!light.cursorLight) continue;
+      this.shadowRenderer.renderPointLightNoOcclusion(light);
+    }
+    this.shadowRenderer.endCursorFrame();
   }
 
   destroy(): void {
