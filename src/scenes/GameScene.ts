@@ -35,7 +35,7 @@ import { SeasonSystem } from '../game/SeasonSystem';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
 
-interface WindowLightable { updateWindowLights(elevation: number, time?: number): void; }
+interface WindowLightable { updateWindowLights(elevation: number, time?: number, gameHour?: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
   o != null && typeof (o as WindowLightable).updateWindowLights === 'function';
 
@@ -84,6 +84,7 @@ export class GameScene extends Phaser.Scene {
 
   private sunAngle: number = Math.PI / 2;
   private lastWindowElev: number = 2; // out-of-range → forces first update
+  private gameHour = 12;
   private _floatTickCount = 0;
   private _lastTaxTimestamp = 0;
   seasons!: SeasonSystem;
@@ -203,6 +204,7 @@ export class GameScene extends Phaser.Scene {
     this.road.updateWeather(rainIntensity + snowIntensity * 0.3);
     const elapsed   = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
     const gameHour  = Math.floor((elapsed / 240_000) * 24 + 12) % 24;
+    this.gameHour = gameHour;
     if (this.pedestrianManager) {
       this.pedestrianManager.weatherIntensity = this.seasons.weatherIntensity;
       this.pedestrianManager.gameHour         = gameHour;
@@ -727,7 +729,7 @@ export class GameScene extends Phaser.Scene {
     if (elev < -0.1 || Math.abs(elev - this.lastWindowElev) >= 0.003) {
       this.lastWindowElev = elev;
       for (const c of this.plotContainers) {
-        if (isWindowLightable(c)) c.updateWindowLights(elev, wTime);
+        if (isWindowLightable(c)) c.updateWindowLights(elev, wTime, this.gameHour);
       }
     }
     this.carManager?.updateLighting(elev);

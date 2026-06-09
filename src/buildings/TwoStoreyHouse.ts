@@ -23,12 +23,15 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private windowRects: Array<{
     wx: number; wy: number; ww: number; wh: number;
     sashH: number; halfWw: number; upperDay: number; lowerDay: number;
+    isTv: boolean; flickerFreq: number; asleep: boolean;
   }> = [];
   private smokeParticles: SmokeParticle[] = [];
   private chimneyX    = 0;
   private chimneyTopY = 0;
   private nextSmoke   = 0;
-  private lightPhases: number[] = [];
+  private lightPhases:  number[] = [];
+  private flickerFreqs: number[] = [];
+  private lastSleepHour = -1;
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
   getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
@@ -353,7 +356,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const halfWw = Math.round(ww / 2);
 
     for (const [wxx, wy] of [[wx1, wyUp], [wx2, wyUp], [wx1, wyLo], [wx2, wyLo]] as [number, number][]) {
-      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: 0x8ab4cc, lowerDay: 0x9ec2d8 });
+      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: 0x8ab4cc, lowerDay: 0x9ec2d8, isTv: Math.random() < 0.2, flickerFreq: 4 + Math.random() * 8, asleep: false });
       for (const [offX, offY, pw, ph] of [
         [0,          0,          halfWw - 1,      sashH],
         [halfWw + 1, 0,          ww - halfWw - 1, sashH],
@@ -368,7 +371,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       const { gpx, gpy, gpw, gph } = gableRect;
       const gSashH  = Math.round(gph / 2);
       const gHalfWw = Math.round(gpw / 2);
-      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: 0x8ab4cc, lowerDay: 0x8ab4cc });
+      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: 0x8ab4cc, lowerDay: 0x8ab4cc, isTv: Math.random() < 0.2, flickerFreq: 4 + Math.random() * 8, asleep: false });
       for (const [offX, offY, pw, ph] of [
         [0,           0,          gHalfWw - 1,       gSashH],
         [gHalfWw + 1, 0,          gpw - gHalfWw - 1, gSashH],
@@ -389,7 +392,8 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     this.add(smokeGfx);
     this.smokeGfx = smokeGfx;
 
-    this.lightPhases = this.windowLights.map(() => Math.random() * Math.PI * 2);
+    this.lightPhases  = this.windowLights.map(() => Math.random() * Math.PI * 2);
+    this.flickerFreqs = this.windowLights.map(() => 0.8 + Math.random() * 2.5);
 
     if (initialParticles?.length) this.smokeParticles = [...initialParticles];
 
@@ -410,7 +414,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number, time = 0): void {
+  updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
     const ambientIntensity = elevation >= 0.3 ? 1.0
@@ -419,8 +423,20 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const tNorm = t * (0.5 / ambientIntensity);
     const now = time || this.scene.time.now / 1000;
 
+    if (t >= 0.8 && gameHour >= 0 && gameHour !== this.lastSleepHour) {
+      const awake = this.windowRects.filter(r => !r.asleep);
+      if (awake.length > 0) {
+        awake[Math.floor(Math.random() * awake.length)].asleep = true;
+        this.lastSleepHour = gameHour;
+      }
+    }
+    if (t < 0.1) {
+      for (const r of this.windowRects) r.asleep = false;
+      this.lastSleepHour = -1;
+    }
+
     this.windowLights.forEach((light, i) => {
-      const flicker = 1 + Math.sin(now * 1.7 + this.lightPhases[i]) * 0.10;
+      const flicker = 1 + Math.sin(now * this.flickerFreqs[i] + this.lightPhases[i]) * 0.10;
       light.intensity = tNorm * 0.45 * flicker;
     });
     if (this.windowGlassGfx) this.drawWindowGlass(this.windowGlassGfx, tNorm, now);
@@ -462,9 +478,18 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
-    for (const { wx, wy: winY, ww, wh, sashH, halfWw, upperDay, lowerDay } of this.windowRects) {
-      const isTv     = t > 0.1 && ((wx | 0) * 7 + (winY | 0) * 13) % 4 === 0;
-      const tvFlick  = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * 7.3 + wx)) : 1;
+    for (const { wx, wy: winY, ww, wh, sashH, halfWw, upperDay, lowerDay, isTv, flickerFreq, asleep } of this.windowRects) {
+      if (asleep) {
+        gfx.fillStyle(lerpColor(upperDay, 0x0a0f18, t), 1);
+        gfx.fillRect(wx, winY, ww, sashH);
+        gfx.fillStyle(lerpColor(lowerDay, 0x0a0f18, t), 1);
+        gfx.fillRect(wx, winY + sashH + 2, ww, wh - sashH - 2);
+        gfx.fillStyle(0xffffff, 0.4);
+        gfx.fillRect(wx, winY + sashH, ww, 2);
+        gfx.fillRect(wx + halfWw - 1, winY, 2, wh);
+        continue;
+      }
+      const tvFlick  = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
       const nightTop = isTv ? lerpColor(upperDay, 0x334488, t * tvFlick) : lerpColor(upperDay, 0xffcc66, t);
       const nightBot = isTv ? lerpColor(lowerDay, 0x334488, t * tvFlick) : lerpColor(lowerDay, 0xffcc66, t);
       gfx.fillStyle(nightTop, 1);
