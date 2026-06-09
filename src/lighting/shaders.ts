@@ -149,6 +149,7 @@ uniform sampler2D uMainSampler;
 uniform sampler2D uShadowSampler;
 uniform vec3      uAmbientColor;
 uniform float     uAmbientIntensity;
+uniform float     uNightWeight;
 uniform float     uGameFraction;
 uniform float     uTopFraction;
 
@@ -160,6 +161,12 @@ void main() {
         gl_FragColor = scene;
         return;
     }
+    // Scotopic shift: at night, mute warm colours toward blue-tinted luminance
+    // (simulates rod-dominant vision in low light — the Purkinje shift).
+    float lum = dot(scene.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 scotopic = vec3(lum * 0.50, lum * 0.65, lum * 1.10);
+    scene.rgb = mix(scene.rgb, scotopic, uNightWeight * 0.18);
+
     // Shadow map shares the same UV convention as the scene texture — no flip needed.
     vec4 lmap  = texture2D(uShadowSampler, outTexCoord);
     // Ambient uses actual scene colour (dark surfaces stay dark without lights).

@@ -36,19 +36,20 @@ function ambientFromElevation(elevation: number): AmbientState {
 
   if (e >= 0.3) {
     // Full day
-    return { r: 1.0, g: 0.95, b: 0.85, intensity: 1.0 };
+    return { r: 1.0, g: 0.95, b: 0.85, intensity: 1.0, nightWeight: 0 };
   } else if (e >= 0.0) {
-    // Dusk/dawn: lerp day white-yellow → night blue (no dark-purple intermediate)
+    // Dusk/dawn: lerp day white-yellow → night blue
     const t = e / 0.3;
     return {
-      r: lerp(0.68, 1.0, t),
-      g: lerp(0.72, 0.95, t),
-      b: lerp(0.87, 0.85, t),
-      intensity: lerp(0.5, 1.0, t),
+      r: lerp(0.55, 1.0, t),
+      g: lerp(0.65, 0.95, t),
+      b: lerp(0.95, 0.85, t),
+      intensity: lerp(0.70, 1.0, t),
+      nightWeight: lerp(1.0, 0.0, t),
     };
   } else {
-    // Night (twilight through full night): consistent blue ambient
-    return { r: 0.68, g: 0.72, b: 0.87, intensity: 0.5 };
+    // Night: vivid moonlit blue ambient with a raised floor
+    return { r: 0.55, g: 0.65, b: 0.95, intensity: 0.70, nightWeight: 1.0 };
   }
 }
 
@@ -86,7 +87,7 @@ export class LightingSystem {
     );
 
     // Kick off with full-day ambient so first frame is correct.
-    this.composite.setAmbient({ r: 1.0, g: 0.95, b: 0.85, intensity: 1.0 });
+    this.composite.setAmbient({ r: 1.0, g: 0.95, b: 0.85, intensity: 1.0, nightWeight: 0 });
   }
 
   addLight(light: LightSource): void {
@@ -108,9 +109,15 @@ export class LightingSystem {
   }
 
   // Called every frame from GameScene.onClockTick().
-  update(sunAngle: number): void {
+  update(sunAngle: number, moonPhase: number = 0): void {
     const elevation = Math.sin(sunAngle);
-    this.composite.setAmbient(ambientFromElevation(elevation));
+    const ambient = ambientFromElevation(elevation);
+    if (elevation < 0) {
+      const moonElev = Math.max(0, Math.sin(sunAngle + Math.PI));
+      const moonIllumination = (1 + Math.cos(2 * Math.PI * moonPhase)) / 2;
+      ambient.intensity += moonElev * moonIllumination * 0.14;
+    }
+    this.composite.setAmbient(ambient);
 
     if (this._segmentsDirty || this._cachedSegments === null) {
       this._cachedSegments = this.collectSegments();

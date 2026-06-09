@@ -16,6 +16,7 @@ const NODE_NAME = 'FilterLightingComposite';
 export interface AmbientState {
   r: number; g: number; b: number;
   intensity: number;
+  nightWeight: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,6 +70,7 @@ export class LightingComposite {
       pm.setUniform('uShadowSampler', 1);
       pm.setUniform('uAmbientColor', [controller.ambientR, controller.ambientG, controller.ambientB]);
       pm.setUniform('uAmbientIntensity', controller.ambientIntensity);
+      pm.setUniform('uNightWeight', controller.nightWeight);
       pm.setUniform('uGameFraction', controller.gameFraction);
       pm.setUniform('uTopFraction', controller.topFraction);
     };
@@ -81,6 +83,7 @@ export class LightingComposite {
     (this.controller as AnyObj).ambientG = 0.95;
     (this.controller as AnyObj).ambientB = 0.85;
     (this.controller as AnyObj).ambientIntensity = 1.0;
+    (this.controller as AnyObj).nightWeight = 0;
     (this.controller as AnyObj).gameFraction = gameFraction;
     (this.controller as AnyObj).topFraction = topFraction;
 
@@ -94,6 +97,7 @@ export class LightingComposite {
     c.ambientG = ambient.g;
     c.ambientB = ambient.b;
     c.ambientIntensity = ambient.intensity;
+    c.nightWeight = ambient.nightWeight;
   }
 
   destroy(): void {

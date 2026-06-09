@@ -773,7 +773,7 @@ export class GameScene extends Phaser.Scene {
     this.waterArea?.updateLighting(elev);
     this.devPanel?.updateClock(this.gameTimeString());
     this.devPanel?.updateFps(this.game.loop.actualFps);
-    this.lightingSystem?.update(this.sunAngle);
+    this.lightingSystem?.update(this.sunAngle, this.seasons.moonPhase);
   }
 
   private advanceTime(): void {

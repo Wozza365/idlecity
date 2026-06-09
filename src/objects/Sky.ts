@@ -94,12 +94,12 @@ export class Sky {
     if (elev > 0.05) {
       this.nightOverlay.setAlpha(0);
     } else if (elev > 0) {
-      this.nightOverlay.setAlpha(0.22 * (1 - elev / 0.05));
+      this.nightOverlay.setAlpha(0.06 * (1 - elev / 0.05));
     } else if (elev > -0.15) {
       const t = -elev / 0.15;
-      this.nightOverlay.setAlpha(0.22 + t * 0.13);
+      this.nightOverlay.setAlpha(0.06 + t * 0.04);
     } else {
-      this.nightOverlay.setAlpha(0.35);
+      this.nightOverlay.setAlpha(0.10);
     }
   }
 
