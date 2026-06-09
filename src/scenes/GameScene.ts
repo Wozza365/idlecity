@@ -245,7 +245,7 @@ export class GameScene extends Phaser.Scene {
     this.boatManager?.update(delta, elevation);
     this.stars.update(delta, elevation, this.sunAngle, this.scale.width);
     this.updateAirplane(delta);
-    this.balloon?.update(delta, elevation);
+    this.balloon?.update(delta, elevation, this.sunAngle);
     this.birdFlock?.update(delta, elevation);
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     for (const c of this.plotContainers) {

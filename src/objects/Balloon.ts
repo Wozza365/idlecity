@@ -1,17 +1,15 @@
 import Phaser from 'phaser';
 
-const BALLOON_W   = 48;
-const BALLOON_H   = 64;
-const GONDOLA_W   = 10;
-const GONDOLA_H   = 8;
-const ROPE_LEN    = 10;
+const BALLOON_W   = 24;
+const BALLOON_H   = 32;
+const GONDOLA_W   = 6;
+const GONDOLA_H   = 4;
+const ROPE_LEN    = 5;
 const MIN_SPEED   = 15;
 const MAX_SPEED   = 25;
 const MIN_WAIT_MS = 180_000;
 const MAX_WAIT_MS = 360_000;
-const FADE_DIST   = 40;
 
-// Pairs of bright, contrasting colours for the 8 alternating envelope gores
 const STRIPE_COLORS: [number, number][] = [
   [0xff2200, 0xffdd00],  // Red / Golden yellow
   [0x0044ee, 0xffffff],  // Cobalt blue / White
@@ -42,7 +40,7 @@ export class Balloon {
     this.skyH       = groundY;
   }
 
-  update(delta: number, elevation: number): void {
+  update(delta: number, elevation: number, sunAngle = Math.PI / 2): void {
     this.gfx.clear();
 
     if (this.active) {
@@ -50,14 +48,13 @@ export class Balloon {
       this.bobPhase += delta / 1000 * 0.6;
       const bobY     = this.y + Math.sin(this.bobPhase) * 3;
 
-      const edgeDist = Math.min(this.x, this.sceneWidth - this.x);
-      const alpha    = Math.min(1, edgeDist / FADE_DIST);
-
-      if (this.x < -(BALLOON_W + 20) || this.x > this.sceneWidth + BALLOON_W + 20) {
+      // No alpha fade — fading caused negative alpha artefacts near the edges.
+      // Just remove the balloon once it is comfortably off-screen.
+      if (this.x < -(BALLOON_W + 200) || this.x > this.sceneWidth + BALLOON_W + 200) {
         this.active    = false;
         this.idleTimer = MIN_WAIT_MS + Math.random() * (MAX_WAIT_MS - MIN_WAIT_MS);
       } else {
-        this.draw(this.x, bobY, alpha);
+        this.draw(this.x, bobY, sunAngle);
       }
     } else if (elevation > 0.05) {
       this.idleTimer -= delta;
@@ -76,7 +73,6 @@ export class Balloon {
     this.active     = true;
   }
 
-  // Spawn immediately at a visible position (for the dev panel button)
   forceSpawn(): void {
     const fromLeft  = Math.random() < 0.5;
     const speed     = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
@@ -84,28 +80,25 @@ export class Balloon {
     this.y          = this.skyH * (0.35 + Math.random() * 0.20);
     this.vx         = fromLeft ? speed : -speed;
     this.bobPhase   = Math.random() * Math.PI * 2;
-    // Always pick a different colour scheme when force-spawned
     this.stripeIdx  = (this.stripeIdx + 1 + Math.floor(Math.random() * (STRIPE_COLORS.length - 1))) % STRIPE_COLORS.length;
     this.active     = true;
   }
 
-  private draw(cx: number, cy: number, alpha: number): void {
+  private draw(cx: number, cy: number, sunAngle: number): void {
     const gfx = this.gfx;
     const [col1, col2] = STRIPE_COLORS[this.stripeIdx];
-    const rx   = BALLOON_W / 2;
-    const bh   = BALLOON_H;
+    const rx   = BALLOON_W / 2;   // 12
+    const bh   = BALLOON_H;       // 32
     const bx   = Math.round(cx);
     const by   = Math.round(cy);
     const topY = by - bh / 2;
 
-    // Circular-dome profile — much more rounded top than asin():
-    //   Top  (t=0..T_PEAK): t_top(nx) = T_PEAK * (1 − √(1 − nx²))
-    //   Bottom (t=T_PEAK..1): t_bot(nx) = T_PEAK + (1−T_PEAK)·(2/π)·acos((nx−NECK_W)/(1−NECK_W))
-    //                         (or 1.0 when nx ≤ NECK_W, column reaches the full neck)
+    // Circular-dome profile (rounded top, tapering neck at bottom):
+    //   Top  (t=0..T_PEAK): half-width = rx · √(1−((T_PEAK−t)/T_PEAK)²)
+    //   Bottom (t=T_PEAK..1): half-width = rx · (NECK_W + (1−NECK_W)·cos((t−T_PEAK)/(1−T_PEAK)·π/2))
     const T_PEAK = 0.40;
     const NECK_W = 0.28;
 
-    // Pre-compute per-column extents once; y1=-1 flags an out-of-bounds column.
     const y1s = new Int32Array(BALLOON_W);
     const y2s = new Int32Array(BALLOON_W);
     for (let col = 0; col < BALLOON_W; col++) {
@@ -119,14 +112,21 @@ export class Balloon {
       y2s[col] = Math.round(topY + tBot * bh);
     }
 
-    // ── Drop shadow — two passes simulate a soft gaussian blur ───────────────
-    // Inner (closer, darker) + outer (further, faint) → feathered penumbra.
-    // Phaser's Graphics doesn't expose ctx.shadowBlur directly, so we fake it
-    // with layered transparent fills — same visual result at pixel-art scale.
+    // Shadow direction: opposite side from the sun.
+    // cos(sunAngle) > 0 → sun in east → shadow falls west (negative x).
+    // Shadow is longer near the horizon (low elevation) and shorter at noon.
+    const elev    = Math.max(0.05, Math.sin(sunAngle));
+    const shadowX = Math.round(-Math.cos(sunAngle) * 3);     // ±3 px horizontal
+    const shadowY = Math.round(2 + (1 - elev) * 2);          // 2 px (noon) → 4 px (horizon)
+
     const envBottomY = by + bh / 2;
     const gondolaY   = envBottomY + ROPE_LEN;
-    for (const [sox, soy, sa] of [[2, 3, 0.22], [4, 5, 0.09]] as [number, number, number][]) {
-      gfx.fillStyle(0x000000, alpha * sa);
+
+    // ── Drop shadow: inner (closer/darker) + outer (faint penumbra) ──────────
+    for (const [frac, sa] of [[0.5, 0.18], [1.0, 0.07]] as [number, number][]) {
+      const sox = Math.round(shadowX * frac);
+      const soy = Math.max(1, Math.round(shadowY * frac));
+      gfx.fillStyle(0x000000, sa);
       for (let col = 0; col < BALLOON_W; col++) {
         if (y1s[col] < 0) continue;
         const h = y2s[col] - y1s[col];
@@ -137,44 +137,41 @@ export class Balloon {
     }
 
     // ── Balloon envelope stripes ──────────────────────────────────────────────
-    const nStripes   = 8;
-    const stripeColW = BALLOON_W / nStripes;
+    const stripeColW = BALLOON_W / 8;  // 3 px per stripe at half size
     for (let col = 0; col < BALLOON_W; col++) {
       if (y1s[col] < 0) continue;
       const h = y2s[col] - y1s[col];
       if (h < 1) continue;
-      const color = Math.floor(col / stripeColW) % 2 === 0 ? col1 : col2;
-      gfx.fillStyle(color, alpha);
+      gfx.fillStyle(Math.floor(col / stripeColW) % 2 === 0 ? col1 : col2, 1);
       gfx.fillRect(bx - rx + col, y1s[col], 1, h);
     }
 
-    // ── Dark silhouette rim ───────────────────────────────────────────────────
-    gfx.fillStyle(0x000000, alpha * 0.35);
+    // ── Silhouette rim (1 px top and bottom) ─────────────────────────────────
+    gfx.fillStyle(0x000000, 0.35);
     for (let col = 0; col < BALLOON_W; col++) {
       if (y1s[col] < 0) continue;
-      const y1 = y1s[col], y2 = y2s[col];
-      gfx.fillRect(bx - rx + col, y1,     1, 2);
-      gfx.fillRect(bx - rx + col, y2 - 2, 1, 2);
+      gfx.fillRect(bx - rx + col, y1s[col],         1, 1);
+      gfx.fillRect(bx - rx + col, y2s[col] - 1,     1, 1);
     }
 
-    // ── Burner glow at throat ────────────────────────────────────────────────
-    gfx.fillStyle(0xff9900, alpha * 0.75);
-    gfx.fillRect(bx - 2, envBottomY - 3, 5, 4);
-    gfx.fillStyle(0xffee88, alpha * 0.9);
-    gfx.fillRect(bx - 1, envBottomY - 4, 3, 2);
+    // ── Burner glow ───────────────────────────────────────────────────────────
+    gfx.fillStyle(0xff9900, 0.75);
+    gfx.fillRect(bx - 1, envBottomY - 2, 3, 3);
+    gfx.fillStyle(0xffee88, 0.9);
+    gfx.fillRect(bx,     envBottomY - 3, 1, 2);
 
     // ── Ropes ─────────────────────────────────────────────────────────────────
-    const ropeSpread = Math.round(rx * 0.3);
-    gfx.fillStyle(0x886644, alpha * 0.9);
+    const ropeSpread = Math.floor(GONDOLA_W / 2);  // ropes at gondola corners
+    gfx.fillStyle(0x886644, 0.9);
     gfx.fillRect(bx - ropeSpread, envBottomY, 1, ROPE_LEN + 1);
     gfx.fillRect(bx + ropeSpread, envBottomY, 1, ROPE_LEN + 1);
 
     // ── Gondola ───────────────────────────────────────────────────────────────
-    gfx.fillStyle(0x8B5E3C, alpha);
+    gfx.fillStyle(0x8B5E3C, 1);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, GONDOLA_H);
-    gfx.fillStyle(0x5C3A1A, alpha);
-    gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, 2);
-    gfx.fillStyle(0x000000, alpha * 0.25);
+    gfx.fillStyle(0x5C3A1A, 1);
+    gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, 1);
+    gfx.fillStyle(0x000000, 0.25);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY + GONDOLA_H - 1, GONDOLA_W, 1);
   }
 
