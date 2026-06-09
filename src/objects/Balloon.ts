@@ -98,74 +98,78 @@ export class Balloon {
     const by   = Math.round(cy);
     const topY = by - bh / 2;
 
-    // Balloon envelope profile (teardrop shape):
-    //   Upper (t=0..0.45): half-width = rx * sin(t/0.45 * π/2)  — dome from point to max
-    //   Lower (t=0.45..1): half-width = rx * (0.25 + 0.75 * cos((t-0.45)/0.55 * π/2)) — tapers to neck
-    // For each x column, invert to find vertical extent.
-    const nStripes  = 8;
-    const stripeColW = BALLOON_W / nStripes;
+    // Circular-dome profile — much more rounded top than asin():
+    //   Top  (t=0..T_PEAK): t_top(nx) = T_PEAK * (1 − √(1 − nx²))
+    //   Bottom (t=T_PEAK..1): t_bot(nx) = T_PEAK + (1−T_PEAK)·(2/π)·acos((nx−NECK_W)/(1−NECK_W))
+    //                         (or 1.0 when nx ≤ NECK_W, column reaches the full neck)
+    const T_PEAK = 0.40;
+    const NECK_W = 0.28;
 
-    for (let col = 0; col < BALLOON_W; col++) {
-      const nx = Math.abs(col + 0.5 - rx) / rx;  // 0 = centre, 1 = edge
-      if (nx >= 1) continue;
-
-      // y extent: top boundary
-      const tTop = 0.45 * (2 / Math.PI) * Math.asin(nx);
-
-      // y extent: bottom boundary
-      let tBot: number;
-      if (nx <= 0.25) {
-        tBot = 1.0;  // this column reaches the full bottom neck
-      } else {
-        tBot = 0.45 + 0.55 * (2 / Math.PI) * Math.acos((nx - 0.25) / 0.75);
-      }
-
-      const y1 = Math.round(topY + tTop * bh);
-      const y2 = Math.round(topY + tBot * bh);
-      const h  = y2 - y1;
-      if (h < 1) continue;
-
-      const color = Math.floor(col / stripeColW) % 2 === 0 ? col1 : col2;
-      gfx.fillStyle(color, alpha);
-      gfx.fillRect(bx - rx + col, y1, 1, h);
-    }
-
-    // Dark silhouette outline (top + bottom rim of each column)
-    gfx.fillStyle(0x000000, alpha * 0.35);
+    // Pre-compute per-column extents once; y1=-1 flags an out-of-bounds column.
+    const y1s = new Int32Array(BALLOON_W);
+    const y2s = new Int32Array(BALLOON_W);
     for (let col = 0; col < BALLOON_W; col++) {
       const nx = Math.abs(col + 0.5 - rx) / rx;
-      if (nx >= 1) continue;
-      const tTop = 0.45 * (2 / Math.PI) * Math.asin(nx);
-      let tBot: number;
-      if (nx <= 0.25) {
-        tBot = 1.0;
-      } else {
-        tBot = 0.45 + 0.55 * (2 / Math.PI) * Math.acos((nx - 0.25) / 0.75);
-      }
-      const y1 = Math.round(topY + tTop * bh);
-      const y2 = Math.round(topY + tBot * bh);
-      gfx.fillRect(bx - rx + col, y1, 1, 2);
-      gfx.fillRect(bx - rx + col, y2 - 1, 1, 2);
+      if (nx >= 1) { y1s[col] = -1; continue; }
+      const tTop = T_PEAK * (1 - Math.sqrt(1 - nx * nx));
+      const tBot = nx <= NECK_W
+        ? 1.0
+        : T_PEAK + (1 - T_PEAK) * (2 / Math.PI) * Math.acos((nx - NECK_W) / (1 - NECK_W));
+      y1s[col] = Math.round(topY + tTop * bh);
+      y2s[col] = Math.round(topY + tBot * bh);
     }
 
-    // Tiny burner glow at the throat (bottom of envelope)
+    // ── Drop shadow — drawn first so it sits behind the balloon ──────────────
+    // Simple offset silhouette; 50% opacity, fades with edge alpha.
+    const SOX = 3, SOY = 4;
+    gfx.fillStyle(0x000000, alpha * 0.5);
+    for (let col = 0; col < BALLOON_W; col++) {
+      if (y1s[col] < 0) continue;
+      const h = y2s[col] - y1s[col];
+      if (h < 1) continue;
+      gfx.fillRect(bx - rx + col + SOX, y1s[col] + SOY, 1, h);
+    }
     const envBottomY = by + bh / 2;
+    const gondolaY   = envBottomY + ROPE_LEN;
+    gfx.fillRect(bx - GONDOLA_W / 2 + SOX, gondolaY + SOY, GONDOLA_W, GONDOLA_H);
+
+    // ── Balloon envelope stripes ──────────────────────────────────────────────
+    const nStripes   = 8;
+    const stripeColW = BALLOON_W / nStripes;
+    for (let col = 0; col < BALLOON_W; col++) {
+      if (y1s[col] < 0) continue;
+      const h = y2s[col] - y1s[col];
+      if (h < 1) continue;
+      const color = Math.floor(col / stripeColW) % 2 === 0 ? col1 : col2;
+      gfx.fillStyle(color, alpha);
+      gfx.fillRect(bx - rx + col, y1s[col], 1, h);
+    }
+
+    // ── Dark silhouette rim ───────────────────────────────────────────────────
+    gfx.fillStyle(0x000000, alpha * 0.35);
+    for (let col = 0; col < BALLOON_W; col++) {
+      if (y1s[col] < 0) continue;
+      const y1 = y1s[col], y2 = y2s[col];
+      gfx.fillRect(bx - rx + col, y1,     1, 2);
+      gfx.fillRect(bx - rx + col, y2 - 2, 1, 2);
+    }
+
+    // ── Burner glow at throat ────────────────────────────────────────────────
     gfx.fillStyle(0xff9900, alpha * 0.75);
     gfx.fillRect(bx - 2, envBottomY - 3, 5, 4);
     gfx.fillStyle(0xffee88, alpha * 0.9);
     gfx.fillRect(bx - 1, envBottomY - 4, 3, 2);
 
-    // Ropes from throat to gondola
-    const ropeSpread = Math.round(rx * 0.3);  // slightly spread
+    // ── Ropes ─────────────────────────────────────────────────────────────────
+    const ropeSpread = Math.round(rx * 0.3);
     gfx.fillStyle(0x886644, alpha * 0.9);
-    gfx.fillRect(bx - ropeSpread, envBottomY,     1, ROPE_LEN + 1);
-    gfx.fillRect(bx + ropeSpread, envBottomY,     1, ROPE_LEN + 1);
+    gfx.fillRect(bx - ropeSpread, envBottomY, 1, ROPE_LEN + 1);
+    gfx.fillRect(bx + ropeSpread, envBottomY, 1, ROPE_LEN + 1);
 
-    // Gondola (wicker basket)
-    const gondolaY = envBottomY + ROPE_LEN;
+    // ── Gondola ───────────────────────────────────────────────────────────────
     gfx.fillStyle(0x8B5E3C, alpha);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, GONDOLA_H);
-    gfx.fillStyle(0x5C3A1A, alpha);  // darker top rim
+    gfx.fillStyle(0x5C3A1A, alpha);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY, GONDOLA_W, 2);
     gfx.fillStyle(0x000000, alpha * 0.25);
     gfx.fillRect(bx - GONDOLA_W / 2, gondolaY + GONDOLA_H - 1, GONDOLA_W, 1);
