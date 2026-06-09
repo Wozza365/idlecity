@@ -25,6 +25,7 @@ export class Balloon {
   private y = 0;
   private vx = 0;
   private bobPhase = 0;
+  private driftPhase = 0;
   private idleTimer: number;
   private sceneWidth = 800;
   private skyH = 400;
@@ -44,9 +45,10 @@ export class Balloon {
     this.gfx.clear();
 
     if (this.active) {
-      this.x        += this.vx * delta / 1000;
-      this.bobPhase += delta / 1000 * 0.6;
-      const bobY     = this.y + Math.sin(this.bobPhase) * 3;
+      this.x          += this.vx * delta / 1000;
+      this.bobPhase   += delta / 1000 * 0.6;
+      this.driftPhase += delta / 1000 * 0.05;
+      const bobY       = this.y + Math.sin(this.bobPhase) * 1 + Math.sin(this.driftPhase) * 5;
 
       // No alpha fade — fading caused negative alpha artefacts near the edges.
       // Just remove the balloon once it is comfortably off-screen.
@@ -66,9 +68,10 @@ export class Balloon {
     const fromLeft  = Math.random() < 0.5;
     const speed     = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
     this.x          = fromLeft ? -(BALLOON_W + 10) : this.sceneWidth + BALLOON_W + 10;
-    this.y          = this.skyH * (0.35 + Math.random() * 0.30);
+    this.y          = this.skyH * (0.35 + Math.random() * 0.20);
     this.vx         = fromLeft ? speed : -speed;
     this.bobPhase   = Math.random() * Math.PI * 2;
+    this.driftPhase = Math.random() * Math.PI * 2;
     this.stripeIdx  = Math.floor(Math.random() * STRIPE_COLORS.length);
     this.active     = true;
   }
@@ -77,9 +80,10 @@ export class Balloon {
     const fromLeft  = Math.random() < 0.5;
     const speed     = MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED);
     this.x          = fromLeft ? this.sceneWidth * 0.15 : this.sceneWidth * 0.85;
-    this.y          = this.skyH * (0.35 + Math.random() * 0.30);
+    this.y          = this.skyH * (0.35 + Math.random() * 0.20);
     this.vx         = fromLeft ? speed : -speed;
     this.bobPhase   = Math.random() * Math.PI * 2;
+    this.driftPhase = Math.random() * Math.PI * 2;
     this.stripeIdx  = (this.stripeIdx + 1 + Math.floor(Math.random() * (STRIPE_COLORS.length - 1))) % STRIPE_COLORS.length;
     this.active     = true;
   }
