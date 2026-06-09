@@ -35,9 +35,10 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private chimneyX    = 0;
   private chimneyTopY = 0;
   private nextSmoke   = 0;
-  private lightPhases:  number[] = [];
-  private flickerFreqs: number[] = [];
-  private nextSleepTime = Infinity;
+  private lightPhases:    number[] = [];
+  private flickerFreqs:   number[] = [];
+  private lastSleepHour  = -1;
+  private pendingSleepAt = Infinity;
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
   getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
@@ -420,7 +421,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  updateWindowLights(elevation: number, time = 0, _gameHour = -1): void {
+  updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
     const ambientIntensity = elevation >= 0.3 ? 1.0
@@ -429,17 +430,20 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const tNorm = t * (0.5 / ambientIntensity);
     const now = time || this.scene.time.now / 1000;
 
-    if (t >= 0.8) {
-      if (this.nextSleepTime === Infinity) this.nextSleepTime = now + Math.random() * 10;
-      if (now >= this.nextSleepTime) {
+    if (t >= 0.8 && gameHour >= 0) {
+      if (gameHour !== this.lastSleepHour && this.pendingSleepAt === Infinity)
+        this.pendingSleepAt = now + Math.random() * 5;
+      if (now >= this.pendingSleepAt) {
         const awake = this.windowRects.filter(r => !r.asleep);
         if (awake.length > 0) awake[Math.floor(Math.random() * awake.length)].asleep = true;
-        this.nextSleepTime = now + 8 + Math.random() * 8;
+        this.lastSleepHour  = gameHour;
+        this.pendingSleepAt = Infinity;
       }
     }
     if (t < 0.1) {
       for (const r of this.windowRects) r.asleep = false;
-      this.nextSleepTime = Infinity;
+      this.lastSleepHour  = -1;
+      this.pendingSleepAt = Infinity;
     }
 
     this.windowLights.forEach((light, i) => {
