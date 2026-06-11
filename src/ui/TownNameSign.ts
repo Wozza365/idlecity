@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { UI_FONT } from '../constants';
+import { UI_FONT, fmtBalance } from '../constants';
 
 export const TOWN_RENAME_COST = 100_000;
 
@@ -27,10 +27,19 @@ export class TownNameSign {
   // Dialog state
   private dialogObjs: Phaser.GameObjects.GameObject[] = [];
   private inputText: Phaser.GameObjects.Text | null = null;
+  private inputBorderGfx: Phaser.GameObjects.Graphics | null = null;
+  private inputBox = { x: 0, y: 0, w: 0, h: 0 };
   private inputVal  = '';
   private cursorOn  = true;
+  private inputFocused = false;
   private blinkTimer: Phaser.Time.TimerEvent | null = null;
-  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  // Native input — invisible overlay used purely to capture keyboard/IME
+  // input and trigger the on-screen keyboard on mobile.
+  private domInput: HTMLInputElement | null = null;
+  private resizeListener: (() => void) | null = null;
+
+  private destroyed = false;
 
   constructor(
     private scene: Phaser.Scene,
@@ -45,6 +54,7 @@ export class TownNameSign {
       fontSize: '20px', color: '#ffe8a0',
       fontFamily: UI_FONT, fontStyle: 'bold',
       shadow: { offsetX: 0, offsetY: 1, color: '#1e0a00', blur: 3, fill: true },
+      padding: { x: 6, y: 6 },
     }).setOrigin(0.5, 0.5).setDepth(S_DEPTH + 1);
 
     this.btnLabel = scene.add.text(0, 0, 'RENAME', {
@@ -60,6 +70,16 @@ export class TownNameSign {
     this.btnHit.on('pointerdown',  () => this.openDialog());
 
     this.drawAll();
+
+    // Re-measure once web fonts finish loading. A Text canvas sized against a
+    // fallback font (before Inter is ready) can clip glyphs — and the drop
+    // shadow especially — once the real font swaps in, producing the
+    // "sharp cut off" look on the town name.
+    if (document.fonts) {
+      document.fonts.ready.then(() => {
+        if (!this.destroyed) this.drawAll();
+      });
+    }
   }
 
   resize(width: number): void {
@@ -113,7 +133,19 @@ export class TownNameSign {
 
   private updateInputDisplay(): void {
     if (!this.inputText) return;
-    this.inputText.setText(this.inputVal + (this.cursorOn ? '|' : ' '));
+    const showCursor = this.inputFocused && this.cursorOn;
+    this.inputText.setText(this.inputVal + (showCursor ? '|' : ' '));
+  }
+
+  private drawInputBorder(focused: boolean): void {
+    if (!this.inputBorderGfx) return;
+    const { x, y, w, h } = this.inputBox;
+    const g = this.inputBorderGfx;
+    g.clear();
+    g.fillStyle(0x06101a, 1);
+    g.fillRoundedRect(x, y, w, h, 5);
+    g.lineStyle(1.5, focused ? 0xe0c060 : 0x3a5a80, 1);
+    g.strokeRoundedRect(x, y, w, h, 5);
   }
 
   private openDialog(): void {
@@ -136,7 +168,7 @@ export class TownNameSign {
     bg.on('pointerdown', () => this.closeDialog());
 
     // Panel
-    const panelW = 360, panelH = 220;
+    const panelW = 400, panelH = 220;
     const px = width / 2,  py = height / 2;
 
     const panelGfx = add(s.add.graphics().setDepth(D + 1).setLighting(false));
@@ -145,8 +177,10 @@ export class TownNameSign {
     panelGfx.lineStyle(2, 0x2a4060, 1);
     panelGfx.strokeRoundedRect(px - panelW / 2, py - panelH / 2, panelW, panelH, 12);
 
-    // Absorb clicks inside the panel so they don't reach the bg overlay
-    add(s.add.rectangle(px, py, panelW, panelH, 0, 0).setDepth(D + 1).setInteractive());
+    // Absorb clicks inside the panel so they don't reach the bg overlay,
+    // and blur the rename input if the user taps elsewhere in the panel.
+    const panelHit = add(s.add.rectangle(px, py, panelW, panelH, 0, 0).setDepth(D + 1).setInteractive());
+    panelHit.on('pointerdown', () => this.blurInput());
 
     // Title
     add(s.add.text(px, py - panelH / 2 + 28, 'RENAME YOUR TOWN', {
@@ -154,20 +188,20 @@ export class TownNameSign {
     }).setOrigin(0.5).setDepth(D + 2));
 
     // Cost
-    add(s.add.text(px, py - panelH / 2 + 50, 'Cost: $100,000', {
+    add(s.add.text(px, py - panelH / 2 + 50, `Cost: ${fmtBalance(TOWN_RENAME_COST)}`, {
       fontSize: '12px', color: '#4a6880', fontFamily: UI_FONT,
     }).setOrigin(0.5).setDepth(D + 2));
 
-    // Input field background
-    const iW = panelW - 40, iH = 38;
+    // Input field
+    const iW = panelW - 48, iH = 38;
     const ix = px - iW / 2,  iy = py - 12;
-    const inputGfx = add(s.add.graphics().setDepth(D + 2).setLighting(false));
-    inputGfx.fillStyle(0x06101a, 1);
-    inputGfx.fillRoundedRect(ix, iy - iH / 2, iW, iH, 5);
-    inputGfx.lineStyle(1.5, 0x3a5a80, 1);
-    inputGfx.strokeRoundedRect(ix, iy - iH / 2, iW, iH, 5);
+    this.inputBox = { x: ix, y: iy - iH / 2, w: iW, h: iH };
 
-    // Input text (includes blinking cursor character)
+    this.inputBorderGfx = add(s.add.graphics().setDepth(D + 2).setLighting(false)) as Phaser.GameObjects.Graphics;
+    this.inputFocused = false;
+    this.drawInputBorder(false);
+
+    // Input text (includes blinking cursor character, only while focused)
     this.inputVal = this.getName();
     this.cursorOn = true;
     this.inputText = add(
@@ -177,12 +211,22 @@ export class TownNameSign {
     ) as Phaser.GameObjects.Text;
     this.updateInputDisplay();
 
+    // Tapping the input box focuses the (invisible) DOM input — on mobile
+    // this is what brings up the on-screen keyboard.
+    const inputHit = add(
+      s.add.rectangle(ix + iW / 2, iy, iW, iH, 0, 0)
+        .setDepth(D + 4).setInteractive({ useHandCursor: true }),
+    );
+    inputHit.on('pointerdown', () => this.focusInput());
+
     // ── Buttons ─────────────────────────────────────────────────────────────
 
     const bY       = py + panelH / 2 - 34;
-    const cancelW  = 140, confirmW = 184, bGap = 12;
-    const cancelX  = px - bGap / 2 - cancelW / 2;
-    const confirmX = px + bGap / 2 + confirmW / 2;
+    const cancelW  = 140, confirmW = 190, bGap = 12;
+    const totalW   = cancelW + bGap + confirmW;
+    const startX   = px - totalW / 2;
+    const cancelX  = startX + cancelW / 2;
+    const confirmX = startX + cancelW + bGap + confirmW / 2;
 
     // Cancel
     const cancelGfx = add(s.add.graphics().setDepth(D + 2).setLighting(false));
@@ -207,7 +251,7 @@ export class TownNameSign {
     confirmGfx.fillRoundedRect(confirmX - confirmW / 2, bY - 16, confirmW, 32, 6);
     confirmGfx.lineStyle(1, 0xd4a820, 1);
     confirmGfx.strokeRoundedRect(confirmX - confirmW / 2, bY - 16, confirmW, 32, 6);
-    const confirmLbl = add(s.add.text(confirmX, bY, 'CONFIRM  —  $100,000', {
+    const confirmLbl = add(s.add.text(confirmX, bY, `CONFIRM  —  ${fmtBalance(TOWN_RENAME_COST)}`, {
       fontSize: '11px', color: '#ffe8a0', fontFamily: UI_FONT, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(D + 3));
     const confirmHit = add(
@@ -224,23 +268,90 @@ export class TownNameSign {
       callback: () => { this.cursorOn = !this.cursorOn; this.updateInputDisplay(); },
     });
 
-    // ── Keyboard ─────────────────────────────────────────────────────────────
-    this.keyHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Backspace') {
-        this.inputVal = this.inputVal.slice(0, -1);
-        this.cursorOn = true;
-        this.updateInputDisplay();
-      } else if (e.key === 'Enter') {
+    // ── Native input ─────────────────────────────────────────────────────────
+    // Invisible, positioned exactly over the input box. Handles typing
+    // (including IME/paste), and focusing it opens the on-screen keyboard.
+    this.createDomInput();
+    this.focusInput();
+
+    this.resizeListener = (): void => this.positionDomInput();
+    window.addEventListener('resize', this.resizeListener);
+  }
+
+  private createDomInput(): void {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 40;
+    input.value = this.inputVal;
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', 'Town name');
+    input.style.cssText = [
+      'position:fixed',
+      'box-sizing:border-box',
+      'margin:0',
+      'padding:0 10px',
+      'border:none',
+      'outline:none',
+      'background:transparent',
+      'color:transparent',
+      'caret-color:transparent',
+      'font-size:16px', // keep ≥16px so mobile browsers don't zoom on focus
+      'z-index:10000',
+    ].join(';');
+
+    input.addEventListener('input', () => {
+      this.inputVal = input.value.slice(0, 40);
+      this.cursorOn = true;
+      this.updateInputDisplay();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
         this.confirmDialog();
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         this.closeDialog();
-      } else if (e.key.length === 1 && this.inputVal.length < 40) {
-        this.inputVal += e.key;
-        this.cursorOn = true;
-        this.updateInputDisplay();
       }
-    };
-    window.addEventListener('keydown', this.keyHandler);
+    });
+    input.addEventListener('focus', () => {
+      this.inputFocused = true;
+      this.cursorOn = true;
+      this.drawInputBorder(true);
+      this.updateInputDisplay();
+    });
+    input.addEventListener('blur', () => {
+      this.inputFocused = false;
+      this.drawInputBorder(false);
+      this.updateInputDisplay();
+    });
+
+    document.body.appendChild(input);
+    this.domInput = input;
+    this.positionDomInput();
+  }
+
+  private positionDomInput(): void {
+    if (!this.domInput) return;
+    const canvas = this.scene.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width  / this.scene.scale.width;
+    const scaleY = rect.height / this.scene.scale.height;
+    const { x, y, w, h } = this.inputBox;
+    this.domInput.style.left   = `${rect.left + x * scaleX}px`;
+    this.domInput.style.top    = `${rect.top  + y * scaleY}px`;
+    this.domInput.style.width  = `${w * scaleX}px`;
+    this.domInput.style.height = `${h * scaleY}px`;
+  }
+
+  private focusInput(): void {
+    this.domInput?.focus();
+    this.domInput?.select();
+  }
+
+  private blurInput(): void {
+    this.domInput?.blur();
   }
 
   private confirmDialog(): void {
@@ -253,16 +364,26 @@ export class TownNameSign {
   private closeDialog(): void {
     this.blinkTimer?.remove();
     this.blinkTimer = null;
-    if (this.keyHandler) {
-      window.removeEventListener('keydown', this.keyHandler);
-      this.keyHandler = null;
+
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+      this.resizeListener = null;
     }
+
+    if (this.domInput) {
+      this.domInput.remove();
+      this.domInput = null;
+    }
+
     for (const obj of this.dialogObjs) obj.destroy();
     this.dialogObjs = [];
-    this.inputText  = null;
+    this.inputText = null;
+    this.inputBorderGfx = null;
+    this.inputFocused = false;
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.closeDialog();
     this.gfx.destroy();
     this.nameText.destroy();

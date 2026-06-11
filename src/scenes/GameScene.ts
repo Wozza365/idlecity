@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
 import {
-  PLOT_COUNT, MAX_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H,
+  PLOT_COUNT, MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H,
   ROAD_H, VERGE_H, WATER_H, YARD_H,
   UNLOCK_COSTS,
   upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
@@ -22,6 +22,7 @@ import { PanelChrome } from '../ui/PanelChrome';
 import { PlotUI } from '../ui/PlotUI';
 import { RoadUI } from '../ui/RoadUI';
 import { DevPanel, DEV_PANEL_H, DEV_PANEL_OFFSET } from '../ui/DevPanel';
+import { MenuUI } from '../ui/MenuUI';
 import { LightingSystem, type LightSource } from '../lighting/LightingSystem';
 import { CarManager } from '../objects/CarManager';
 import { PedestrianManager } from '../objects/PedestrianManager';
@@ -60,6 +61,7 @@ export class GameScene extends Phaser.Scene {
   private townSign!: TownNameSign;
   private roadUI!: RoadUI;
   private devPanel!: DevPanel;
+  private menuUI!: MenuUI;
   private saveNotification!: Phaser.GameObjects.Text;
 
   // World-layer managers
@@ -91,6 +93,7 @@ export class GameScene extends Phaser.Scene {
   private gameHour = 12;
   private _floatTickCount = 0;
   private _lastTaxTimestamp = 0;
+  private _lastPlayTimeTimestamp = Date.now();
   seasons!: SeasonSystem;
 
   private cursorLight: LightSource | null = null;
@@ -176,7 +179,10 @@ export class GameScene extends Phaser.Scene {
     this.time.addEvent({ delay: 250, loop: true, callback: this.onTaxTick, callbackScope: this });
 
     // Catch up when a throttled/paused background tab becomes visible again
-    const onVisible = () => { if (document.visibilityState === 'visible') this.onTaxTick(); };
+    const onVisible = () => {
+      this._lastPlayTimeTimestamp = Date.now();
+      if (document.visibilityState === 'visible') this.onTaxTick();
+    };
     document.addEventListener('visibilitychange', onVisible);
     this.events.once('shutdown', () => document.removeEventListener('visibilitychange', onVisible));
 
@@ -379,6 +385,12 @@ export class GameScene extends Phaser.Scene {
       () => this.balloon?.forceSpawn(),
     );
     this.add.existing(this.devPanel.container);
+
+    if (this.menuUI) {
+      this.menuUI.resize(width, height);
+    } else {
+      this.menuUI = new MenuUI(this, width, height, () => this.state);
+    }
 
     this.refreshButtons();
     this.statsBar.update(this.state.gold, this.taxRate);
@@ -588,7 +600,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state.gold < cost) return;
 
     this.state.gold -= cost;
-    this.state.road.level = Math.min(this.state.road.level + 1, 10);
+    this.state.road.level = Math.min(this.state.road.level + 1, MAX_ROAD_LEVEL);
     this.road.render(this.state.road.level, this.scale.width, this.groundY);
     if (this.carManager && this.lightingSystem) {
       if (this.carManager.needsRebuild(this.state.road.level)) {
@@ -682,6 +694,7 @@ export class GameScene extends Phaser.Scene {
 
   private onAddGold(): void {
     this.state.gold += 1_000_000_000;
+    this.state.stats.totalMoneyEarned += 1_000_000_000;
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
   }
@@ -820,7 +833,7 @@ export class GameScene extends Phaser.Scene {
 
   private skipToHighLevel(): void {
     const SKIP_LEVELS = [75, 60, 45, 30, 15];
-    this.state.road.level  = 10;
+    this.state.road.level  = MAX_ROAD_LEVEL;
     this.state.verge.level = MAX_VERGE_LEVEL;
     this.state.water.level = MAX_WATER_LEVEL;
     for (let i = 0; i < PLOT_COUNT; i++) {
@@ -854,9 +867,16 @@ export class GameScene extends Phaser.Scene {
     const now = Date.now();
     const elapsed = now - this._lastTaxTimestamp;
     this._lastTaxTimestamp = now;
-    this.state.gold += this.taxRate * (elapsed / 1000);
+    const earned = this.taxRate * (elapsed / 1000);
+    this.state.gold += earned;
+    this.state.stats.totalMoneyEarned += earned;
     this.statsBar.update(this.state.gold, this.taxRate);
     this.refreshButtons();
+
+    if (document.visibilityState === 'visible') {
+      this.state.stats.totalPlayTimeMs += now - this._lastPlayTimeTimestamp;
+    }
+    this._lastPlayTimeTimestamp = now;
 
     this._floatTickCount++;
     if (this._floatTickCount >= 12) {

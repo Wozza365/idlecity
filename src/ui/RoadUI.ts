@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { type RoadState, type VergeState, type WaterState } from '../game/GameState';
 import {
-  ROAD_BAR_H, MAX_VERGE_LEVEL, MAX_WATER_LEVEL,
+  ROAD_BAR_H, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL,
   fmt, fmtRate, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR,
   roadUpgradeCost, roadIncome,
   vergeTierName, vergeUpgradeCost, vergeIncome,
@@ -66,7 +66,7 @@ export class RoadUI {
     road: RoadState,
     onUpgrade: () => void,
   ): void {
-    const atMax = road.level >= 10;
+    const atMax = road.level >= MAX_ROAD_LEVEL;
     const cost  = roadUpgradeCost(road.level);
     const btnW  = Math.min(sectionW - 24, 200);
     const btnH  = 34;

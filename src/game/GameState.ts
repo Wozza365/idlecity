@@ -1,4 +1,5 @@
 import type { SeasonSaveState } from './SeasonSystem';
+import { MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, TOTAL_SKINS } from '../constants';
 
 const SAVE_KEY = 'idlecity-save';
 
@@ -22,6 +23,12 @@ export interface WaterState {
   level: number; // 0 = inactive, 1–12
 }
 
+export interface StatsState {
+  totalPlayTimeMs: number;
+  totalMoneyEarned: number;
+  skinsUnlocked: number;
+}
+
 /** All persistent game data lives here. */
 export interface GameState {
   gold: number;
@@ -29,6 +36,7 @@ export interface GameState {
   road: RoadState;
   verge: VergeState;
   water: WaterState;
+  stats: StatsState;
   season?: SeasonSaveState;
   townName: string;
 }
@@ -47,7 +55,33 @@ export function defaultState(plotCount: number): GameState {
     road: { level: 0 },
     verge: { level: 0 },
     water: { level: 0 },
+    stats: { totalPlayTimeMs: 0, totalMoneyEarned: 0, skinsUnlocked: 1 },
   };
+}
+
+// ── Progress calculation ──────────────────────────────────────────────────────
+
+/**
+ * Overall game-completion percentage (0-100), based on the average of nine
+ * progress ratios (each clamped to [0,1]): one per plot's level/MAX_LEVEL
+ * (0 if locked), road/verge/water levels relative to their max, and skins
+ * unlocked relative to the total available.
+ */
+export function calculateProgress(state: GameState): number {
+  const ratios: number[] = [];
+
+  for (const plot of state.plots) {
+    ratios.push(plot.unlocked ? plot.level / MAX_LEVEL : 0);
+  }
+
+  ratios.push(state.road.level / MAX_ROAD_LEVEL);
+  ratios.push(state.verge.level / MAX_VERGE_LEVEL);
+  ratios.push(state.water.level / MAX_WATER_LEVEL);
+  ratios.push(state.stats.skinsUnlocked / TOTAL_SKINS);
+
+  const clamped = ratios.map(r => Math.max(0, Math.min(1, r)));
+  const avg = clamped.reduce((a, b) => a + b, 0) / clamped.length;
+  return Math.round(avg * 100);
 }
 
 // ── Persistence ────────────────────────────────────────────────────────────────
@@ -80,6 +114,7 @@ export function loadGame(plotCount: number): GameState {
       if (!parsed.verge)    parsed.verge    = { level: 0 };
       if (!parsed.water)    parsed.water    = { level: 0 };
       if (!parsed.townName) parsed.townName = 'Idleville';
+      if (!parsed.stats)    parsed.stats    = { totalPlayTimeMs: 0, totalMoneyEarned: 0, skinsUnlocked: 1 };
       return parsed as GameState;
     }
   } catch {

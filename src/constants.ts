@@ -19,17 +19,29 @@ export const RIVER_H = 48;
 export const WATER_H = 100;
 export const MAX_WATER_LEVEL = 12;
 export const YARD_H = 20;
+export const MAX_ROAD_LEVEL = 10;
+
+// ── Skins ──────────────────────────────────────────────────────────────────────
+export const TOTAL_SKINS = 24;
 
 export const UNLOCK_COSTS: readonly number[] = [0, 50_000, 250_000, 1_500_000, 10_000_000];
 
 // ── Pure helper functions ─────────────────────────────────────────────────────
 
-// Exp-poly cost curve: 200 × exp(0.0695 × (L-1)^1.2) × 1.05^buildingIndex
-// A=200 gives ~8s for the first upgrade (5 plots × $5/s income) — fast early progression.
-// k=0.0695 targets ~$5B at level 99 with this base.
-// Each successive building costs 5% more than the previous one at the same level.
+// Exp-poly cost curve, per building: BASE[i] × exp(K[i] × (L-1)^1.2)
+// BASE[i] is the cost of the FIRST upgrade after a plot is unlocked. It now scales
+// with that plot's unlock fee (roughly 4-8% of it) so newly-unlocked plots feel like
+// a real continuation of the spend rather than dropping to a near-free upgrade.
+// BASE[0]=200 is unchanged — gives ~8s for the first upgrade on the starter plot.
+// K[i] is reduced slightly for higher-index buildings so each still tops out around
+// the same ~$5-6B at level 99 despite its higher starting cost.
+const BUILDING_BASE_COST: readonly number[]   = [200, 4_000, 16_000, 80_000, 400_000];
+const BUILDING_GROWTH_RATE: readonly number[] = [0.0695, 0.0575, 0.0520, 0.0457, 0.0393];
+
 export function upgradeCost(level: number, buildingIndex: number = 0): number {
-  return Math.round(200 * Math.exp(0.0695 * Math.pow(level - 1, 1.2)) * Math.pow(1.05, buildingIndex));
+  return Math.round(
+    BUILDING_BASE_COST[buildingIndex] * Math.exp(BUILDING_GROWTH_RATE[buildingIndex] * Math.pow(level - 1, 1.2)),
+  );
 }
 
 export function buildingHeight(level: number): number {
@@ -62,13 +74,18 @@ export function waterIncome(level: number): number {
   return BASE_INCOME_MULTIPLIER * level * level * 0.52;
 }
 
+// Road / verge / water upgrade costs use an exponential curve (base × e^(k·level)) so
+// each tier becomes a serious investment — fully maxing each track now costs roughly
+// $7M, up from tens of thousands previously, putting them on a similar scale to
+// mid-to-late-game building upgrades.
 export function roadUpgradeCost(level: number): number {
-  return level === 0 ? 500 : level * level * 100;
+  if (level === 0) return 5_000;
+  return Math.round(2_000 * Math.exp(0.85 * level));
 }
 
 export function waterUpgradeCost(level: number): number {
-  if (level === 0) return 2_500;
-  return level * level * 700 + 1_000;
+  if (level === 0) return 5_000;
+  return Math.round(2_000 * Math.exp(0.6789 * level));
 }
 
 export function waterTierName(level: number): string {
@@ -82,8 +99,8 @@ export function waterTierName(level: number): string {
 }
 
 export function vergeUpgradeCost(level: number): number {
-  if (level === 0) return 1_500;
-  return level * level * 400 + 600;
+  if (level === 0) return 3_000;
+  return Math.round(2_000 * Math.exp(0.5224 * level));
 }
 
 export function vergeTierName(level: number): string {
