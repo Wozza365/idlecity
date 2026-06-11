@@ -1023,8 +1023,8 @@ export class WaterArea {
       };
 
       // Lighthouse island "wake" — waves fade into a calm clearing around the
-      // island, with a longer tail trailing behind it (away from shore) so the
-      // gap reads as a natural wake/shadow rather than a hard hole.
+      // island, with a longer tail trailing behind/above it (toward shore) so
+      // the gap reads as a natural wake/shadow rather than a hard hole.
       const islandActive = lv >= 8;
       const islandCx = this._lighthouseX;
       const islandCy = this._lighthouseTopY + 48;
@@ -1033,7 +1033,7 @@ export class WaterArea {
         if (!islandActive) return 0;
         const dx = px - islandCx;
         const dy = py - islandCy;
-        const ry = dy >= 0 ? ISLAND_RY_BACK : ISLAND_RY_FRONT;
+        const ry = dy < 0 ? ISLAND_RY_BACK : ISLAND_RY_FRONT;
         const nx = dx / ISLAND_RX, ny = dy / ry;
         const t  = Math.sqrt(nx * nx + ny * ny);
         if (t >= 1.5) return 0;
