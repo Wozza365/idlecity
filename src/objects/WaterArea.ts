@@ -562,7 +562,8 @@ export class WaterArea {
   // ── Lighthouse (level 8+) ─────────────────────────────────────────────────
 
   private drawLighthouse(): void {
-    const gfx = this.structGfx;
+    // Drawn on islandGfx (above the wave fx layer) so waves don't draw over it.
+    const gfx = this.islandGfx;
     const { _lighthouseX: lx, _lighthouseTopY: topY } = this;
     const towerH = 44;
     const towerW = 10;
@@ -1270,9 +1271,10 @@ export class WaterArea {
       this._beamSprite.setPosition(ox, oy).setRotation(angle).setAlpha(nf);
     }
 
-    // Lens glow
+    // Lens glow — drawn larger than the lamp window so its halo is visible
+    // around the (now in-front) tower rather than hidden entirely behind it.
     gfx.fillStyle(0xFFFF44, nf * 0.55);
-    gfx.fillCircle(ox, oy, 4);
+    gfx.fillCircle(ox, oy, 8);
   }
 
   // ── Sky reflection ────────────────────────────────────────────────────────
