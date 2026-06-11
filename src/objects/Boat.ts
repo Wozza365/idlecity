@@ -56,7 +56,9 @@ export class Boat {
     this.baseSpeed = def.speed * (0.975 + Math.random() * 0.05); // ±2.5% variation
     this.bobPhase = Math.random() * Math.PI * 2;
 
-    this.gfx = scene.add.graphics().setDepth(5.9);
+    // Above the wave fx (5.85) so boats sit on top of the water/waves, but
+    // below the lighthouse island layer (5.86) so it stays in front of boats.
+    this.gfx = scene.add.graphics().setDepth(5.855);
 
     // Port (top/city-side) = red
     this.portLight = {
