@@ -12,6 +12,9 @@ const SAND_WET   = 0xB8946A;
 const ROCK_BASE  = 0x5A5A5A;
 const ROCK_MID   = 0x6E6E6E;
 const ROCK_LIGHT = 0x888888;
+const ROCK_WET   = 0x474D55;
+const MOSS_GREEN = 0x6E8B3D;
+const MOSS_DARK  = 0x4F6B2A;
 const DOCK_WOOD  = 0xA0784A;
 const PIER_WOOD  = 0xB8884E;
 
@@ -173,7 +176,7 @@ export class WaterArea {
     else { this._dockGlows = []; }
     if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
     else { this._buoys = []; }
-    if (level >= 8) this.drawLighthouse();
+    if (level >= 8) { this.drawLighthouseIsland(); this.drawLighthouse(); }
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
     else { this.destroyFoamSprites(); }
 
@@ -489,6 +492,74 @@ export class WaterArea {
     gfx.fillRect(hx + hutW + 4, hutY - 8, 5, 4);
     gfx.fillStyle(0x888888, 1);
     gfx.fillRect(hx + hutW + 1, hutY - 14, 2, hutH + 14);
+  }
+
+  // ── Lighthouse rocky island (level 8+) ─────────────────────────────────────
+
+  private drawLighthouseIsland(): void {
+    const gfx = this.waterGfx;
+    const { _lighthouseX: cx, _lighthouseTopY: topY } = this;
+    const baseY = topY + 52;
+
+    // Soft halo in the surrounding water — grounds the island visually
+    gfx.fillStyle(0x06223A, 0.25);
+    gfx.fillEllipse(cx, topY + 64, 124, 56);
+
+    // ── Submerged rock mass — broad, rounded, dark wet stone ──
+    gfx.fillStyle(ROCK_WET, 1);
+    gfx.fillEllipse(cx, topY + 58, 104, 48);
+    gfx.fillStyle(dimColor(ROCK_WET, 0.7), 1);
+    gfx.fillEllipse(cx, topY + 66, 88, 30);
+
+    // ── Jagged dry peaks rising above the waterline, each lit on the left
+    //    face and shaded on the right for a faceted pixel-art look ──
+    const peaks: ReadonlyArray<{ x0: number; x1: number; ax: number; ay: number }> = [
+      { x0: cx - 48, x1: cx - 26, ax: cx - 38, ay: topY + 30 },
+      { x0: cx - 24, x1: cx - 2,  ax: cx - 11, ay: topY + 21 },
+      { x0: cx + 0,  x1: cx + 20, ax: cx + 9,  ay: topY + 26 },
+      { x0: cx + 18, x1: cx + 42, ax: cx + 31, ay: topY + 35 },
+    ];
+    for (const p of peaks) {
+      gfx.fillStyle(ROCK_BASE, 1);
+      gfx.fillTriangle(p.x0, baseY, p.x1, baseY, p.ax, p.ay);
+      gfx.fillStyle(ROCK_LIGHT, 0.8);
+      gfx.fillTriangle(p.x0, baseY, p.ax, p.ay, (p.x0 + p.ax) / 2, baseY);
+      gfx.fillStyle(0x404040, 0.55);
+      gfx.fillTriangle(p.x1, baseY, p.ax, p.ay, (p.x1 + p.ax) / 2, baseY);
+    }
+
+    // ── Strata cracks ──
+    gfx.fillStyle(0x333333, 0.6);
+    gfx.fillRect(cx - 40, topY + 46, 16, 2);
+    gfx.fillRect(cx - 6,  topY + 40, 18, 2);
+    gfx.fillRect(cx + 14, topY + 47, 14, 2);
+
+    // ── Moss patches on the highest peaks ──
+    gfx.fillStyle(MOSS_DARK, 0.9);
+    gfx.fillEllipse(cx - 11, topY + 25, 14, 5);
+    gfx.fillEllipse(cx + 9,  topY + 30, 10, 4);
+    gfx.fillStyle(MOSS_GREEN, 0.9);
+    gfx.fillEllipse(cx - 12, topY + 24, 10, 3);
+    gfx.fillEllipse(cx + 8,  topY + 29, 7, 2.5);
+
+    // ── Foam where waves break against the rock ──
+    gfx.fillStyle(0xFFFFFF, 0.3);
+    for (let i = 0; i < 7; i++) {
+      const fx = cx - 50 + i * 17;
+      const fy = topY + 50 + Math.round(Math.sin(i * 1.7) * 4);
+      gfx.fillCircle(fx, fy, 2);
+    }
+
+    // ── Small companion boulder to the left ──
+    gfx.fillStyle(ROCK_WET, 1);
+    gfx.fillEllipse(cx - 70, topY + 68, 36, 18);
+    gfx.fillStyle(ROCK_BASE, 1);
+    gfx.fillTriangle(cx - 84, topY + 62, cx - 62, topY + 62, cx - 74, topY + 46);
+    gfx.fillStyle(ROCK_LIGHT, 0.8);
+    gfx.fillTriangle(cx - 84, topY + 62, cx - 74, topY + 46, cx - 78, topY + 62);
+    gfx.fillStyle(0xFFFFFF, 0.3);
+    gfx.fillCircle(cx - 86, topY + 70, 2);
+    gfx.fillCircle(cx - 56, topY + 72, 2);
   }
 
   // ── Lighthouse (level 8+) ─────────────────────────────────────────────────
