@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H, VERGE_H, WATER_H } from '../constants';
+import { ROAD_H, VERGE_H } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { Boat } from './Boat';
 import { pickRandomBoat } from './BoatAssets';
@@ -148,8 +148,10 @@ export class BoatManager {
 
   private spawnBoat(): void {
     const def = pickRandomBoat();
-    // Single lane across the deep water at roughly 75–90% down the water strip
-    const y = this.waterY + WATER_H * (0.75 + Math.random() * 0.12);
+    // Single lane across the deep water, a fixed distance below the shoreline
+    // (independent of WATER_H) so boats stay near the dock/pier even as the
+    // water area extends further out to sea.
+    const y = this.waterY + 75 + Math.random() * 12;
 
     // Don't spawn if another boat is too close to the left edge
     const MIN_SEPARATION = 100 + def.w;

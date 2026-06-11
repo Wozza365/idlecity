@@ -884,7 +884,7 @@ export class WaterArea {
 
       if (dayA > 0.01) {
         const SHORE_FADE = 30;
-        const NUM_WAVES  = 7;
+        const NUM_WAVES  = 14;
         const SPACING    = WATER_H / NUM_WAVES;
 
         for (let wi = 0; wi < NUM_WAVES; wi++) {
