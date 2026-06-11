@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { UI_HEIGHT } from '../constants';
+import { STATS_BAR_H } from '../constants';
 import {
   type Point,
   type Segment,
@@ -72,7 +72,7 @@ export class LightingSystem {
   constructor(scene: Phaser.Scene, _groundY: number, topUIPx: number = 0) {
     this.scene = scene;
     const { width, height } = scene.scale;
-    const gameH = height - UI_HEIGHT;
+    const gameH = height - STATS_BAR_H;
 
     // Shadow map must match the camera output size (full screen) so that the
     // composite filter's UV coordinates align 1:1 with the shadow map.
@@ -171,7 +171,7 @@ export class LightingSystem {
 
   collectSegments(): Segment[] {
     const { width, height } = this.scene.scale;
-    const gameH = height - UI_HEIGHT;
+    const gameH = height - STATS_BAR_H;
     const segs: Segment[] = buildScreenBoundary(width, gameH);
 
     for (const child of this.scene.children.list) {

@@ -3,14 +3,20 @@ import { STATS_BAR_H, fmtBalance, fmtRate, UI_FONT, MONO_FONT, GAME_HOUR_FACTOR 
 
 export class StatsBar {
   private gfx: Phaser.GameObjects.Graphics;
+  private chevronGfx: Phaser.GameObjects.Graphics;
+  private hitZone: Phaser.GameObjects.Rectangle;
   private incomeLabel: Phaser.GameObjects.Text;
   private incomeValue: Phaser.GameObjects.Text;
   private incomeIcon: Phaser.GameObjects.Text;
   private balanceLabel: Phaser.GameObjects.Text;
   private balanceValue: Phaser.GameObjects.Text;
   private balanceIcon: Phaser.GameObjects.Text;
+  private readonly width: number;
+  private readonly panelTop: number;
 
-  constructor(scene: Phaser.Scene, panelTop: number, width: number) {
+  constructor(scene: Phaser.Scene, panelTop: number, width: number, onToggle: () => void) {
+    this.width = width;
+    this.panelTop = panelTop;
     const labelY = panelTop + 24;
     const valueY = panelTop + 41;
     const pillY  = panelTop + 8;
@@ -59,6 +65,34 @@ export class StatsBar {
     this.balanceIcon = scene.add
       .text(width - pillW - 8 + 16, pillCY, '◆', { fontSize: '30px', color: '#d4a820', fontFamily: UI_FONT })
       .setOrigin(0.5, 0.5).setAlpha(0.5).setDepth(11);
+
+    // Chevron — hints that the bar can be tapped to expand/collapse the panel
+    this.chevronGfx = scene.add.graphics().setDepth(11).setLighting(false);
+    this.drawChevron(false);
+
+    // Full-width hit zone over the bar — tap to toggle the panel
+    this.hitZone = scene.add
+      .rectangle(width / 2, panelTop + STATS_BAR_H / 2, width, STATS_BAR_H, 0, 0)
+      .setDepth(12)
+      .setInteractive({ useHandCursor: true });
+    this.hitZone.on('pointerdown', onToggle);
+  }
+
+  private drawChevron(expanded: boolean): void {
+    const cx = this.width / 2;
+    const cy = this.panelTop + 4;
+    const g = this.chevronGfx;
+    g.clear();
+    g.fillStyle(0x5a7088, 1);
+    if (expanded) {
+      g.fillTriangle(cx - 6, cy - 2, cx + 6, cy - 2, cx, cy + 3); // pointing down — tap to collapse
+    } else {
+      g.fillTriangle(cx - 6, cy + 3, cx + 6, cy + 3, cx, cy - 2); // pointing up — tap to expand
+    }
+  }
+
+  setExpanded(expanded: boolean): void {
+    this.drawChevron(expanded);
   }
 
   update(gold: number, taxRate: number): void {
@@ -68,6 +102,8 @@ export class StatsBar {
 
   destroy(): void {
     this.gfx.destroy();
+    this.chevronGfx.destroy();
+    this.hitZone.destroy();
     this.incomeLabel.destroy();
     this.incomeValue.destroy();
     this.incomeIcon.destroy();
