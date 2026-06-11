@@ -21,6 +21,29 @@ const PIER_WOOD  = 0xB8884E;
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
 
+// ── Lighthouse tower (baked cone, same technique as Balloon.ts) ────────────────
+const LH_TEX_KEY  = 'lighthouse-tower';
+const LH_TOWER_H  = 44;  // tower height
+const LH_BASE_W   = 14;  // width at the base (bottom)
+const LH_TOP_W    = 8;   // width at the top — slight taper
+const LH_CT_PAD   = 2;
+const LH_CT_W     = LH_BASE_W + LH_CT_PAD * 2;
+const LH_CT_H     = LH_TOWER_H + LH_CT_PAD * 2;
+const LH_CT_CX    = LH_CT_W / 2;
+const LH_CT_TOP   = LH_CT_PAD;
+
+// Per-column (1px) shadow profile for the tapered tower silhouette — for each
+// column across the base width, the y (relative to the tower top) at which the
+// cone's outline begins to cover that column. Mirrors Balloon.ts's shadowY1s/
+// shadowY2s, but the cone's bottom edge is flat so only one array is needed.
+const lhShadowTopYs = new Int32Array(LH_BASE_W);
+for (let col = 0; col < LH_BASE_W; col++) {
+  const dx = Math.abs(col + 0.5 - LH_BASE_W / 2) * 2;
+  lhShadowTopYs[col] = dx <= LH_TOP_W
+    ? 0
+    : Math.round(LH_TOWER_H * (dx - LH_TOP_W) / (LH_BASE_W - LH_TOP_W));
+}
+
 // People
 const PED_COLORS   = [0xff6b6b, 0xffd93d, 0x6bcb77, 0x4d96ff, 0xc77dff, 0xff9f43, 0x00d2d3, 0xff6bcd];
 const TOWEL_COLORS = [0xE63946, 0x4CC9F0, 0xF4D35E, 0x3A86FF, 0xFFB347, 0xFF6BBA, 0x06D6A0, 0xB5838D];
@@ -85,6 +108,7 @@ export class WaterArea {
   private _bonfireY   = 0;
   private _lighthouseX    = 0;
   private _lighthouseTopY = 0;
+  private _lhTowerImg: Phaser.GameObjects.Image | null = null;
   private _dockSlots: number[] = [];
 
   // Beach people
@@ -180,6 +204,7 @@ export class WaterArea {
     if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
     else { this._buoys = []; }
     if (level >= 8) { this.drawLighthouseIsland(); this.drawLighthouse(); }
+    else { this._lhTowerImg?.setVisible(false); }
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
     else { this.destroyFoamSprites(); }
 
@@ -565,20 +590,22 @@ export class WaterArea {
     // Drawn on islandGfx (above the wave fx layer) so waves don't draw over it.
     const gfx = this.islandGfx;
     const { _lighthouseX: lx, _lighthouseTopY: topY } = this;
-    const towerH = 44;
-    const towerW = 10;
 
     gfx.fillStyle(0x888888, 1);
-    gfx.fillRect(lx - 9, topY + towerH, 18, 5);
+    gfx.fillRect(lx - 9, topY + LH_TOWER_H, 18, 5);
 
-    gfx.fillStyle(0xEEEEEE, 1);
-    gfx.fillRect(lx - towerW / 2, topY, towerW, towerH);
-    gfx.fillStyle(0xCC3333, 1);
-    gfx.fillRect(lx - towerW / 2, topY + 10, towerW, 6);
-    gfx.fillRect(lx - towerW / 2, topY + 28, towerW, 6);
+    // Tower body — baked cone texture (smooth taper, bands clipped to its outline).
+    this.bakeLighthouseTower();
+    if (!this._lhTowerImg) {
+      this._lhTowerImg = this.scene.add.image(lx, topY, LH_TEX_KEY)
+        .setOrigin(LH_CT_CX / LH_CT_W, LH_CT_TOP / LH_CT_H)
+        .setDepth(5.86);
+    } else {
+      this._lhTowerImg.setPosition(lx, topY).setVisible(true);
+    }
 
     gfx.fillStyle(0x444444, 1);
-    gfx.fillRect(lx - towerW / 2 - 3, topY - 1, towerW + 6, 2);
+    gfx.fillRect(lx - LH_TOP_W / 2 - 3, topY - 1, LH_TOP_W + 6, 2);
 
     gfx.fillStyle(0x333333, 1);
     gfx.fillRect(lx - 6, topY - 10, 12, 10);
@@ -588,6 +615,39 @@ export class WaterArea {
     gfx.fillRect(lx - 5, topY - 12, 10, 3);
     gfx.fillStyle(0x333333, 1);
     gfx.fillRect(lx - 1, topY - 15, 2, 4);
+  }
+
+  // Bake the tapered tower body once into a CanvasTexture using the same
+  // Path2D-clip-and-fill technique as Balloon.ts's bake(): clip to the cone
+  // outline, fill the white body and red bands (auto-cropped to the taper),
+  // then stroke the outline for a subtle anti-aliased rim.
+  private bakeLighthouseTower(): void {
+    if (this.scene.textures.exists(LH_TEX_KEY)) return;
+
+    const ct  = this.scene.textures.createCanvas(LH_TEX_KEY, LH_CT_W, LH_CT_H)!;
+    const ctx = ct.getContext();
+
+    const path = new Path2D();
+    path.moveTo(LH_CT_CX - LH_TOP_W / 2,  LH_CT_TOP);
+    path.lineTo(LH_CT_CX + LH_TOP_W / 2,  LH_CT_TOP);
+    path.lineTo(LH_CT_CX + LH_BASE_W / 2, LH_CT_TOP + LH_TOWER_H);
+    path.lineTo(LH_CT_CX - LH_BASE_W / 2, LH_CT_TOP + LH_TOWER_H);
+    path.closePath();
+
+    ctx.save();
+    ctx.clip(path);
+    ctx.fillStyle = '#EEEEEE';
+    ctx.fillRect(0, LH_CT_TOP, LH_CT_W, LH_TOWER_H);
+    ctx.fillStyle = '#CC3333';
+    ctx.fillRect(0, LH_CT_TOP + 10, LH_CT_W, 6);
+    ctx.fillRect(0, LH_CT_TOP + 28, LH_CT_W, 6);
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.40)';
+    ctx.lineWidth   = 1;
+    ctx.stroke(path);
+
+    ct.refresh();
   }
 
   // ── Buoys ─────────────────────────────────────────────────────────────────
@@ -866,12 +926,22 @@ export class WaterArea {
       gfx.fillEllipse(cafeCx + leanX * 6, wy + BEACH_SHORE_H - 2, 40, 8);
     }
 
-    // Lighthouse shadow (long, thin) — anchored to the lighthouse's own base
+    // Lighthouse shadow — a soft offset silhouette of the cone tower, drawn in
+    // the same two-pass per-column technique as Balloon.ts's drawShadow().
     if (this._level >= 8) {
-      const lx = this._lighthouseX + leanX * 22;
-      const baseY = this._lighthouseTopY + ROCK_SHORE_H;
-      gfx.fillRect(lx - 3, baseY, 6, 12);
-      gfx.fillEllipse(lx, baseY + 12, 10 + Math.abs(leanX) * 8, 5);
+      const { _lighthouseX: lx, _lighthouseTopY: topY } = this;
+      const shadowX = Math.round(leanX * 4);
+      const shadowY = Math.round(2 + (1 - elevation) * 3);
+      for (const [frac, a] of [[0.5, alpha], [1.0, alpha * 0.5]] as [number, number][]) {
+        const sox = Math.round(shadowX * frac);
+        const soy = Math.max(1, Math.round(shadowY * frac));
+        gfx.fillStyle(0x000000, a);
+        for (let col = 0; col < LH_BASE_W; col++) {
+          const h = LH_TOWER_H - lhShadowTopYs[col];
+          if (h < 1) continue;
+          gfx.fillRect(lx - LH_BASE_W / 2 + col + sox, topY + lhShadowTopYs[col] + soy, 1, h);
+        }
+      }
     }
   }
 
@@ -1350,5 +1420,7 @@ export class WaterArea {
     this.beachPeopleGfx.destroy();
     this.fxGfx.destroy();
     this.islandGfx.destroy();
+    this._lhTowerImg?.destroy();
+    if (this.scene.textures.exists(LH_TEX_KEY)) this.scene.textures.remove(LH_TEX_KEY);
   }
 }
