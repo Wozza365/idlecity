@@ -160,8 +160,8 @@ export class WaterArea {
     this._cafeX      = 16;
     this._bonfireX   = Math.floor(width * 0.17);
     this._bonfireY   = this._waterY + 32;
-    this._lighthouseX    = Math.floor(width * 0.88);
-    this._lighthouseTopY = this._waterY;
+    this._lighthouseX    = Math.floor(width * 0.63);
+    this._lighthouseTopY = this._waterY + WATER_H * 0.5;
 
     this.structGfx.clear();
 
@@ -797,11 +797,12 @@ export class WaterArea {
       gfx.fillEllipse(cafeCx + leanX * 6, wy + BEACH_SHORE_H - 2, 40, 8);
     }
 
-    // Lighthouse shadow (long, thin)
+    // Lighthouse shadow (long, thin) — anchored to the lighthouse's own base
     if (this._level >= 8) {
       const lx = this._lighthouseX + leanX * 22;
-      gfx.fillRect(lx - 3, wy + ROCK_SHORE_H, 6, 12);
-      gfx.fillEllipse(lx, wy + ROCK_SHORE_H + 12, 10 + Math.abs(leanX) * 8, 5);
+      const baseY = this._lighthouseTopY + ROCK_SHORE_H;
+      gfx.fillRect(lx - 3, baseY, 6, 12);
+      gfx.fillEllipse(lx, baseY + 12, 10 + Math.abs(leanX) * 8, 5);
     }
   }
 
