@@ -1022,6 +1022,25 @@ export class WaterArea {
         return wy + Math.round(BEACH_SHORE_H * (1 - s) + ROCK_SHORE_H * s);
       };
 
+      // Lighthouse island "wake" — waves fade into a calm clearing around the
+      // island, with a longer tail trailing behind it (away from shore) so the
+      // gap reads as a natural wake/shadow rather than a hard hole.
+      const islandActive = lv >= 8;
+      const islandCx = this._lighthouseX;
+      const islandCy = this._lighthouseTopY + 48;
+      const ISLAND_RX = 26, ISLAND_RY_FRONT = 18, ISLAND_RY_BACK = 32;
+      const islandClearAt = (px: number, py: number): number => {
+        if (!islandActive) return 0;
+        const dx = px - islandCx;
+        const dy = py - islandCy;
+        const ry = dy >= 0 ? ISLAND_RY_BACK : ISLAND_RY_FRONT;
+        const nx = dx / ISLAND_RX, ny = dy / ry;
+        const t  = Math.sqrt(nx * nx + ny * ny);
+        if (t >= 1.5) return 0;
+        if (t <= 1)   return 1;
+        return (1.5 - t) / 0.5;
+      };
+
       if (dayA > 0.01) {
         const SHORE_FADE = 30;
         const NUM_WAVES  = 14;
@@ -1074,8 +1093,11 @@ export class WaterArea {
               const ceilY = ceilAt(x);
               if (y0 < ceilY || y0 >= wy + WATER_H) continue;
 
+              const clear = islandClearAt(x, y0);
+              if (clear >= 1) continue;
+
               const shoreFade = Math.min(1, (y0 - ceilY) / SHORE_FADE);
-              const a = baseAlpha * pd.aScale * shoreFade;
+              const a = baseAlpha * pd.aScale * shoreFade * (1 - clear);
               if (a < 0.005) continue;
 
               // Segment length varies per position (±2 px around base)
