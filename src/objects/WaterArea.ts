@@ -69,6 +69,7 @@ export class WaterArea {
   private beachShadowGfx:  Phaser.GameObjects.Graphics; // 5.76 – beach people shadows
   private beachPeopleGfx:  Phaser.GameObjects.Graphics; // 5.78 – moving beach people
   private fxGfx:           Phaser.GameObjects.Graphics; // 5.85 – bonfire, sparkles, buoys (no lighting)
+  private islandGfx:       Phaser.GameObjects.Graphics; // 5.86 – lighthouse island (above wave fx)
 
   // Layout
   private _level  = 0;
@@ -146,6 +147,7 @@ export class WaterArea {
     this.beachShadowGfx = scene.add.graphics().setDepth(5.62);
     this.beachPeopleGfx = scene.add.graphics().setDepth(5.66).setLighting(true);
     this.fxGfx          = scene.add.graphics().setDepth(5.85);
+    this.islandGfx      = scene.add.graphics().setDepth(5.86).setLighting(true);
   }
 
   render(level: number, width: number, groundY: number): void {
@@ -167,6 +169,7 @@ export class WaterArea {
     this._lighthouseTopY = this._waterY + WATER_H * 0.5;
 
     this.structGfx.clear();
+    this.islandGfx.clear();
 
     this.drawWaterAndCoast();
 
@@ -497,27 +500,25 @@ export class WaterArea {
   // ── Lighthouse rocky island (level 8+) ─────────────────────────────────────
 
   private drawLighthouseIsland(): void {
-    const gfx = this.waterGfx;
+    const gfx = this.islandGfx;
     const { _lighthouseX: cx, _lighthouseTopY: topY } = this;
-    const baseY = topY + 52;
+    const baseY = topY + 46;
 
     // Soft halo in the surrounding water — grounds the island visually
     gfx.fillStyle(0x06223A, 0.25);
-    gfx.fillEllipse(cx, topY + 64, 124, 56);
+    gfx.fillEllipse(cx, topY + 50, 48, 22);
 
-    // ── Submerged rock mass — broad, rounded, dark wet stone ──
+    // ── Submerged rock base — small, rounded, dark wet stone ──
     gfx.fillStyle(ROCK_WET, 1);
-    gfx.fillEllipse(cx, topY + 58, 104, 48);
+    gfx.fillEllipse(cx, topY + 48, 40, 18);
     gfx.fillStyle(dimColor(ROCK_WET, 0.7), 1);
-    gfx.fillEllipse(cx, topY + 66, 88, 30);
+    gfx.fillEllipse(cx, topY + 52, 32, 12);
 
     // ── Jagged dry peaks rising above the waterline, each lit on the left
     //    face and shaded on the right for a faceted pixel-art look ──
     const peaks: ReadonlyArray<{ x0: number; x1: number; ax: number; ay: number }> = [
-      { x0: cx - 48, x1: cx - 26, ax: cx - 38, ay: topY + 30 },
-      { x0: cx - 24, x1: cx - 2,  ax: cx - 11, ay: topY + 21 },
-      { x0: cx + 0,  x1: cx + 20, ax: cx + 9,  ay: topY + 26 },
-      { x0: cx + 18, x1: cx + 42, ax: cx + 31, ay: topY + 35 },
+      { x0: cx - 18, x1: cx - 2, ax: cx - 11, ay: topY + 30 },
+      { x0: cx + 0,  x1: cx + 16, ax: cx + 8, ay: topY + 34 },
     ];
     for (const p of peaks) {
       gfx.fillStyle(ROCK_BASE, 1);
@@ -530,36 +531,32 @@ export class WaterArea {
 
     // ── Strata cracks ──
     gfx.fillStyle(0x333333, 0.6);
-    gfx.fillRect(cx - 40, topY + 46, 16, 2);
-    gfx.fillRect(cx - 6,  topY + 40, 18, 2);
-    gfx.fillRect(cx + 14, topY + 47, 14, 2);
+    gfx.fillRect(cx - 13, topY + 40, 10, 2);
+    gfx.fillRect(cx + 2,  topY + 42, 9, 2);
 
-    // ── Moss patches on the highest peaks ──
+    // ── Moss patch on the highest peak ──
     gfx.fillStyle(MOSS_DARK, 0.9);
-    gfx.fillEllipse(cx - 11, topY + 25, 14, 5);
-    gfx.fillEllipse(cx + 9,  topY + 30, 10, 4);
+    gfx.fillEllipse(cx - 11, topY + 29, 9, 4);
     gfx.fillStyle(MOSS_GREEN, 0.9);
-    gfx.fillEllipse(cx - 12, topY + 24, 10, 3);
-    gfx.fillEllipse(cx + 8,  topY + 29, 7, 2.5);
+    gfx.fillEllipse(cx - 12, topY + 28, 6, 2.5);
 
     // ── Foam where waves break against the rock ──
     gfx.fillStyle(0xFFFFFF, 0.3);
-    for (let i = 0; i < 7; i++) {
-      const fx = cx - 50 + i * 17;
-      const fy = topY + 50 + Math.round(Math.sin(i * 1.7) * 4);
-      gfx.fillCircle(fx, fy, 2);
+    for (let i = 0; i < 4; i++) {
+      const fx = cx - 18 + i * 12;
+      const fy = topY + 44 + Math.round(Math.sin(i * 1.7) * 3);
+      gfx.fillCircle(fx, fy, 1.5);
     }
 
-    // ── Small companion boulder to the left ──
+    // ── Tiny companion boulder ──
     gfx.fillStyle(ROCK_WET, 1);
-    gfx.fillEllipse(cx - 70, topY + 68, 36, 18);
+    gfx.fillEllipse(cx - 26, topY + 54, 14, 8);
     gfx.fillStyle(ROCK_BASE, 1);
-    gfx.fillTriangle(cx - 84, topY + 62, cx - 62, topY + 62, cx - 74, topY + 46);
+    gfx.fillTriangle(cx - 32, topY + 52, cx - 21, topY + 52, cx - 27, topY + 43);
     gfx.fillStyle(ROCK_LIGHT, 0.8);
-    gfx.fillTriangle(cx - 84, topY + 62, cx - 74, topY + 46, cx - 78, topY + 62);
+    gfx.fillTriangle(cx - 32, topY + 52, cx - 27, topY + 43, cx - 29, topY + 52);
     gfx.fillStyle(0xFFFFFF, 0.3);
-    gfx.fillCircle(cx - 86, topY + 70, 2);
-    gfx.fillCircle(cx - 56, topY + 72, 2);
+    gfx.fillCircle(cx - 33, topY + 56, 1.5);
   }
 
   // ── Lighthouse (level 8+) ─────────────────────────────────────────────────
@@ -1350,5 +1347,6 @@ export class WaterArea {
     this.beachShadowGfx.destroy();
     this.beachPeopleGfx.destroy();
     this.fxGfx.destroy();
+    this.islandGfx.destroy();
   }
 }
