@@ -1026,7 +1026,9 @@ export class WaterArea {
       // island, with a longer tail trailing behind/above it (toward shore) so
       // the gap reads as a natural wake/shadow rather than a hard hole.
       const islandActive = lv >= 8;
-      const islandCx = this._lighthouseX;
+      // Shifted left of _lighthouseX to match the island's visual centre,
+      // which is pulled left by the companion boulder (drawn at cx-26..cx-33).
+      const islandCx = this._lighthouseX - 7;
       const islandCy = this._lighthouseTopY + 48;
       const ISLAND_RX = 26, ISLAND_RY_FRONT = 18, ISLAND_RY_BACK = 32;
       const islandClearAt = (px: number, py: number): number => {
