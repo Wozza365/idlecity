@@ -893,7 +893,7 @@ export class WaterArea {
           const botFade  = Math.min(1, (WATER_H - rawDepth) / 8);
           if (topFade < 0.05 || botFade < 0.05) continue;
 
-          const baseAlpha = dayA * 0.27 * topFade * botFade;
+          const baseAlpha = dayA * 0.2025 * topFade * botFade;
           if (baseAlpha < 0.01) continue;
 
           // Multi-harmonic smooth envelope — determines the y-centre for each crest
