@@ -327,19 +327,25 @@ export class GameScene extends Phaser.Scene {
     this.statsBar?.destroy();
     this.statsBar = new StatsBar(this, this.panelTop, width);
 
-    this.townSign?.destroy();
-    this.townSign = new TownNameSign(
-      this,
-      width,
-      () => this.state.townName,
-      (newName) => {
-        if (this.state.gold < TOWN_RENAME_COST) return false;
-        this.state.gold -= TOWN_RENAME_COST;
-        this.state.townName = newName;
-        this.statsBar.update(this.state.gold, this.taxRate);
-        return true;
-      },
-    );
+    if (this.townSign) {
+      // Reuse the existing instance so an open rename dialog (and its
+      // focused input) survives a layout rebuild — e.g. when the on-screen
+      // keyboard closes and the viewport resizes back.
+      this.townSign.resize(width);
+    } else {
+      this.townSign = new TownNameSign(
+        this,
+        width,
+        () => this.state.townName,
+        (newName) => {
+          if (this.state.gold < TOWN_RENAME_COST) return false;
+          this.state.gold -= TOWN_RENAME_COST;
+          this.state.townName = newName;
+          this.statsBar.update(this.state.gold, this.taxRate);
+          return true;
+        },
+      );
+    }
 
     const nextUnlock = this.state.plots.findIndex(p => !p.unlocked);
     for (let i = 0; i < PLOT_COUNT; i++) {
@@ -401,6 +407,13 @@ export class GameScene extends Phaser.Scene {
   // ── Resize handler ─────────────────────────────────────────────────────────
 
   private onResize(): void {
+    // On mobile, opening the on-screen keyboard shrinks the viewport and
+    // fires a window 'resize' event. Rebuilding the whole layout here would
+    // destroy/recreate the rename dialog (and its focused input) the instant
+    // the keyboard opens. Skip the rebuild while a text input is focused —
+    // it'll run again once the input blurs and the keyboard closes.
+    if (document.activeElement instanceof HTMLInputElement) return;
+
     const { width, height } = this.scale;
 
     this.sky.resize(width, height);

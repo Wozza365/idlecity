@@ -55,6 +55,7 @@ export class TownNameSign {
       fontFamily: UI_FONT, fontStyle: 'bold',
       shadow: { offsetX: 0, offsetY: 1, color: '#1e0a00', blur: 3, fill: true },
       padding: { x: 6, y: 6 },
+      resolution: Math.min(window.devicePixelRatio || 1, 2),
     }).setOrigin(0.5, 0.5).setDepth(S_DEPTH + 1);
 
     this.btnLabel = scene.add.text(0, 0, 'RENAME', {
@@ -71,14 +72,17 @@ export class TownNameSign {
 
     this.drawAll();
 
-    // Re-measure once web fonts finish loading. A Text canvas sized against a
-    // fallback font (before Inter is ready) can clip glyphs — and the drop
-    // shadow especially — once the real font swaps in, producing the
-    // "sharp cut off" look on the town name.
+    // Re-measure once the bold Inter face has actually loaded. Until then the
+    // canvas falls back to a synthetic ("faux") bold of a fallback font, which
+    // can overlap/clip adjacent glyphs (e.g. "e" and "v") and look pixelated —
+    // producing the "sharp cut off"/low-res look on the town name.
     if (document.fonts) {
-      document.fonts.ready.then(() => {
+      Promise.all([
+        document.fonts.load(`bold 20px ${UI_FONT}`),
+        document.fonts.load(`16px ${UI_FONT}`),
+      ]).then(() => {
         if (!this.destroyed) this.drawAll();
-      });
+      }).catch(() => { /* font load failed — keep fallback rendering */ });
     }
   }
 
@@ -207,6 +211,7 @@ export class TownNameSign {
     this.inputText = add(
       s.add.text(ix + 10, iy, '', {
         fontSize: '16px', color: '#d0c090', fontFamily: UI_FONT,
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
       }).setOrigin(0, 0.5).setDepth(D + 3),
     ) as Phaser.GameObjects.Text;
     this.updateInputDisplay();
