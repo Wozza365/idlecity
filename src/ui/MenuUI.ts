@@ -50,6 +50,18 @@ const TABS: readonly TabDef[] = [
   { id: 'stats', label: 'STATS' },
 ];
 
+interface StatsRefs {
+  playtimeText: Phaser.GameObjects.Text;
+  skinsText: Phaser.GameObjects.Text;
+  moneyText: Phaser.GameObjects.Text;
+  progressText: Phaser.GameObjects.Text;
+  barGfx: Phaser.GameObjects.Graphics;
+  barX: number;
+  barY: number;
+  barW: number;
+  barH: number;
+}
+
 export class MenuUI {
   private btnGfx: Phaser.GameObjects.Graphics;
   private btnLabel: Phaser.GameObjects.Text;
@@ -60,6 +72,9 @@ export class MenuUI {
 
   private currentTab: string = TABS[0].id;
   private skinsPage = 0;
+
+  private statsTimer: Phaser.Time.TimerEvent | null = null;
+  private statsRefs: StatsRefs | null = null;
 
   constructor(
     private scene: Phaser.Scene,
@@ -374,53 +389,52 @@ export class MenuUI {
     const state = this.getState();
     const rowX = px - (panelW - 32) / 2;
     const rowW = panelW - 32;
-
-    const rows: { label: string; value: string }[] = [
-      { label: 'Total Playtime',     value: formatPlaytime(state.stats.totalPlayTimeMs) },
-      { label: 'Skins Unlocked',     value: `${state.stats.skinsUnlocked} / ${TOTAL_SKINS}` },
-      { label: 'Total Money Earned', value: fmtBalance(state.stats.totalMoneyEarned) },
-    ];
-
-    let y = top + 4;
     const rowH = 36;
 
-    for (const row of rows) {
-      add(s.add.text(rowX, y, row.label, {
+    const addRow = (y: number, label: string, value: string): Phaser.GameObjects.Text => {
+      add(s.add.text(rowX, y, label, {
         fontSize: '13px', color: '#88aacc', fontFamily: UI_FONT,
       }).setOrigin(0, 0.5).setDepth(D + 2));
 
-      add(s.add.text(rowX + rowW, y, row.value, {
+      const valueText = add(s.add.text(rowX + rowW, y, value, {
         fontSize: '13px', color: '#e0e8f0', fontFamily: MONO_FONT, fontStyle: 'bold',
-      }).setOrigin(1, 0.5).setDepth(D + 2));
+      }).setOrigin(1, 0.5).setDepth(D + 2)) as Phaser.GameObjects.Text;
 
       // Subtle divider
       const div = add(s.add.graphics().setDepth(D + 2).setLighting(false));
       div.lineStyle(1, 0x1c2a3c, 1);
       div.lineBetween(rowX, y + rowH / 2 - 2, rowX + rowW, y + rowH / 2 - 2);
 
-      y += rowH;
-    }
+      return valueText;
+    };
+
+    let y = top + 4;
+    const playtimeText = addRow(y, 'Total Playtime', formatPlaytime(state.stats.totalPlayTimeMs));
+    y += rowH;
+    const skinsText = addRow(y, 'Skins Unlocked', `${state.stats.skinsUnlocked} / ${TOTAL_SKINS}`);
+    y += rowH;
+    const moneyText = addRow(y, 'Total Money Earned', fmtBalance(state.stats.totalMoneyEarned));
+    y += rowH;
 
     // Progress row + bar
     const progress = calculateProgress(state);
     add(s.add.text(rowX, y, 'Progress', {
       fontSize: '13px', color: '#88aacc', fontFamily: UI_FONT,
     }).setOrigin(0, 0.5).setDepth(D + 2));
-    add(s.add.text(rowX + rowW, y, `${progress}%`, {
+    const progressText = add(s.add.text(rowX + rowW, y, `${progress}%`, {
       fontSize: '13px', color: '#e0e8f0', fontFamily: MONO_FONT, fontStyle: 'bold',
-    }).setOrigin(1, 0.5).setDepth(D + 2));
+    }).setOrigin(1, 0.5).setDepth(D + 2)) as Phaser.GameObjects.Text;
     y += 22;
 
     const barW = rowW;
     const barH = 12;
-    const barGfx = add(s.add.graphics().setDepth(D + 2).setLighting(false));
-    barGfx.fillStyle(0x0a1320, 1);
-    barGfx.fillRoundedRect(rowX, y, barW, barH, 6);
-    const fillW = Math.max(barH, barW * (progress / 100));
-    barGfx.fillStyle(0xd4a820, 1);
-    barGfx.fillRoundedRect(rowX, y, fillW, barH, 6);
-    barGfx.lineStyle(1, 0x2a4060, 1);
-    barGfx.strokeRoundedRect(rowX, y, barW, barH, 6);
+    const barX = rowX;
+    const barY = y;
+    const barGfx = add(s.add.graphics().setDepth(D + 2).setLighting(false)) as Phaser.GameObjects.Graphics;
+    drawProgressBar(barGfx, barX, barY, barW, barH, progress);
+
+    this.statsRefs = { playtimeText, skinsText, moneyText, progressText, barGfx, barX, barY, barW, barH };
+    this.startStatsTimer();
 
     y += barH + 28;
 
@@ -442,6 +456,7 @@ export class MenuUI {
   }
 
   private closeDialog(keepLayoutState = false): void {
+    this.stopStatsTimer();
     for (const obj of this.dialogObjs) obj.destroy();
     this.dialogObjs = [];
     this.bodyObjs = [];
@@ -449,6 +464,37 @@ export class MenuUI {
       this.currentTab = TABS[0].id;
       this.skinsPage = 0;
     }
+  }
+
+  // ── Stats live refresh ───────────────────────────────────────────────────────
+
+  private startStatsTimer(): void {
+    this.stopStatsTimer();
+    this.statsTimer = this.scene.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => this.refreshStats(),
+    });
+  }
+
+  private stopStatsTimer(): void {
+    this.statsTimer?.remove();
+    this.statsTimer = null;
+    this.statsRefs = null;
+  }
+
+  private refreshStats(): void {
+    if (!this.statsRefs) return;
+    const { playtimeText, skinsText, moneyText, progressText, barGfx, barX, barY, barW, barH } = this.statsRefs;
+    const state = this.getState();
+
+    playtimeText.setText(formatPlaytime(state.stats.totalPlayTimeMs));
+    skinsText.setText(`${state.stats.skinsUnlocked} / ${TOTAL_SKINS}`);
+    moneyText.setText(fmtBalance(state.stats.totalMoneyEarned));
+
+    const progress = calculateProgress(state);
+    progressText.setText(`${progress}%`);
+    drawProgressBar(barGfx, barX, barY, barW, barH, progress);
   }
 
   destroy(): void {
@@ -469,4 +515,18 @@ function formatPlaytime(ms: number): string {
   const seconds = totalSeconds % 60;
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
+}
+
+function drawProgressBar(
+  gfx: Phaser.GameObjects.Graphics,
+  x: number, y: number, w: number, h: number, progress: number,
+): void {
+  gfx.clear();
+  gfx.fillStyle(0x0a1320, 1);
+  gfx.fillRoundedRect(x, y, w, h, 6);
+  const fillW = Math.max(h, w * (progress / 100));
+  gfx.fillStyle(0xd4a820, 1);
+  gfx.fillRoundedRect(x, y, fillW, h, 6);
+  gfx.lineStyle(1, 0x2a4060, 1);
+  gfx.strokeRoundedRect(x, y, w, h, 6);
 }
