@@ -10,6 +10,7 @@ import {
 } from '../constants';
 import { spawnFloatingText } from '../ui/FloatingText';
 import { createBuilding, EmptyPlot } from '../buildings';
+import { attachBuildingShadow } from '../buildings/buildingShadow';
 import { hasShadowOverlay, hasSmokeUpdate, hasFlagUpdate } from '../buildings/types';
 import { Sky } from '../objects/Sky';
 import { SunMoon } from '../objects/SunMoon';
@@ -1074,6 +1075,7 @@ export class GameScene extends Phaser.Scene {
 
     building.setDepth(9);
     this.add.existing(building);
+    attachBuildingShadow(this, building, x, this.plotWidth, this.groundY);
     if (hasExtraLights(building)) {
       for (const l of building.extraLights) this.lightingSystem?.addLight(l);
     }
