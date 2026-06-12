@@ -3,6 +3,7 @@ import { YARD_H, buildingHeight } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import { type DoorEntrance } from './types';
+import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -63,6 +64,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private pendingSleepAt = Infinity;
   private windowRects:   Array<{ wx: number; wy: number; ww: number; wh: number; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
   private shadowGfx!:   Phaser.GameObjects.Graphics;
+  private glassDayColor = 0;
   private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
   private _neonX = 0;
   private _neonY = 0;
@@ -72,7 +74,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     return this.signSpot ? [...this.signSpot.beams] : [];
   }
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, _params: ThemeParams) {
     super(scene, 0, 0);
 
     const w       = plotWidth;
@@ -91,14 +93,16 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const pentBw     = level >= 68 ? Math.round(bw * 0.86) : bw;
     const pentBx     = level >= 68 ? bx + Math.round((bw - pentBw) / 2) : bx;
 
+    this.glassDayColor = palette.glass;
+
     // ── Dark steel-frame curtain wall body ────────────────────────
-    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, 0x3a5570);
+    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyBot - bodyTop, palette.wall);
     body.setLighting(true);
     this.add(body);
 
     // Penthouse (slightly lighter dark, inset)
     if (pentFloors > 0) {
-      const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, 0x2d4055);
+      const pent = scene.add.rectangle(pentBx + pentBw / 2, bodyTop + pentH / 2, pentBw, pentH, palette.wallShade);
       pent.setLighting(true);
       this.add(pent);
     }
@@ -107,13 +111,13 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Foundation plinth ─────────────────────────────────────────
-    gfx.fillStyle(0x2a3040, 1);
+    gfx.fillStyle(palette.foundation, 1);
     gfx.fillRect(bx, bodyBot, bw, FOUND_H);
     gfx.fillStyle(0x181e28, 1);
     gfx.fillRect(bx, bodyBot, bw, 1);
 
     // ── Parapet — dark steel cap with bright metal edge ───────────
-    gfx.fillStyle(0x3a5570, 1);
+    gfx.fillStyle(palette.wall, 1);
     gfx.fillRect(bx, top, bw, PARAPET_H);
     // Bright aluminium coping strip
     gfx.fillStyle(0x90a8c0, 1);
@@ -122,7 +126,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     gfx.fillRect(bx - 2, top + 2, bw + 4, 1);
 
     // ── Sidewalk ──────────────────────────────────────────────────
-    gfx.fillStyle(0xb8b0a0, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
     gfx.lineStyle(1, 0xa0988a, 0.4);
     for (let px = x + 30; px < x + w; px += 30) {
@@ -139,14 +143,14 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const actualFH = Math.round(upperH / nFloors);
 
     // Spandrel bands — very thin to maximise visible glass
-    gfx.fillStyle(0x0e141e, 1);
+    gfx.fillStyle(palette.glassShade, 1);
     for (let f = 1; f < nFloors; f++) {
       const fy = lobbyTop - f * actualFH;
       gfx.fillRect(bx, fy, bw, 1);
     }
 
     // Vertical mullion strips
-    gfx.fillStyle(0x0e141e, 1);
+    gfx.fillStyle(palette.glassShade, 1);
     for (let c = 1; c < nCols; c++) {
       const cx_ = bx + c * (bayW + colW) - colW;
       gfx.fillRect(cx_, bodyTop, colW, upperH);
@@ -216,7 +220,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     gfx.fillStyle(0xd8f0ff, 0.50);
     gfx.fillRect(bx + 2, lobbyTop + 4, bw - 4, 4);
     // Lobby frame bar
-    gfx.fillStyle(0x0e141e, 1);
+    gfx.fillStyle(palette.glassShade, 1);
     gfx.fillRect(bx, lobbyTop, bw, 3);
     gfx.fillStyle(0x5aa8d0, 0.5);
     gfx.fillRect(bx, lobbyTop + 1, bw, 1);
@@ -227,9 +231,9 @@ export class LargeApartment extends Phaser.GameObjects.Container {
     const door1X = bx + Math.round(bw * 0.25) - Math.round(doorW / 2);
     const door2X = bx + Math.round(bw * 0.75) - Math.round(doorW / 2);
     for (const doorX of [door1X, door2X]) {
-      gfx.fillStyle(0x0a1520, 1);
+      gfx.fillStyle(palette.door, 1);
       gfx.fillRect(doorX, bodyBot - doorH, doorW, doorH);
-      gfx.fillStyle(0x2a4a62, 0.6);
+      gfx.fillStyle(palette.doorAccent, 0.6);
       gfx.fillRect(doorX + 2, bodyBot - doorH + 2, doorW - 4, doorH - 4);
       gfx.fillStyle(0x3a5a78, 0.8);
       gfx.fillRect(doorX + Math.round(doorW / 2) - 1, bodyBot - doorH, 2, doorH);
@@ -685,16 +689,17 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
+    const dayColor = this.glassDayColor;
     for (const { wx, wy, ww, wh, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
       if (asleep) {
-        gfx.fillStyle(lerpColor(0x3a88c8, 0x0a0f18, t), 1);
+        gfx.fillStyle(lerpColor(dayColor, 0x0a0f18, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, Math.max(0, 0.22 - t * 0.20));
         gfx.fillRect(wx, wy, ww, Math.max(1, Math.round(wh * 0.22)));
         continue;
       }
       const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
-      gfx.fillStyle(isTv ? lerpColor(0x3a88c8, tvColor, t * tvFlick) : lerpColor(0x3a88c8, 0xffdd88, t), 1);
+      gfx.fillStyle(isTv ? lerpColor(dayColor, tvColor, t * tvFlick) : lerpColor(dayColor, 0xffdd88, t), 1);
       gfx.fillRect(wx, wy, ww, wh);
       gfx.fillStyle(0xffffff, Math.max(0, 0.22 - t * 0.18));
       gfx.fillRect(wx, wy, ww, Math.max(1, Math.round(wh * 0.22)));

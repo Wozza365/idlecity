@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ROAD_H, VERGE_H, lerpColor } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
+import type { VergePalette, ThemeParams } from '../theme/ThemeTypes';
 
 const CYCLE_H = 14;
 
@@ -16,8 +17,6 @@ function getPositions(width: number, start: number, spacing: number): number[] {
   for (let x = start; x < width; x += spacing) arr.push(Math.round(x));
   return arr;
 }
-
-const CYCLIST_COLORS = [0x4ecdc4, 0xff6b6b, 0x95e77e, 0xffd93d, 0xc77dff, 0xff9f43];
 
 interface Cyclist { x: number; speed: number; dir: 1 | -1; color: number; }
 
@@ -45,6 +44,8 @@ export class VergeRiver {
   private _level:   number = 0;
   private _width:   number = 0;
   private _groundY: number = 0;
+  private _palette!: VergePalette;
+  private _params!:  ThemeParams;
   private _lastLightingElevation = NaN;
 
   // Seasonal colour weights — updated once per game day, trigger tree/grass redraw
@@ -74,10 +75,12 @@ export class VergeRiver {
     this.grassSeasonGfx = scene.add.graphics().setDepth(6.02).setLighting(true);
   }
 
-  render(level: number, width: number, groundY: number): void {
+  render(level: number, width: number, groundY: number, palette: VergePalette, params: ThemeParams): void {
     this._level   = level;
     this._width   = width;
     this._groundY = groundY;
+    this._palette = palette;
+    this._params  = params;
 
     const vergeY = groundY + ROAD_H;
 
@@ -129,7 +132,7 @@ export class VergeRiver {
         const armX = lx + 8;
         const spot = new SoftSpotLight({
           x: armX, y: lampHeadY,
-          radius: 51, color: 0xffcc66, intensity: 0,
+          radius: 51, color: this._params.lampColor, intensity: 0,
           angle: Math.PI / 2,       // pointing straight down
           coneAngle: Math.PI / 3.06, // ~59° cone
           noOcclusion: true,
@@ -142,7 +145,7 @@ export class VergeRiver {
         this.lampBulbs.push(bulb);
         this.lampLights.push(...spot.beams, bulb);
         // Native Phaser light so .setLighting(true) geometry gets warm tint
-        this.lampNativeLights.push(this.scene.lights.addLight(armX, lampHeadY, 60, 0xffcc66, 0));
+        this.lampNativeLights.push(this.scene.lights.addLight(armX, lampHeadY, 60, this._params.lampColor, 0));
       }
     }
 
@@ -155,11 +158,11 @@ export class VergeRiver {
       for (const bx of bollardXs) {
         const point: Extract<LightSource, { type?: 'point' }> = {
           x: bx, y: bollardHeadY, radius: 18,
-          color: 0xffcc66, intensity: 0, noOcclusion: true,
+          color: this._params.lampColor, intensity: 0, noOcclusion: true,
         };
         this.bollardBulbs.push(point);
         this.bollardLights.push(point);
-        this.bollardNativeLights.push(this.scene.lights.addLight(bx, bollardHeadY, 18, 0xffcc66, 0));
+        this.bollardNativeLights.push(this.scene.lights.addLight(bx, bollardHeadY, 18, this._params.lampColor, 0));
       }
     }
 
@@ -223,7 +226,7 @@ export class VergeRiver {
   private drawBase(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
     if (level === 0) {
       // Earthy base — mirrors road dirt style, spanning full verge height
-      gfx.fillStyle(0x7a5a35, 1);
+      gfx.fillStyle(this._palette.dirtBase, 1);
       gfx.fillRect(0, vergeY, width, VERGE_H);
       const dc = [0x9a7050, 0xb08060, 0x7a5530, 0xc89060, 0x4a3018, 0x8a6040, 0xd0a870];
       const rowCount = Math.ceil(VERGE_H / 7);
@@ -243,10 +246,10 @@ export class VergeRiver {
       }
     } else if (level === 1) {
       // Patchy grass: soil base with organic grass patches spanning full height
-      gfx.fillStyle(0x7a5a35, 1);
+      gfx.fillStyle(this._palette.dirtBase, 1);
       gfx.fillRect(0, vergeY, width, VERGE_H);
       // Large irregular grass patches at varying Y positions
-      gfx.fillStyle(0x4a8c3a, 1);
+      gfx.fillStyle(this._palette.grassBase, 1);
       const patchCount = Math.floor(width / 14);
       for (let i = 0; i < patchCount; i++) {
         const px = ((i * 41 + 17) % Math.max(1, Math.floor(width) - 16)) + 8;
@@ -271,7 +274,7 @@ export class VergeRiver {
         gfx.fillRect(px, py, 1 + (i % 3), 3 + (i % 5));
       }
     } else {
-      const grassColor = level >= 14 ? 0x3d7a2e : 0x4a8c3a;
+      const grassColor = level >= 14 ? this._palette.grassAlt : this._palette.grassBase;
       gfx.fillStyle(grassColor, 1);
       gfx.fillRect(0, vergeY, width, VERGE_H);
       gfx.fillStyle(0x000000, 0.06);
@@ -283,7 +286,7 @@ export class VergeRiver {
 
   private drawCyclePath(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
     const cy = vergeY + VERGE_H - CYCLE_H;
-    gfx.fillStyle(0xb22820, 0.78);
+    gfx.fillStyle(this._palette.cyclePathBase, 0.78);
     gfx.fillRect(0, cy, width, CYCLE_H);
     gfx.fillStyle(0xd03428, 0.9);
     gfx.fillRect(0, cy, width, 1);
@@ -305,7 +308,7 @@ export class VergeRiver {
 
     for (let bx = 20; bx < width; bx += 40) {
       // Pole
-      gfx.fillStyle(0x111111, 1);
+      gfx.fillStyle(this._palette.bollardColor, 1);
       gfx.fillRect(bx - 1, poleTopY + capH, 2, poleH);
       // Cap housing
       gfx.fillStyle(0x1e1e1e, 1);
@@ -341,16 +344,7 @@ export class VergeRiver {
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
-    const allColors = [
-      0xff1155, 0xff4488, 0xff77aa,  // roses
-      0x00ccff, 0x33bbff, 0x0099ff,  // sky blue
-      0xffcc00, 0xffaa00, 0xffee22,  // sunflowers
-      0x00ffcc, 0x00ddbb, 0x44ffdd,  // teal
-      0xff5500, 0xff7700, 0xff9922,  // marigolds
-      0x88ff00, 0xaaff33, 0x66ee00,  // lime green
-      0xff00bb, 0xff33cc, 0xff66dd,  // magenta
-      0xaa33ff, 0xcc66ff, 0x8811ee,  // purple
-    ];
+    const allColors = this._palette.flowerColors;
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
     const bedTop = vergeY + VERGE_H - bottomBand - 18;
@@ -398,7 +392,7 @@ export class VergeRiver {
       const by = vergeY + 22;
 
       // Seat (30 px wide, 4 px tall)
-      gfx.fillStyle(0xc8a46e, 1);
+      gfx.fillStyle(this._palette.benchWood, 1);
       gfx.fillRect(bx - 15, by, 30, 4);
       // Seat slat lines
       gfx.fillStyle(0x8a6030, 0.35);
@@ -410,7 +404,7 @@ export class VergeRiver {
       gfx.fillRect(bx - 15, by - 6, 30, 3);
 
       // Cast-iron legs (2 each side)
-      gfx.fillStyle(0x4a4a4a, 1);
+      gfx.fillStyle(this._palette.benchMetal, 1);
       gfx.fillRect(bx - 13, by + 4, 3, 5);
       gfx.fillRect(bx + 10, by + 4, 3, 5);
     }
@@ -421,9 +415,9 @@ export class VergeRiver {
   private drawPaving(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
     const pathY = vergeY + 10;
     const pathH = 9;
-    gfx.fillStyle(0xbcb0a0, 0.55);
+    gfx.fillStyle(this._palette.pavingBase, 0.55);
     gfx.fillRect(0, pathY, width, pathH);
-    gfx.fillStyle(0x706050, 0.3);
+    gfx.fillStyle(this._palette.pavingLine, 0.3);
     for (let x = 0; x < width; x += 18) gfx.fillRect(x, pathY, 1, pathH);
     gfx.fillRect(0, pathY + 4, width, 1);
     gfx.fillRect(0, pathY, width, 1);
@@ -446,10 +440,12 @@ export class VergeRiver {
     const canopyR    = Math.round(baseR * (1 - 0.22 * ww));
 
     // Base green colours — lerped through autumn (orange) and winter (dark/muted) and spring (bright)
-    const baseShadow  = level >= 14 ? 0x152808 : 0x1e4a1a;
-    const baseDark    = level >= 14 ? 0x234e10 : 0x336622;
-    const baseMid     = level >= 14 ? 0x347020 : 0x4a8c32;
-    const baseLight   = level >= 14 ? 0x4ea030 : 0x66cc44;
+    const canopy     = this._palette.treeCanopy;
+    const matureIdx  = level >= 14 ? 4 : 0;
+    const baseShadow  = canopy[matureIdx + 0];
+    const baseDark    = canopy[matureIdx + 1];
+    const baseMid     = canopy[matureIdx + 2];
+    const baseLight   = canopy[matureIdx + 3];
 
     // Autumn: green → orange/rust; Winter: darken toward near-black twigs
     const shadowRing  = lerpColor(lerpColor(baseShadow, 0x6a2800, aw), 0x1a1000, ww * 0.5);
@@ -457,7 +453,7 @@ export class VergeRiver {
     const canopyMid   = lerpColor(lerpColor(baseMid,    0xbb5500, aw), 0x3a2800, ww * 0.5);
     const canopyLight = lerpColor(lerpColor(lerpColor(baseLight, 0xff8800, aw), 0x4a3818, ww * 0.5), 0x88ee44, sw * 0.55);
 
-    const trunkColor = 0x5c3a1e;
+    const trunkColor = this._palette.treeTrunk;
 
     for (const tx of this.treeXs) {
       gfx.fillStyle(trunkColor, 1);
@@ -532,7 +528,7 @@ export class VergeRiver {
         x: (width * (i + 1)) / (count + 1),
         speed: 32 + (i % 3) * 15,
         dir: i % 2 === 0 ? 1 : -1,
-        color: CYCLIST_COLORS[i % CYCLIST_COLORS.length],
+        color: this._palette.cyclistColors[i % this._palette.cyclistColors.length],
       });
     }
   }

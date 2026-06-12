@@ -3,6 +3,7 @@ import { YARD_H, buildingHeight } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import { type DoorEntrance } from './types';
+import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -43,7 +44,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
   private neonPhases:     number[] = [];
   private lastSleepHour  = -1;
   private pendingSleepAt = Infinity;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; shop?: boolean; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
+  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; dayColor: number; shop?: boolean; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
   get extraLights(): LightSource[] {
@@ -52,7 +53,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     return out;
   }
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, params: ThemeParams) {
     super(scene, 0, 0);
 
     const w       = plotWidth;
@@ -67,7 +68,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     const shopTop = bodyBot - SHOP_H;
 
     // ── Brick body ────────────────────────────────────────────────
-    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyH, 0x8a3a28);
+    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyH, palette.wall);
     body.setLighting(true);
     this.add(body);
 
@@ -75,7 +76,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Foundation plinth ─────────────────────────────────────────
-    gfx.fillStyle(0x707868, 1);
+    gfx.fillStyle(palette.foundation, 1);
     gfx.fillRect(bx, bodyBot, bw, FOUND_H);
     gfx.lineStyle(1, 0x505850, 1);
     gfx.moveTo(bx, bodyBot).lineTo(bx + bw, bodyBot).strokePath();
@@ -94,7 +95,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     gfx.fillRect(bx, top + PARAPET_H - 1, bw, 1);
 
     // ── Sidewalk ──────────────────────────────────────────────────
-    gfx.fillStyle(0xb8b0a0, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
     gfx.lineStyle(1, 0xa0988a, 0.4);
     for (let px = x + 30; px < x + w; px += 30) {
@@ -168,12 +169,12 @@ export class SmallApartment extends Phaser.GameObjects.Container {
           gfx.fillRect(panelX, panelY + panelH, panelW, spanH - 1);
         }
 
-        this.windowRects.push({ wx: panelX, wy: panelY, ww: panelW, wh: panelH, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
+        this.windowRects.push({ wx: panelX, wy: panelY, ww: panelW, wh: panelH, dayColor: palette.windowGlassDay, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       }
 
       // One centred light per floor — covers full building width evenly
       this.windowLights.push(scene.lights.addLight(
-        bx + Math.round(bw / 2), floorBot - Math.round(actualFH / 2), Math.round(bw * 0.7), 0xffaa44, 0,
+        bx + Math.round(bw / 2), floorBot - Math.round(actualFH / 2), Math.round(bw * 0.7), params.windowGlowColor, 0,
       ));
     }
 
@@ -210,7 +211,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       gfx.fillStyle(0x1e3040, 1);
       gfx.fillRect(dispX - 1, dispY - 1, dispW + 2, dispH + 2);
       // Store for glass animation
-      this.windowRects.push({ wx: dispX, wy: dispY, ww: dispW, wh: dispH, shop: true, isTv: false, flickerFreq: 1, tvColor: 0, asleep: false });
+      this.windowRects.push({ wx: dispX, wy: dispY, ww: dispW, wh: dispH, dayColor: palette.windowGlassDayAlt, shop: true, isTv: false, flickerFreq: 1, tvColor: 0, asleep: false });
 
       // Door
       const doorX = sx + sw_ - doorW - 2;
@@ -634,20 +635,20 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
-    for (const { wx, wy, ww, wh, shop, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
+    for (const { wx, wy, ww, wh, dayColor, shop, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
       if (shop) {
-        gfx.fillStyle(lerpColor(0x3a6888, 0xffdd88, t), 1);
+        gfx.fillStyle(lerpColor(dayColor, 0xffdd88, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, Math.max(0, 0.12 - t * 0.1));
         gfx.fillRect(wx, wy, ww, 2);
       } else if (asleep) {
-        gfx.fillStyle(lerpColor(0x4a8aaa, 0x0a0f18, t), 1);
+        gfx.fillStyle(lerpColor(dayColor, 0x0a0f18, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, 0.08);
         gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);
       } else {
         const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
-        gfx.fillStyle(isTv ? lerpColor(0x4a8aaa, tvColor, t * tvFlick) : lerpColor(0x4a8aaa, 0xffcc66, t), 1);
+        gfx.fillStyle(isTv ? lerpColor(dayColor, tvColor, t * tvFlick) : lerpColor(dayColor, 0xffcc66, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, 0.18);
         gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);

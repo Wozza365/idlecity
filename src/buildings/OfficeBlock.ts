@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
 import { type DoorEntrance } from './types';
+import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -24,7 +25,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
   private _neonY = 0;
   private _neonPhase = 0;
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, _params: ThemeParams) {
     super(scene, 0, 0);
 
     const w       = plotWidth;
@@ -40,13 +41,13 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
     const setbackBx    = level >= 82 ? x + Math.round((w - setbackBw) / 2) : x;
 
     // ── Dark glass body ───────────────────────────────────────────
-    const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, 0x1e2e3e);
+    const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, palette.wall);
     body.setLighting(true);
     this.add(body);
 
     // Setback upper section (slightly different shade)
     if (setbackH > 0) {
-      const sb = scene.add.rectangle(setbackBx + setbackBw / 2, top + setbackH / 2, setbackBw, setbackH, 0x243848);
+      const sb = scene.add.rectangle(setbackBx + setbackBw / 2, top + setbackH / 2, setbackBw, setbackH, palette.wallShade);
       sb.setLighting(true);
       this.add(sb);
     }
@@ -55,7 +56,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Roof cap ──────────────────────────────────────────────────
-    gfx.fillStyle(0x2a3a4a, 1);
+    gfx.fillStyle(palette.roof, 1);
     gfx.fillRect(x, top, w, 3);
 
     // ── Lv 85+: architectural crown ──────────────────────────────
@@ -67,7 +68,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
     }
 
     // ── Vertical structural frame columns ────────────────────────
-    gfx.fillStyle(0x384858, 1);
+    gfx.fillStyle(palette.trim, 1);
     gfx.fillRect(x,                    top, 4, h);
     gfx.fillRect(x + Math.round(w / 2) - 2, top, 4, h);
     gfx.fillRect(x + w - 4,            top, 4, h);
@@ -80,7 +81,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
     }
 
     // ── Sidewalk / plaza ──────────────────────────────────────────
-    gfx.fillStyle(0xa8a090, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
     // Lv 81+: plaza paving pattern
     if (level >= 81) {

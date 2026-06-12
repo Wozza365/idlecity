@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { type GameState, calculateProgress } from '../game/GameState';
 import { TOTAL_SKINS, UI_FONT, MONO_FONT, fmtBalance } from '../constants';
+import { getTheme } from '../theme/themes';
 
 const BTN_DEPTH = 100; // corner button
 const D_DEPTH   = 300; // dialog (above everything, including TownNameSign's dialog)
@@ -81,6 +82,7 @@ export class MenuUI {
     private width: number,
     private height: number,
     private getState: () => GameState,
+    private onSkinSelect: (index: number) => void,
   ) {
     this.btnGfx = scene.add.graphics().setDepth(BTN_DEPTH).setLighting(false);
 
@@ -244,6 +246,10 @@ export class MenuUI {
     this.openDialog();
   }
 
+  refreshSkinsTab(): void {
+    if (this.currentTab === 'skins' && this.dialogObjs.length) this.redrawDialog();
+  }
+
   private renderBody(px: number, top: number, panelW: number, availH: number, D: number): void {
     // Clear any existing body objects
     for (const obj of this.bodyObjs) obj.destroy();
@@ -285,10 +291,10 @@ export class MenuUI {
         const cx = gridLeft + col * (cellW + cellGap) + cellW / 2;
         const cy = top + row * (cellH + cellGap) + cellH / 2;
 
-        const isDefault = slot === 0;
+        const isActive = slot === this.getState().selectedSkin;
 
         const gfx = add(s.add.graphics().setDepth(D + 2).setLighting(false));
-        if (isDefault) {
+        if (isActive) {
           gfx.fillStyle(0x1e1608, 1);
           gfx.fillRoundedRect(cx - cellW / 2, cy - cellH / 2, cellW, cellH, 8);
           gfx.lineStyle(2, 0xd4a820, 1);
@@ -300,15 +306,22 @@ export class MenuUI {
           gfx.strokeRoundedRect(cx - cellW / 2, cy - cellH / 2, cellW, cellH, 8);
         }
 
-        if (isDefault) {
-          add(s.add.text(cx, cy - 10, '🏙️', { fontSize: '22px', fontFamily: UI_FONT })
+        if (isActive) {
+          const theme = getTheme(slot);
+          add(s.add.text(cx, cy - 10, theme.emoji, { fontSize: '22px', fontFamily: UI_FONT })
             .setOrigin(0.5).setDepth(D + 3));
-          add(s.add.text(cx, cy + 22, 'Classic', {
+          add(s.add.text(cx, cy + 22, theme.name, {
             fontSize: '11px', color: '#ffe8a0', fontFamily: UI_FONT, fontStyle: 'bold',
           }).setOrigin(0.5).setDepth(D + 3));
           add(s.add.text(cx, cy + 38, 'ACTIVE', {
             fontSize: '9px', color: '#d4a820', fontFamily: UI_FONT, fontStyle: 'bold',
           }).setOrigin(0.5).setDepth(D + 3));
+
+          const hit = add(
+            s.add.rectangle(cx, cy, cellW, cellH, 0, 0)
+              .setDepth(D + 4).setInteractive({ useHandCursor: true }),
+          );
+          hit.on('pointerdown', () => this.onSkinSelect(slot));
         } else {
           const name = SKIN_NAMES[slot - 1] ?? `Skin ${slot + 1}`;
           add(s.add.text(cx, cy - 10, '🔒', { fontSize: '20px', fontFamily: UI_FONT })

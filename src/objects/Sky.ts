@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { lerpColor } from '../constants';
+import type { SkyPalette } from '../theme/ThemeTypes';
 
 export class Sky {
   private skyGfx!: Phaser.GameObjects.Graphics;
@@ -29,6 +30,7 @@ export class Sky {
   updateGradient(
     elev: number, width: number, groundY: number,
     winterWeight = 0, springWeight = 0, weatherIntensity = 0,
+    palette: SkyPalette,
   ): void {
     if (!this.skyGfx) return;
 
@@ -36,31 +38,31 @@ export class Sky {
     let horizon: number;
 
     if (elev <= -0.15) {
-      zenith = 0x04040f; horizon = 0x08082a;
+      [zenith, horizon] = palette.night;
     } else if (elev <= -0.02) {
       const t = (elev + 0.15) / 0.13;
-      zenith  = lerpColor(0x04040f, 0x160c2a, t);
-      horizon = lerpColor(0x08082a, 0x3a100a, t);
+      zenith  = lerpColor(palette.night[0], palette.preDawn[0], t);
+      horizon = lerpColor(palette.night[1], palette.preDawn[1], t);
     } else if (elev <= 0.05) {
       const t = (elev + 0.02) / 0.07;
-      zenith  = lerpColor(0x160c2a, 0x1e3878, t);
-      horizon = lerpColor(0x3a100a, 0xc85c14, t);
+      zenith  = lerpColor(palette.preDawn[0], palette.sunrise[0], t);
+      horizon = lerpColor(palette.preDawn[1], palette.sunrise[1], t);
     } else if (elev <= 0.10) {
       // Golden hour — horizon builds to deep amber as sun clears the horizon
       const t = (elev - 0.05) / 0.05;
-      zenith  = lerpColor(0x1e3878, 0x4466aa, t);
-      horizon = lerpColor(0xc85c14, 0xff9933, t);
+      zenith  = lerpColor(palette.sunrise[0], palette.goldenHour[0], t);
+      horizon = lerpColor(palette.sunrise[1], palette.goldenHour[1], t);
     } else if (elev <= 0.25) {
       // Post-golden morning — amber fades toward clear sky blue
       const t = (elev - 0.10) / 0.15;
-      zenith  = lerpColor(0x4466aa, 0x2255aa, t);
-      horizon = lerpColor(0xff9933, 0x78aac8, t);
+      zenith  = lerpColor(palette.goldenHour[0], palette.morning[0], t);
+      horizon = lerpColor(palette.goldenHour[1], palette.morning[1], t);
     } else if (elev <= 0.50) {
       const t = (elev - 0.25) / 0.25;
-      zenith  = lerpColor(0x2255aa, 0x2a6aa0, t);
-      horizon = lerpColor(0x78aac8, 0x6aaad0, t);
+      zenith  = lerpColor(palette.morning[0], palette.day[0], t);
+      horizon = lerpColor(palette.morning[1], palette.day[1], t);
     } else {
-      zenith = 0x2a6aa0; horizon = 0x6aaad0;
+      [zenith, horizon] = palette.day;
     }
 
     // Seasonal tints — applied via continuous weights, no branches

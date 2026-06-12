@@ -39,6 +39,7 @@ export interface GameState {
   stats: StatsState;
   season?: SeasonSaveState;
   townName: string;
+  selectedSkin: number;
 }
 
 // ── Default state ──────────────────────────────────────────────────────────────
@@ -56,6 +57,7 @@ export function defaultState(plotCount: number): GameState {
     verge: { level: 0 },
     water: { level: 0 },
     stats: { totalPlayTimeMs: 0, totalMoneyEarned: 0, skinsUnlocked: 1 },
+    selectedSkin: 0,
   };
 }
 
@@ -115,6 +117,7 @@ export function loadGame(plotCount: number): GameState {
       if (!parsed.water)    parsed.water    = { level: 0 };
       if (!parsed.townName) parsed.townName = 'Idleville';
       if (!parsed.stats)    parsed.stats    = { totalPlayTimeMs: 0, totalMoneyEarned: 0, skinsUnlocked: 1 };
+      if (typeof parsed.selectedSkin !== 'number') parsed.selectedSkin = 0;
       return parsed as GameState;
     }
   } catch {

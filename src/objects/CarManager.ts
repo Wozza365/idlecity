@@ -77,6 +77,7 @@ export class CarManager {
   private shadowGfx: Phaser.GameObjects.Graphics | null = null;
   private _lastCarShadowAngle = NaN;
   private _rushFactor = 1.0;
+  private _speedMultiplier = 1;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -105,7 +106,7 @@ export class CarManager {
     return getLaneBand(newLevel) !== getLaneBand(this.currentLevel);
   }
 
-  rebuild(level: number, groundY: number): void {
+  rebuild(level: number, groundY: number, speedMultiplier = 1): void {
     for (const car of this.allCars) car.destroy();
     this.shadowGfx?.destroy();
     this.shadowGfx = null;
@@ -114,6 +115,7 @@ export class CarManager {
     this.lanes    = [];
     this._lights  = [];
     this.currentLevel = 0;
+    this._speedMultiplier = speedMultiplier;
 
     if (level === 0) return;
 
@@ -122,7 +124,7 @@ export class CarManager {
     const { width } = this.scene.scale;
     this.lanes       = getLanes(level, groundY);
     const numCars    = carsPerLane(level);
-    const speed      = baseSpeed(level);
+    const speed      = baseSpeed(level) * this._speedMultiplier;
     const totalRange = width + 2 * OFFSCREEN_BUFFER;
     const spacing    = totalRange / numCars;
 
@@ -154,7 +156,7 @@ export class CarManager {
   upgradeInPlace(newLevel: number, _groundY: number): LightSource[] {
     const oldCarCount = carsPerLane(this.currentLevel);
     const newCarCount = carsPerLane(newLevel);
-    const newBase     = baseSpeed(newLevel);
+    const newBase     = baseSpeed(newLevel) * this._speedMultiplier;
     const newLights: LightSource[] = [];
     const { width }   = this.scene.scale;
 
@@ -208,7 +210,7 @@ export class CarManager {
     if (Math.abs(factor - this._rushFactor) < 0.01) return;
     this._rushFactor = factor;
 
-    const speed = baseSpeed(this.currentLevel);
+    const speed = baseSpeed(this.currentLevel) * this._speedMultiplier;
     for (let i = 0; i < this.lanes.length; i++) {
       const laneSpeed = speed * this.lanes[i].speedMultiplier * factor;
       for (const car of this.laneCars[i]) car.setSpeed(laneSpeed);
