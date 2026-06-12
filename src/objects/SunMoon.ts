@@ -256,7 +256,7 @@ export class SunMoon {
         }
       }
 
-      gfx.fillStyle(0x000022, totalAlpha / SHADOW_NUM_SAMPLES);
+      gfx.fillStyle(0x000022, this._shadowAlpha / SHADOW_NUM_SAMPLES);
 
       for (let i = 0; i < PLOT_COUNT; i++) {
         const plot = plots[i];
