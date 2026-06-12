@@ -19,10 +19,10 @@ export interface PersonDef {
 // 4-frame walk cycles cropped from Pixel Frog's "Pixel Adventure 1" character
 // set (free for any project, pixelfrog-assets.itch.io/pixel-adventure-1).
 export const PERSON_DEFS: readonly PersonDef[] = [
-  { key: 'pink',   frameWidth: 23, frameHeight: 29, frameCount: 4 },
-  { key: 'blue',   frameWidth: 24, frameHeight: 28, frameCount: 4 },
-  { key: 'orange', frameWidth: 26, frameHeight: 32, frameCount: 4 },
-  { key: 'green',  frameWidth: 25, frameHeight: 28, frameCount: 4 },
+  { key: 'pink',   frameWidth: 23, frameHeight: 27, frameCount: 4 },
+  { key: 'blue',   frameWidth: 24, frameHeight: 26, frameCount: 4 },
+  { key: 'orange', frameWidth: 26, frameHeight: 30, frameCount: 4 },
+  { key: 'green',  frameWidth: 25, frameHeight: 26, frameCount: 4 },
 ];
 
 export const ALL_PERSON_KEYS: readonly string[] = PERSON_DEFS.map(d => d.key);
