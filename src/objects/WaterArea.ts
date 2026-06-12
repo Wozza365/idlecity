@@ -654,12 +654,13 @@ export class WaterArea {
 
   private setupBuoys(): void {
     const { _width: w, _waterY: wy } = this;
-    // Positioned clear of dock (36–60%)
+    // Two pairs, clear of the dock (36–60%) and the lighthouse island (~59–65%):
+    // one pair bobbing off the beach, one pair out past the lighthouse.
     this._buoys = [
-      { x: Math.floor(w * 0.28), y: wy + 58, color: 0xFF3333, phase: 0 },
-      { x: Math.floor(w * 0.63), y: wy + 74, color: 0xFF7700, phase: Math.PI * 0.5 },
-      { x: Math.floor(w * 0.74), y: wy + 70, color: 0xFF3333, phase: Math.PI },
-      { x: Math.floor(w * 0.84), y: wy + 77, color: 0xFF7700, phase: Math.PI * 1.5 },
+      { x: Math.floor(w * 0.18), y: wy + 60, color: 0xFF3333, phase: 0 },
+      { x: Math.floor(w * 0.31), y: wy + 70, color: 0xFF7700, phase: Math.PI * 0.6 },
+      { x: Math.floor(w * 0.71), y: wy + 58, color: 0xFF7700, phase: Math.PI * 1.2 },
+      { x: Math.floor(w * 0.88), y: wy + 74, color: 0xFF3333, phase: Math.PI * 1.8 },
     ];
   }
 
@@ -749,9 +750,9 @@ export class WaterArea {
       this._beamSprite = null;
     }
 
-    // ── Buoy lights — small warm points (level 7+) ──
+    // ── Buoy lights — small warm points at the lantern, above the float (level 7+) ──
     this._buoyBulbs = this._buoys.map(b => ({
-      x: b.x, y: b.y, radius: 4, color: b.color, intensity: 0, noOcclusion: true,
+      x: b.x, y: b.y - 9, radius: 4, color: b.color, intensity: 0, noOcclusion: true,
     } as Extract<LightSource, { type?: 'point' }>));
   }
 
@@ -965,7 +966,7 @@ export class WaterArea {
     for (let i = 0; i < this._buoys.length; i++) {
       this._buoys[i].phase += dt * 0.8;
       if (this._buoyBulbs[i]) {
-        this._buoyBulbs[i].y = this._buoys[i].y + Math.sin(this._buoys[i].phase) * 1.5;
+        this._buoyBulbs[i].y = this._buoys[i].y - 9 + Math.sin(this._buoys[i].phase) * 1.5;
       }
     }
 
@@ -1170,24 +1171,42 @@ export class WaterArea {
       }
     }
 
-    // Buoys — dim by elevation so they match day/night lighting
+    // Buoys — small conical channel markers with a white collar band and a
+    // lantern on top, dimmed by elevation so they match day/night lighting.
     const buoyBrightness = Math.max(0.35, Math.min(1.0, (1 - this._nightFactor * 0.7)));
     for (const b of this._buoys) {
-      const bobY  = b.y + Math.sin(b.phase) * 1.5;
-      const bCol  = dimColor(b.color, buoyBrightness);
+      const bx   = b.x;
+      const by   = Math.round(b.y + Math.sin(b.phase) * 1.5);
+      const bCol = dimColor(b.color, buoyBrightness);
+
+      // Ripple shadow where the buoy sits in the water
+      gfx.fillStyle(0x0A2A40, 0.30);
+      gfx.fillEllipse(bx, by + 3, 11, 3);
+
+      // Conical body tapering down to the waterline, with a white collar
+      // band and a darker lower hull just below it
       gfx.fillStyle(bCol, 1);
-      gfx.fillRect(b.x - 4, Math.round(bobY) - 5, 8, 8);
-      gfx.fillStyle(0x000000, 0.25);
-      gfx.fillRect(b.x - 3, Math.round(bobY) - 4, 6, 6);
+      gfx.fillTriangle(bx - 4, by + 3, bx + 4, by + 3, bx, by - 4);
+      gfx.fillStyle(dimColor(0xF0F0F0, buoyBrightness), 1);
+      gfx.fillRect(bx - 4, by, 8, 2);
+      gfx.fillStyle(dimColor(bCol, 0.55), 1);
+      gfx.fillRect(bx - 2, by + 2, 4, 2);
+
+      // Mast topped with a small lantern
+      gfx.fillStyle(dimColor(0x999999, buoyBrightness), 1);
+      gfx.fillRect(bx, by - 8, 1, 4);
       gfx.fillStyle(bCol, 1);
-      gfx.fillRect(b.x - 3, Math.round(bobY) - 4, 6, 6);
-      // Top marker pole
-      gfx.fillStyle(dimColor(0xFFFFFF, buoyBrightness * 0.9), 0.9);
-      gfx.fillRect(b.x - 1, Math.round(bobY) - 7, 2, 3);
-      // Night glow halo
-      if (this._nightFactor > 0.15) {
-        gfx.fillStyle(b.color, this._nightFactor * 0.45);
-        gfx.fillRect(b.x - 5, Math.round(bobY) - 6, 10, 10);
+      gfx.fillCircle(bx, by - 9, 1.5);
+
+      // Soft circular night glow around the lantern
+      if (this._nightFactor > 0.1) {
+        const nf = this._nightFactor;
+        gfx.fillStyle(b.color, nf * 0.12);
+        gfx.fillCircle(bx, by - 9, 8);
+        gfx.fillStyle(b.color, nf * 0.25);
+        gfx.fillCircle(bx, by - 9, 4);
+        gfx.fillStyle(b.color, Math.min(1, nf * 0.7));
+        gfx.fillCircle(bx, by - 9, 1.5);
       }
     }
 
