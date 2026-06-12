@@ -406,14 +406,6 @@ export class SunMoon {
       }
     }
 
-    // Yard self-shadow — one draw at full shadowAlpha so it composites over pedestrians
-    // (pedestrians are Graphics at depth 9.1; this shadowGfx is depth 9.5)
-    gfx.fillStyle(0x000022, this._shadowAlpha);
-    for (let i = 0; i < PLOT_COUNT; i++) {
-      if (!plots[i].unlocked) continue;
-      gfx.fillRect(i * plotWidth, groundY - YARD_H, plotWidth, YARD_H);
-    }
-
     if (this.DEBUG_SHADOWS) {
       const sAngle = sunAngle;
       const sElev = Math.sin(sAngle);
