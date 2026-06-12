@@ -17,6 +17,22 @@ const DESPAWN_ARRIVAL_DIST  = 6;
 const DESPAWN_BASE_PER_SEC  = 0.025;
 const MAX_PEDS              = 60;
 
+// Depth-sorting: pedestrians lower on the pavement (larger bottomY) draw on top.
+const PED_DEPTH_BASE        = 9.10;
+const PED_DEPTH_RANGE       = 0.04;
+
+// Character-shaped "halo" shadow — a slightly oversized silhouette of the same
+// sprite, solid-filled via tint and drawn just behind/below the character.
+const SHAPE_SHADOW_ALPHA    = 0.22;
+const SHAPE_SHADOW_PAD      = 2;
+const SHAPE_SHADOW_OFFSET_X = 1;
+const SHAPE_SHADOW_OFFSET_Y = 1;
+
+// Soft ground-contact shadow: two overlapping ellipses (wide/faint + narrow/denser)
+// approximate a blurred shadow without a real blur filter.
+const GROUND_SHADOW_OUTER_A = 0.10;
+const GROUND_SHADOW_INNER_A = 0.20;
+
 function smoothstep(t: number): number {
   const c = Math.max(0, Math.min(1, t));
   return c * c * (3 - 2 * c);
@@ -39,6 +55,7 @@ interface Pedestrian {
   phase: PedPhase;
   turnAtX: number | null;
   sprite: Phaser.GameObjects.Sprite;
+  shadowSprite: Phaser.GameObjects.Sprite;
 }
 
 interface DoorEntry { x: number; y: number; level: number; }
@@ -87,7 +104,7 @@ export class PedestrianManager {
   rebuild(groundY: number, plotWidth: number): void {
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
-    for (const p of this.pedestrians) p.sprite.destroy();
+    for (const p of this.pedestrians) { p.sprite.destroy(); p.shadowSprite.destroy(); }
     this.pedestrians    = [];
     this.offscreenTimer = 800  + Math.random() * 1500;
     this.doorTimer      = 2000 + Math.random() * 2000;
@@ -139,6 +156,7 @@ export class PedestrianManager {
         p.x  += p.speed * p.dir * dt;
         if (p.x + p.w < -40 || p.x > rightBound + 40) {
           p.sprite.destroy();
+          p.shadowSprite.destroy();
           this.pedestrians.splice(i, 1);
           continue;
         }
@@ -157,6 +175,7 @@ export class PedestrianManager {
         p.alpha   = 1 - smoothstep(ph.t);
         if (ph.t >= 1) {
           p.sprite.destroy();
+          p.shadowSprite.destroy();
           this.pedestrians.splice(i, 1);
           continue;
         }
@@ -177,6 +196,7 @@ export class PedestrianManager {
       if (p.x + p.w > rightBound) { p.x = rightBound - p.w; p.dir = -1; p.turnAtX = null; }
       if (p.x + p.w < -40) {
         p.sprite.destroy();
+        p.shadowSprite.destroy();
         this.pedestrians.splice(i, 1);
         continue;
       }
@@ -209,31 +229,69 @@ export class PedestrianManager {
     return 0.3;
   }
 
+  // Depth increases with how far down the pavement (yard) a pedestrian stands,
+  // so those nearer the viewer (lower on screen) draw over those further back.
+  private pedDepth(bottomY: number): number {
+    const frac = (bottomY - (this.groundY - YARD_H)) / YARD_H;
+    return PED_DEPTH_BASE + Math.max(0, Math.min(1, frac)) * PED_DEPTH_RANGE;
+  }
+
+  private drawGroundShadow(p: Pedestrian): void {
+    const cx = p.x + p.w / 2;
+    const cy = p.bottomY + 1;
+    this.pedShadowGfx.fillStyle(0x000000, GROUND_SHADOW_OUTER_A * p.alpha);
+    this.pedShadowGfx.fillEllipse(cx, cy, p.w * 1.3, p.h * 0.22);
+    this.pedShadowGfx.fillStyle(0x000000, GROUND_SHADOW_INNER_A * p.alpha);
+    this.pedShadowGfx.fillEllipse(cx, cy, p.w * 0.8, p.h * 0.13);
+  }
+
   private syncGO(p: Pedestrian): void {
     const brightness = this.nightBrightness();
     const v = Math.round(255 * brightness);
+    const tint  = (v << 16) | (v << 8) | v;
+    const depth = this.pedDepth(p.bottomY);
+    const cx    = Math.round(p.x + p.w / 2);
+    const cy    = Math.round(p.bottomY);
 
-    p.sprite.setPosition(Math.round(p.x + p.w / 2), Math.round(p.bottomY));
+    p.sprite.setPosition(cx, cy);
     p.sprite.setAlpha(p.alpha);
     p.sprite.setFlipX(p.dir === -1);
-    p.sprite.setTint((v << 16) | (v << 8) | v);
+    p.sprite.setTint(tint);
+    p.sprite.setDepth(depth);
 
-    this.pedShadowGfx.fillStyle(0x000000, 0.22 * p.alpha);
-    this.pedShadowGfx.fillRect(Math.round(p.x), Math.round(p.bottomY) + 1, Math.round(p.w), 2);
+    // Shape shadow mirrors the main sprite's current frame, slightly enlarged
+    // and offset, solid-filled black — a soft silhouette to separate overlaps.
+    p.shadowSprite.setPosition(cx + SHAPE_SHADOW_OFFSET_X, cy + SHAPE_SHADOW_OFFSET_Y);
+    p.shadowSprite.setFlipX(p.dir === -1);
+    p.shadowSprite.setFrame(p.sprite.frame.name);
+    p.shadowSprite.setAlpha(p.alpha * SHAPE_SHADOW_ALPHA);
+    p.shadowSprite.setDepth(depth);
+
+    this.drawGroundShadow(p);
   }
 
-  private makeSprite(x: number, bottomY: number, w: number, h: number, dir: 1 | -1, def: PersonDef): Phaser.GameObjects.Sprite {
+  private makePedSprites(
+    x: number, bottomY: number, w: number, h: number, dir: 1 | -1, def: PersonDef,
+  ): { sprite: Phaser.GameObjects.Sprite; shadowSprite: Phaser.GameObjects.Sprite } {
+    // Added first so it sits behind the main sprite at equal depth (stable sort).
+    const shadowSprite = this.scene.add.sprite(x + w / 2, bottomY, def.key)
+      .setOrigin(0.5, 1)
+      .setDisplaySize(w + SHAPE_SHADOW_PAD, h + SHAPE_SHADOW_PAD)
+      .setFlipX(dir === -1)
+      .setTint(0x000000)
+      .setTintMode(Phaser.TintModes.FILL);
+
     const sprite = this.scene.add.sprite(x + w / 2, bottomY, def.key)
       .setOrigin(0.5, 1)
-      .setDepth(9.1)
       .setDisplaySize(w, h)
       .setFlipX(dir === -1);
 
     if (this.scene.anims.exists(walkAnimKey(def.key))) {
       sprite.play(walkAnimKey(def.key));
       sprite.anims.setProgress(Math.random());
+      shadowSprite.setFrame(sprite.frame.name);
     }
-    return sprite;
+    return { sprite, shadowSprite };
   }
 
   private getAllDoors(plots: PlotState[], containers: Phaser.GameObjects.Container[]): DoorEntry[] {
@@ -268,11 +326,12 @@ export class PedestrianManager {
     const speed   = PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED);
     const x       = door.x + jitter - w / 2;
 
-    const sprite = this.makeSprite(x, door.y, w, h, dir, def);
+    const { sprite, shadowSprite } = this.makePedSprites(x, door.y, w, h, dir, def);
     sprite.anims.timeScale = speed / PED_BASE_SPEED;
     sprite.setAlpha(0);
+    shadowSprite.setAlpha(0);
 
-    this.pedestrians.push({
+    const p: Pedestrian = {
       x,
       bottomY: door.y,
       speed,
@@ -283,7 +342,10 @@ export class PedestrianManager {
       phase:   { k: 'enter', startY: door.y, targetY, t: 0 },
       turnAtX: null,
       sprite,
-    });
+      shadowSprite,
+    };
+    this.pedestrians.push(p);
+    this.syncGO(p);
   }
 
   private spawnOffscreen(): void {
@@ -297,10 +359,10 @@ export class PedestrianManager {
     const x       = -(w + 2);
     const speed   = PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED);
 
-    const sprite = this.makeSprite(x, bottomY, w, h, 1, def);
+    const { sprite, shadowSprite } = this.makePedSprites(x, bottomY, w, h, 1, def);
     sprite.anims.timeScale = speed / PED_BASE_SPEED;
 
-    this.pedestrians.push({
+    const p: Pedestrian = {
       x,
       bottomY,
       speed,
@@ -311,7 +373,10 @@ export class PedestrianManager {
       phase:   { k: 'walk' },
       turnAtX: null,
       sprite,
-    });
+      shadowSprite,
+    };
+    this.pedestrians.push(p);
+    this.syncGO(p);
   }
 
   private pickDespawnDoor(p: Pedestrian, doors: DoorEntry[]): DoorEntry | null {
@@ -359,7 +424,7 @@ export class PedestrianManager {
   }
 
   destroy(): void {
-    for (const p of this.pedestrians) p.sprite.destroy();
+    for (const p of this.pedestrians) { p.sprite.destroy(); p.shadowSprite.destroy(); }
     this.pedShadowGfx.destroy();
     this.pedestrians = [];
   }
