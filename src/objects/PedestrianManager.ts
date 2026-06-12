@@ -2,19 +2,14 @@ import Phaser from 'phaser';
 import { YARD_H } from '../constants';
 import { type PlotState } from '../game/GameState';
 import { hasDoorEntrances } from '../buildings/types';
+import { type PersonDef, PERSON_DEFS, pickRandomPerson, walkAnimKey } from './PedestrianAssets';
 
-const COLORS = [
-  0xff6b6b, 0xffd93d, 0x6bcb77, 0x4d96ff, 0xc77dff,
-  0xff9f43, 0x00d2d3, 0xff6bcd, 0xa29bfe, 0xfdcb6e,
-  0x55efc4, 0xfd79a8,
-];
-
-const PED_MIN_H             = 8;
-const PED_MAX_H             = 13;
-const PED_MIN_W             = 3;
-const PED_MAX_W             = 5;
+const PED_MIN_H             = 12;
+const PED_MAX_H             = 18;
 const PED_MIN_SPEED         = 13;
 const PED_MAX_SPEED         = 37;
+const PED_BASE_SPEED        = (PED_MIN_SPEED + PED_MAX_SPEED) / 2;
+const WALK_ANIM_FRAMERATE   = 7;
 const TURN_ZONE_FRAC        = 0.05;
 const DOOR_SPAWN_RATE_FRAC  = 0.20;
 const DOOR_SPAWN_POS_JITTER = 3;
@@ -27,13 +22,6 @@ function smoothstep(t: number): number {
   return c * c * (3 - 2 * c);
 }
 
-function darkenColor(color: number, factor: number): number {
-  const r = Math.round(((color >> 16) & 0xff) * factor);
-  const g = Math.round(((color >> 8)  & 0xff) * factor);
-  const b = Math.round((color & 0xff)          * factor);
-  return (r << 16) | (g << 8) | b;
-}
-
 type PedPhase =
   | { k: 'walk' }
   | { k: 'enter'; startY: number; targetY: number; t: number }
@@ -44,18 +32,19 @@ interface Pedestrian {
   x: number;
   bottomY: number;
   speed: number;
-  color: number;
   w: number;
   h: number;
   dir: 1 | -1;
   alpha: number;
   phase: PedPhase;
   turnAtX: number | null;
+  sprite: Phaser.GameObjects.Sprite;
 }
 
 interface DoorEntry { x: number; y: number; level: number; }
 
 export class PedestrianManager {
+  private readonly scene: Phaser.Scene;
   private pedestrians: Pedestrian[] = [];
   private groundY:    number;
   private plotWidth:  number;
@@ -65,25 +54,40 @@ export class PedestrianManager {
   weatherIntensity = 0;
   gameHour = 12;
 
-  // Both Graphics so depth-sort composites correctly with shadow overlays (also Graphics).
-  // Rectangle objects in Phaser 4 render in a separate pipeline pass that ignores depth
-  // ordering relative to Graphics, which is why Rectangle pedestrians were never darkened.
-  private bodyGfx:      Phaser.GameObjects.Graphics;
+  // Shadow is Graphics so it depth-sorts correctly with other shadow overlays
+  // (also Graphics) — Rectangle objects render in a pass that ignores depth
+  // ordering relative to Graphics.
   private pedShadowGfx: Phaser.GameObjects.Graphics;
   private _hadPedsLastFrame = false;
 
   constructor(scene: Phaser.Scene, groundY: number, plotWidth: number) {
+    this.scene      = scene;
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
-    this.bodyGfx      = scene.add.graphics().setDepth(9.1);
     this.pedShadowGfx = scene.add.graphics().setDepth(9.09);
     this.offscreenTimer = 1000 + Math.random() * 2000;
     this.doorTimer      = 3000 + Math.random() * 2000;
+    this.setupAnimations();
+  }
+
+  private setupAnimations(): void {
+    for (const def of PERSON_DEFS) {
+      const key = walkAnimKey(def.key);
+      if (this.scene.anims.exists(key)) continue;
+      if (!this.scene.textures.exists(def.key)) continue;
+      this.scene.anims.create({
+        key,
+        frames: this.scene.anims.generateFrameNumbers(def.key, { start: 0, end: def.frameCount - 1 }),
+        frameRate: WALK_ANIM_FRAMERATE,
+        repeat: -1,
+      });
+    }
   }
 
   rebuild(groundY: number, plotWidth: number): void {
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
+    for (const p of this.pedestrians) p.sprite.destroy();
     this.pedestrians    = [];
     this.offscreenTimer = 800  + Math.random() * 1500;
     this.doorTimer      = 2000 + Math.random() * 2000;
@@ -99,7 +103,6 @@ export class PedestrianManager {
 
     const hasPeds = this.pedestrians.length > 0;
     if (hasPeds || this._hadPedsLastFrame) {
-      this.bodyGfx.clear();
       this.pedShadowGfx.clear();
     }
     this._hadPedsLastFrame = hasPeds;
@@ -135,6 +138,7 @@ export class PedestrianManager {
         p.dir = toRight ? 1 : -1;
         p.x  += p.speed * p.dir * dt;
         if (p.x + p.w < -40 || p.x > rightBound + 40) {
+          p.sprite.destroy();
           this.pedestrians.splice(i, 1);
           continue;
         }
@@ -152,6 +156,7 @@ export class PedestrianManager {
         p.bottomY = ph.startY + dist * smoothstep(ph.t);
         p.alpha   = 1 - smoothstep(ph.t);
         if (ph.t >= 1) {
+          p.sprite.destroy();
           this.pedestrians.splice(i, 1);
           continue;
         }
@@ -170,7 +175,11 @@ export class PedestrianManager {
         p.turnAtX = null;
       }
       if (p.x + p.w > rightBound) { p.x = rightBound - p.w; p.dir = -1; p.turnAtX = null; }
-      if (p.x + p.w < -40) { this.pedestrians.splice(i, 1); continue; }
+      if (p.x + p.w < -40) {
+        p.sprite.destroy();
+        this.pedestrians.splice(i, 1);
+        continue;
+      }
 
       if (doors.length > 0 && Math.random() < DESPAWN_BASE_PER_SEC * dt) {
         const door = this.pickDespawnDoor(p, doors);
@@ -201,15 +210,30 @@ export class PedestrianManager {
   }
 
   private syncGO(p: Pedestrian): void {
-    const top        = p.bottomY - p.h;
     const brightness = this.nightBrightness();
-    const drawColor  = darkenColor(p.color, brightness);
+    const v = Math.round(255 * brightness);
+
+    p.sprite.setPosition(Math.round(p.x + p.w / 2), Math.round(p.bottomY));
+    p.sprite.setAlpha(p.alpha);
+    p.sprite.setFlipX(p.dir === -1);
+    p.sprite.setTint((v << 16) | (v << 8) | v);
 
     this.pedShadowGfx.fillStyle(0x000000, 0.22 * p.alpha);
-    this.pedShadowGfx.fillRect(Math.round(p.x), Math.round(p.bottomY) + 2, p.w + 3, 3);
+    this.pedShadowGfx.fillRect(Math.round(p.x), Math.round(p.bottomY) + 1, Math.round(p.w), 2);
+  }
 
-    this.bodyGfx.fillStyle(drawColor, p.alpha);
-    this.bodyGfx.fillRect(Math.round(p.x), Math.round(top), p.w, Math.round(p.h));
+  private makeSprite(x: number, bottomY: number, w: number, h: number, dir: 1 | -1, def: PersonDef): Phaser.GameObjects.Sprite {
+    const sprite = this.scene.add.sprite(x + w / 2, bottomY, def.key)
+      .setOrigin(0.5, 1)
+      .setDepth(9.1)
+      .setDisplaySize(w, h)
+      .setFlipX(dir === -1);
+
+    if (this.scene.anims.exists(walkAnimKey(def.key))) {
+      sprite.play(walkAnimKey(def.key));
+      sprite.anims.setProgress(Math.random());
+    }
+    return sprite;
   }
 
   private getAllDoors(plots: PlotState[], containers: Phaser.GameObjects.Container[]): DoorEntry[] {
@@ -234,45 +258,59 @@ export class PedestrianManager {
     let door = doors[0];
     for (const d of doors) { pick -= d.level; if (pick <= 0) { door = d; break; } }
 
-    const w       = PED_MIN_W + Math.floor(Math.random() * (PED_MAX_W - PED_MIN_W + 1));
+    const def     = pickRandomPerson();
     const h       = PED_MIN_H + Math.random() * (PED_MAX_H - PED_MIN_H);
+    const w       = h * (def.frameWidth / def.frameHeight);
     const footTop = this.groundY - YARD_H;
     const targetY = footTop + Math.random() * YARD_H;
     const jitter  = (Math.random() * 2 - 1) * DOOR_SPAWN_POS_JITTER;
+    const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+    const speed   = PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED);
+    const x       = door.x + jitter - w / 2;
+
+    const sprite = this.makeSprite(x, door.y, w, h, dir, def);
+    sprite.anims.timeScale = speed / PED_BASE_SPEED;
+    sprite.setAlpha(0);
 
     this.pedestrians.push({
-      x:       door.x + jitter - w / 2,
+      x,
       bottomY: door.y,
-      speed:   PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED),
-      color:   COLORS[Math.floor(Math.random() * COLORS.length)],
+      speed,
       w,
       h,
-      dir:     Math.random() < 0.5 ? 1 : -1,
+      dir,
       alpha:   0,
       phase:   { k: 'enter', startY: door.y, targetY, t: 0 },
       turnAtX: null,
+      sprite,
     });
   }
 
   private spawnOffscreen(): void {
     if (this.pedestrians.length >= MAX_PEDS) return;
 
-    const w       = PED_MIN_W + Math.floor(Math.random() * (PED_MAX_W - PED_MIN_W + 1));
+    const def     = pickRandomPerson();
     const h       = PED_MIN_H + Math.random() * (PED_MAX_H - PED_MIN_H);
+    const w       = h * (def.frameWidth / def.frameHeight);
     const footTop = this.groundY - YARD_H;
     const bottomY = footTop + Math.random() * YARD_H;
+    const x       = -(w + 2);
+    const speed   = PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED);
+
+    const sprite = this.makeSprite(x, bottomY, w, h, 1, def);
+    sprite.anims.timeScale = speed / PED_BASE_SPEED;
 
     this.pedestrians.push({
-      x:       -(w + 2),
+      x,
       bottomY,
-      speed:   PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED),
-      color:   COLORS[Math.floor(Math.random() * COLORS.length)],
+      speed,
       w,
       h,
       dir:     1,
       alpha:   1,
       phase:   { k: 'walk' },
       turnAtX: null,
+      sprite,
     });
   }
 
@@ -321,7 +359,7 @@ export class PedestrianManager {
   }
 
   destroy(): void {
-    this.bodyGfx.destroy();
+    for (const p of this.pedestrians) p.sprite.destroy();
     this.pedShadowGfx.destroy();
     this.pedestrians = [];
   }
