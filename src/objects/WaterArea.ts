@@ -8,6 +8,11 @@ import {
   PIER_KEY, PIER_ORIGIN_X, PIER_ORIGIN_Y,
   CAFE_KEY, CAFE_ORIGIN_X, CAFE_ORIGIN_Y,
   HUT_KEY, HUT_ORIGIN_X, HUT_ORIGIN_Y,
+  LIGHTHOUSE_KEY, LIGHTHOUSE_ORIGIN_X, LIGHTHOUSE_ORIGIN_Y,
+  DOCK_PLANK_KEY,
+  DOCK_POST_KEY, DOCK_POST_ORIGIN_X, DOCK_POST_ORIGIN_Y,
+  DOCK_BOLLARD_KEY, DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y,
+  BUOY_RED_KEY, BUOY_ORANGE_KEY, BUOY_ORIGIN_X, BUOY_ORIGIN_Y,
 } from './WaterStructureAssets';
 
 const NIGHT_TINT = 0x5a6680;
@@ -42,16 +47,11 @@ const DUCK_SPEED_MIN = 3;  // px/s
 const DUCK_SPEED_MAX = 6;  // px/s
 const DUCK_DIP_DURATION = 500; // ms — head-dunk animation length
 
-// ── Lighthouse tower (baked cone, same technique as Balloon.ts) ────────────────
-const LH_TEX_KEY  = 'lighthouse-tower';
-const LH_TOWER_H  = 44;  // tower height
-const LH_BASE_W   = 14;  // width at the base (bottom)
-const LH_TOP_W    = 8;   // width at the top — slight taper
-const LH_CT_PAD   = 2;
-const LH_CT_W     = LH_BASE_W + LH_CT_PAD * 2;
-const LH_CT_H     = LH_TOWER_H + LH_CT_PAD * 2;
-const LH_CT_CX    = LH_CT_W / 2;
-const LH_CT_TOP   = LH_CT_PAD;
+// ── Lighthouse tower (pre-rendered sprite — see assets/water-structures/lighthouse.png) ──
+const LH_TOWER_H  = 44;  // tower-body height below topY (matches lighthouse.png tex-y 25-69)
+const LH_BASE_W   = 16;  // tower-body width at the base (bottom)
+const LH_TOP_W    = 12;  // tower-body width at the top — slight taper
+const LH_LAMP_DY  = -9;  // lantern-room centre, relative to topY (light/beam origin)
 
 // Per-column (1px) shadow profile for the tapered tower silhouette — for each
 // column across the base width, the y (relative to the tower top) at which the
@@ -166,6 +166,10 @@ export class WaterArea {
   private _cafeImg: Phaser.GameObjects.Image | null = null;
   private _hutImg: Phaser.GameObjects.Image | null = null;
   private _dockSlots: number[] = [];
+  private _dockDeckTile: Phaser.GameObjects.TileSprite | null = null;
+  private _dockPostImgs: Phaser.GameObjects.Image[] = [];
+  private _dockBollardImgs: Phaser.GameObjects.Image[] = [];
+  private _buoyImgs: Phaser.GameObjects.Image[] = [];
 
   // Beach people
   private _people: BeachPerson[] = [];
@@ -264,9 +268,21 @@ export class WaterArea {
     if (level >= 3) this.drawPier(); else this._pierImg?.setVisible(false);
     if (level >= 4) this.drawBeachCafe(); else this._cafeImg?.setVisible(false);
     if (level >= 5) this.drawDock();
-    else { this._dockGlows = []; }
+    else {
+      this._dockGlows = [];
+      this._dockDeckTile?.setVisible(false);
+      for (const img of this._dockPostImgs) img.destroy();
+      this._dockPostImgs = [];
+      for (const img of this._dockBollardImgs) img.destroy();
+      this._dockBollardImgs = [];
+    }
     if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
-    else { this._buoys = []; this._hutImg?.setVisible(false); }
+    else {
+      this._buoys = [];
+      this._hutImg?.setVisible(false);
+      for (const img of this._buoyImgs) img.destroy();
+      this._buoyImgs = [];
+    }
     if (level >= 8) { this.drawLighthouseIsland(); this.drawLighthouse(); }
     else { this._lhTowerImg?.setVisible(false); }
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
@@ -411,43 +427,29 @@ export class WaterArea {
     const gfx = this.structGfx;
     const { _waterY: wy, _dockX1: dx1, _dockX2: dx2 } = this;
     const dockW   = dx2 - dx1;
-    const deckEnd      = wy + BEACH_SHORE_H;  // wy+48: matches beach height
-    const waterBeamEnd = wy + 62;             // where visible wood transitions to shadow
-    const beamEnd      = wy + 72;             // bottom of submerged beams
+    const deckEnd = wy + BEACH_SHORE_H;  // wy+48: matches beach height
 
-    // Submerged beam section — barely visible, shadow-like
-    for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) {
-      gfx.fillStyle(0x2A1806, 0.28);
-      gfx.fillRect(bx2 - 2, waterBeamEnd, 4, beamEnd - waterBeamEnd);
-    }
-    // Right-edge post submerged section
-    gfx.fillStyle(0x2A1806, 0.28);
-    gfx.fillRect(dx2 - 4, waterBeamEnd, 4, beamEnd - waterBeamEnd);
-
-    // Visible wooden beam section — dark wood, clearly readable as structure
-    for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) {
-      gfx.fillStyle(0x5A3810, 0.85);
-      gfx.fillRect(bx2 - 2, deckEnd, 4, waterBeamEnd - deckEnd);
-    }
-    // Right-edge post visible section
-    gfx.fillStyle(0x5A3810, 0.85);
-    gfx.fillRect(dx2 - 4, deckEnd, 4, waterBeamEnd - deckEnd);
-
-    // Main dock body — starts from land edge (wy) and sticks out into water
-    gfx.fillStyle(this._palette.dockWood, 1);
-    gfx.fillRect(dx1, wy, dockW, deckEnd - wy);
-
-    // Horizontal plank lines
-    gfx.fillStyle(0x000000, 0.08);
-    for (let j = 0; j <= 6; j++) {
-      const y = wy + Math.round((j / 6) * (deckEnd - wy));
-      gfx.fillRect(dx1, y, dockW, 1);
+    // Wood-plank deck, tiled across the dock width
+    if (!this._dockDeckTile) {
+      this._dockDeckTile = this.scene.add.tileSprite(dx1, wy, dockW, BEACH_SHORE_H, DOCK_PLANK_KEY)
+        .setOrigin(0, 0)
+        .setDepth(5.699);
+    } else {
+      this._dockDeckTile.setPosition(dx1, wy).setSize(dockW, BEACH_SHORE_H).setVisible(true);
     }
 
-    // Vertical board dividers
-    gfx.fillStyle(0x000000, 0.07);
-    for (let i = 0; i < dockW; i += 14) {
-      gfx.fillRect(dx1 + i, wy, 1, deckEnd - wy);
+    // Posts/pilings — visible wood above the waterline, fading into shadow below
+    for (const img of this._dockPostImgs) img.destroy();
+    this._dockPostImgs = [];
+    const postXs: number[] = [];
+    for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) postXs.push(bx2);
+    postXs.push(dx2 - 4); // right-edge post
+    for (const px of postXs) {
+      this._dockPostImgs.push(
+        this.scene.add.image(px, deckEnd, DOCK_POST_KEY)
+          .setOrigin(DOCK_POST_ORIGIN_X, DOCK_POST_ORIGIN_Y)
+          .setDepth(5.699),
+      );
     }
 
     // Right-edge wall — slightly darker strip to give the dock a natural side face
@@ -458,10 +460,14 @@ export class WaterArea {
     gfx.fillRect(dx2 - 5, wy, 1, deckEnd - wy);
 
     // Mooring bollards along top edge
-    gfx.fillStyle(0x555555, 1);
+    for (const img of this._dockBollardImgs) img.destroy();
+    this._dockBollardImgs = [];
     for (const x of [dx1 + 14, dx1 + Math.floor(dockW / 2), dx2 - 18]) {
-      gfx.fillRect(x - 2, wy - 4, 5, 4);
-      gfx.fillRect(x - 4, wy - 5, 9, 2);
+      this._dockBollardImgs.push(
+        this.scene.add.image(x, wy, DOCK_BOLLARD_KEY)
+          .setOrigin(DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y)
+          .setDepth(5.701),
+      );
     }
 
     // Front end cap
@@ -577,67 +583,15 @@ export class WaterArea {
   // ── Lighthouse (level 8+) ─────────────────────────────────────────────────
 
   private drawLighthouse(): void {
-    // Drawn on islandGfx (above the wave fx layer) so waves don't draw over it.
-    const gfx = this.islandGfx;
     const { _lighthouseX: lx, _lighthouseTopY: topY } = this;
 
-    gfx.fillStyle(0x888888, 1);
-    gfx.fillRect(lx - 9, topY + LH_TOWER_H, 18, 5);
-
-    // Tower body — baked cone texture (smooth taper, bands clipped to its outline).
-    this.bakeLighthouseTower();
     if (!this._lhTowerImg) {
-      this._lhTowerImg = this.scene.add.image(lx, topY, LH_TEX_KEY)
-        .setOrigin(LH_CT_CX / LH_CT_W, LH_CT_TOP / LH_CT_H)
+      this._lhTowerImg = this.scene.add.image(lx, topY, LIGHTHOUSE_KEY)
+        .setOrigin(LIGHTHOUSE_ORIGIN_X, LIGHTHOUSE_ORIGIN_Y)
         .setDepth(5.86);
     } else {
       this._lhTowerImg.setPosition(lx, topY).setVisible(true);
     }
-
-    gfx.fillStyle(0x444444, 1);
-    gfx.fillRect(lx - LH_TOP_W / 2 - 3, topY - 1, LH_TOP_W + 6, 2);
-
-    gfx.fillStyle(0x333333, 1);
-    gfx.fillRect(lx - 6, topY - 10, 12, 10);
-    gfx.fillStyle(0xFFFF88, 0.85);
-    gfx.fillRect(lx - 4, topY - 9, 8, 8);
-    gfx.fillStyle(0x222222, 1);
-    gfx.fillRect(lx - 5, topY - 12, 10, 3);
-    gfx.fillStyle(0x333333, 1);
-    gfx.fillRect(lx - 1, topY - 15, 2, 4);
-  }
-
-  // Bake the tapered tower body once into a CanvasTexture using the same
-  // Path2D-clip-and-fill technique as Balloon.ts's bake(): clip to the cone
-  // outline, fill the white body and red bands (auto-cropped to the taper),
-  // then stroke the outline for a subtle anti-aliased rim.
-  private bakeLighthouseTower(): void {
-    if (this.scene.textures.exists(LH_TEX_KEY)) return;
-
-    const ct  = this.scene.textures.createCanvas(LH_TEX_KEY, LH_CT_W, LH_CT_H)!;
-    const ctx = ct.getContext();
-
-    const path = new Path2D();
-    path.moveTo(LH_CT_CX - LH_TOP_W / 2,  LH_CT_TOP);
-    path.lineTo(LH_CT_CX + LH_TOP_W / 2,  LH_CT_TOP);
-    path.lineTo(LH_CT_CX + LH_BASE_W / 2, LH_CT_TOP + LH_TOWER_H);
-    path.lineTo(LH_CT_CX - LH_BASE_W / 2, LH_CT_TOP + LH_TOWER_H);
-    path.closePath();
-
-    ctx.save();
-    ctx.clip(path);
-    ctx.fillStyle = '#EEEEEE';
-    ctx.fillRect(0, LH_CT_TOP, LH_CT_W, LH_TOWER_H);
-    ctx.fillStyle = '#CC3333';
-    ctx.fillRect(0, LH_CT_TOP + 10, LH_CT_W, 6);
-    ctx.fillRect(0, LH_CT_TOP + 28, LH_CT_W, 6);
-    ctx.restore();
-
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.40)';
-    ctx.lineWidth   = 1;
-    ctx.stroke(path);
-
-    ct.refresh();
   }
 
   // ── Buoys ─────────────────────────────────────────────────────────────────
@@ -652,6 +606,13 @@ export class WaterArea {
       { x: Math.floor(w * 0.71), y: wy + 58, color: 0xFF7700, phase: Math.PI * 1.2 },
       { x: Math.floor(w * 0.88), y: wy + 74, color: 0xFF3333, phase: Math.PI * 1.8 },
     ];
+
+    for (const img of this._buoyImgs) img.destroy();
+    this._buoyImgs = this._buoys.map(b =>
+      this.scene.add.image(b.x, b.y, b.color === 0xFF3333 ? BUOY_RED_KEY : BUOY_ORANGE_KEY)
+        .setOrigin(BUOY_ORIGIN_X, BUOY_ORIGIN_Y)
+        .setDepth(5.85),
+    );
   }
 
   // ── Light sources ─────────────────────────────────────────────────────────
@@ -722,16 +683,16 @@ export class WaterArea {
     // ── Lighthouse sweeping SoftSpotLight (level 8+) ──
     if (lv >= 8) {
       this._lighthouseSpot = new SoftSpotLight({
-        x: this._lighthouseX, y: this._lighthouseTopY - 5,
+        x: this._lighthouseX, y: this._lighthouseTopY + LH_LAMP_DY,
         radius: 180, color: 0xFFFF88, intensity: 0,
         angle: 0, coneAngle: Math.PI / 8,
         noOcclusion: true,
       });
       this._lighthouseBulb = {
-        x: this._lighthouseX, y: this._lighthouseTopY - 5,
+        x: this._lighthouseX, y: this._lighthouseTopY + LH_LAMP_DY,
         radius: 3, color: 0xFFFF88, intensity: 0, noOcclusion: true,
       };
-      this._nativeLights.push(this.scene.lights.addLight(this._lighthouseX, this._lighthouseTopY - 5, 80, 0xFFFF88, 0));
+      this._nativeLights.push(this.scene.lights.addLight(this._lighthouseX, this._lighthouseTopY + LH_LAMP_DY, 80, 0xFFFF88, 0));
       this.createBeamSprite();
     } else {
       this._lighthouseSpot = null;
@@ -1443,32 +1404,20 @@ export class WaterArea {
       }
     }
 
-    // Buoys — small conical channel markers with a white collar band and a
-    // lantern on top, dimmed by elevation so they match day/night lighting.
+    // Buoys — pre-rendered conical channel-marker sprites, dimmed by elevation
+    // so they match day/night lighting.
     const buoyBrightness = Math.max(0.35, Math.min(1.0, (1 - this._nightFactor * 0.7)));
-    for (const b of this._buoys) {
-      const bx   = b.x;
-      const by   = Math.round(b.y + Math.sin(b.phase) * 1.5);
-      const bCol = dimColor(b.color, buoyBrightness);
+    for (let i = 0; i < this._buoys.length; i++) {
+      const b  = this._buoys[i];
+      const bx = b.x;
+      const by = Math.round(b.y + Math.sin(b.phase) * 1.5);
+
+      const img = this._buoyImgs[i];
+      if (img) img.setPosition(bx, by).setTint(dimColor(0xFFFFFF, buoyBrightness));
 
       // Ripple shadow where the buoy sits in the water
       gfx.fillStyle(0x0A2A40, 0.30);
-      gfx.fillEllipse(bx, by + 3, 11, 3);
-
-      // Conical body tapering down to the waterline, with a white collar
-      // band and a darker lower hull just below it
-      gfx.fillStyle(bCol, 1);
-      gfx.fillTriangle(bx - 4, by + 3, bx + 4, by + 3, bx, by - 4);
-      gfx.fillStyle(dimColor(0xF0F0F0, buoyBrightness), 1);
-      gfx.fillRect(bx - 4, by, 8, 2);
-      gfx.fillStyle(dimColor(bCol, 0.55), 1);
-      gfx.fillRect(bx - 2, by + 2, 4, 2);
-
-      // Mast topped with a small lantern
-      gfx.fillStyle(dimColor(0x999999, buoyBrightness), 1);
-      gfx.fillRect(bx, by - 8, 1, 4);
-      gfx.fillStyle(bCol, 1);
-      gfx.fillCircle(bx, by - 9, 1.5);
+      gfx.fillEllipse(bx, by + 5, 11, 3);
 
       // Soft circular night glow around the lantern
       if (this._nightFactor > 0.1) {
@@ -1637,7 +1586,7 @@ export class WaterArea {
     // texture aligns with the lighthouse position; rotation sweeps the beam.
     this._beamSprite?.destroy();
     this._beamSprite = this.scene.add.image(
-      this._lighthouseX, this._lighthouseTopY - 5, texKey,
+      this._lighthouseX, this._lighthouseTopY + LH_LAMP_DY, texKey,
     )
       .setOrigin(sx / W, 0.5)
       .setDepth(5.69)                   // below structGfx (5.7) so tower overlaps beam
@@ -1650,7 +1599,7 @@ export class WaterArea {
     const { _lighthouseX: lx, _lighthouseTopY: ty } = this;
     const nf    = this._nightFactor;
     const angle = this._lighthouseAngle;
-    const ox = lx, oy = ty - 5;
+    const ox = lx, oy = ty + LH_LAMP_DY;
 
     if (this._beamSprite) {
       this._beamSprite.setPosition(ox, oy).setRotation(angle).setAlpha(nf);
@@ -1699,6 +1648,10 @@ export class WaterArea {
     this._pierImg?.setTint(structTint);
     this._cafeImg?.setTint(structTint);
     this._hutImg?.setTint(structTint);
+    this._lhTowerImg?.setTint(structTint);
+    this._dockDeckTile?.setTint(structTint);
+    for (const img of this._dockPostImgs) img.setTint(structTint);
+    for (const img of this._dockBollardImgs) img.setTint(structTint);
 
     // Dock spots
     for (const s of this._dockSpots) s.setIntensity(nf * 3.0);
@@ -1748,6 +1701,9 @@ export class WaterArea {
     this._pierImg?.destroy();
     this._cafeImg?.destroy();
     this._hutImg?.destroy();
-    if (this.scene.textures.exists(LH_TEX_KEY)) this.scene.textures.remove(LH_TEX_KEY);
+    this._dockDeckTile?.destroy();
+    for (const img of this._dockPostImgs) img.destroy();
+    for (const img of this._dockBollardImgs) img.destroy();
+    for (const img of this._buoyImgs) img.destroy();
   }
 }
