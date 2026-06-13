@@ -39,6 +39,8 @@ import { WeatherAccumulation } from '../objects/WeatherAccumulation';
 import { SeasonSystem } from '../game/SeasonSystem';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
+import { PigeonManager } from '../objects/PigeonManager';
+import { SkyToy } from '../objects/SkyToy';
 import { getTheme } from '../theme/themes';
 import type { ThemeDefinition } from '../theme/ThemeTypes';
 import { LoadingScreen } from '../ui/LoadingScreen';
@@ -126,6 +128,8 @@ export class GameScene extends Phaser.Scene {
   // ── Hot air balloon & birds ───────────────────────────────────────────────
   private balloon!: Balloon;
   private birdFlock!: BirdFlock;
+  private pigeonManager!: PigeonManager;
+  private skyToy!: SkyToy;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -166,6 +170,8 @@ export class GameScene extends Phaser.Scene {
     this.planeGfx  = this.add.graphics().setDepth(1.5);
     this.balloon   = new Balloon(this);
     this.birdFlock = new BirdFlock(this);
+    this.pigeonManager = new PigeonManager(this);
+    this.skyToy        = new SkyToy(this);
 
     this.panelChrome = new PanelChrome(this);
 
@@ -280,6 +286,8 @@ export class GameScene extends Phaser.Scene {
     this.updateAirplane(delta);
     this.balloon?.update(delta, elevation, this.sunAngle);
     this.birdFlock?.update(delta, elevation);
+    this.skyToy?.update(delta, elevation);
+    this.pigeonManager?.update(delta, this.state.plots, this.pedestrianManager?.getXPositions() ?? [], this.sunAngle);
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     for (const c of this.plotContainers) {
       if (hasSmokeUpdate(c)) c.updateSmoke(t);
@@ -312,6 +320,8 @@ export class GameScene extends Phaser.Scene {
     this.weatherAccumulation?.rebuild(width, this.groundY);
     this.balloon?.rebuild(width, this.groundY);
     this.birdFlock?.rebuild(width, this.groundY);
+    this.skyToy?.rebuild(width, this.groundY);
+    this.pigeonManager?.rebuild(this.groundY, this.plotWidth);
 
     this.panelBg?.destroy();
     this.panelBg = this.add

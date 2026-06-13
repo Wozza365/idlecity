@@ -33,9 +33,27 @@ const SHAPE_SHADOW_OFFSET_Y = 1;
 const GROUND_SHADOW_OUTER_A = 0.10;
 const GROUND_SHADOW_INNER_A = 0.20;
 
+// Pets — a fraction of pedestrians walk a dog at heel.
+const PET_CHANCE      = 0.16;
+const PET_TRAIL_OFFSET = 0.55; // fraction of pedestrian width, trailing behind owner
+const PET_LEG_FREQ    = 5;     // leg-swap cycles per second at PED_BASE_SPEED
+const PET_TAIL_FREQ   = 2.4;   // tail wags per second
+const PET_WAG_ANGLE   = 0.7;   // radians of tail swing
+const PET_COLORS: readonly number[] = [0x8b5e3c, 0xe8ddc8, 0x2b2b2b, 0x9a9a9a, 0xc97a3c];
+const PET_EAR_COLOR_SHIFT = 0.7; // brightness multiplier for ears/tail vs body
+
 function smoothstep(t: number): number {
   const c = Math.max(0, Math.min(1, t));
   return c * c * (3 - 2 * c);
+}
+
+function pickPet(): Pet | undefined {
+  if (Math.random() >= PET_CHANCE) return undefined;
+  return {
+    color: PET_COLORS[Math.floor(Math.random() * PET_COLORS.length)],
+    legPhase: Math.random() * Math.PI * 2,
+    tailPhase: Math.random() * Math.PI * 2,
+  };
 }
 
 type PedPhase =
@@ -43,6 +61,12 @@ type PedPhase =
   | { k: 'enter'; startY: number; targetY: number; t: number }
   | { k: 'approach'; doorX: number; doorY: number }
   | { k: 'leave'; startY: number; doorY: number; t: number };
+
+interface Pet {
+  color: number;
+  legPhase: number;
+  tailPhase: number;
+}
 
 interface Pedestrian {
   x: number;
@@ -56,6 +80,7 @@ interface Pedestrian {
   turnAtX: number | null;
   sprite: Phaser.GameObjects.Sprite;
   shadowSprite: Phaser.GameObjects.Sprite;
+  pet?: Pet;
 }
 
 interface DoorEntry { x: number; y: number; level: number; }
@@ -75,6 +100,9 @@ export class PedestrianManager {
   // (also Graphics) — Rectangle objects render in a pass that ignores depth
   // ordering relative to Graphics.
   private pedShadowGfx: Phaser.GameObjects.Graphics;
+  // Pets render between the ground shadow (9.09) and pedestrian sprites (9.10+),
+  // so dogs sit behind their owner but in front of the shadow layer.
+  private petGfx: Phaser.GameObjects.Graphics;
   private _hadPedsLastFrame = false;
   private _speedMultiplier = 1;
 
@@ -84,6 +112,7 @@ export class PedestrianManager {
     this.plotWidth  = plotWidth;
     this._speedMultiplier = speedMultiplier;
     this.pedShadowGfx = scene.add.graphics().setDepth(9.09);
+    this.petGfx       = scene.add.graphics().setDepth(9.095);
     this.offscreenTimer = 1000 + Math.random() * 2000;
     this.doorTimer      = 3000 + Math.random() * 2000;
     this.setupAnimations();
@@ -124,6 +153,7 @@ export class PedestrianManager {
     const hasPeds = this.pedestrians.length > 0;
     if (hasPeds || this._hadPedsLastFrame) {
       this.pedShadowGfx.clear();
+      this.petGfx.clear();
     }
     this._hadPedsLastFrame = hasPeds;
 
@@ -137,6 +167,11 @@ export class PedestrianManager {
     for (let i = this.pedestrians.length - 1; i >= 0; i--) {
       const p  = this.pedestrians[i];
       const ph = p.phase;
+
+      if (p.pet) {
+        p.pet.legPhase  += dt * (p.speed / PED_BASE_SPEED) * PET_LEG_FREQ  * Math.PI * 2;
+        p.pet.tailPhase += dt * PET_TAIL_FREQ * Math.PI * 2;
+      }
 
       if (ph.k === 'enter') {
         const dist = ph.targetY - ph.startY;
@@ -271,6 +306,88 @@ export class PedestrianManager {
     p.shadowSprite.setDepth(depth);
 
     this.drawGroundShadow(p);
+    if (p.pet) this.drawPet(p, p.pet, brightness);
+  }
+
+  private drawPet(p: Pedestrian, pet: Pet, brightness: number): void {
+    const gfx = this.petGfx;
+    const v = Math.round(255 * brightness);
+    const dim = (c: number, mult: number): number => {
+      const r = Math.round(((c >> 16) & 0xff) * mult * (v / 255));
+      const g = Math.round(((c >> 8)  & 0xff) * mult * (v / 255));
+      const b = Math.round(( c        & 0xff) * mult * (v / 255));
+      return (r << 16) | (g << 8) | b;
+    };
+
+    const bodyLen = p.h * 0.55;
+    const bodyH   = p.h * 0.32;
+    const cx = p.x + p.w / 2 - p.dir * (p.w * PET_TRAIL_OFFSET);
+    const cy = p.bottomY;
+    const bodyCx = cx;
+    const bodyCy = cy - bodyH / 2;
+
+    // Ground contact shadow
+    gfx.fillStyle(0x000000, GROUND_SHADOW_OUTER_A * p.alpha);
+    gfx.fillEllipse(bodyCx, cy + 1, bodyLen * 1.1, bodyH * 0.4);
+
+    const bodyColor = dim(pet.color, 1);
+    const accentColor = dim(pet.color, PET_EAR_COLOR_SHIFT);
+
+    // Tail — wags behind the body, opposite the facing direction
+    const tailBaseX = bodyCx - p.dir * bodyLen * 0.5;
+    const wag = Math.sin(pet.tailPhase) * PET_WAG_ANGLE;
+    const tailLen = bodyH * 1.1;
+    const tailTipX = tailBaseX - p.dir * Math.cos(wag) * tailLen;
+    const tailTipY = bodyCy - Math.sin(wag + 0.6) * tailLen;
+    gfx.fillStyle(accentColor, p.alpha);
+    gfx.fillTriangle(
+      tailBaseX, bodyCy - bodyH * 0.2,
+      tailBaseX, bodyCy + bodyH * 0.2,
+      tailTipX, tailTipY,
+    );
+
+    // Legs — two visible legs, alternating stride
+    const legSwing = Math.sin(pet.legPhase) * bodyLen * 0.18;
+    gfx.fillStyle(accentColor, p.alpha);
+    gfx.fillRect(Math.round(bodyCx - bodyLen * 0.25 + legSwing), Math.round(cy - 1), 1, 2);
+    gfx.fillRect(Math.round(bodyCx + bodyLen * 0.2 - legSwing), Math.round(cy - 1), 1, 2);
+
+    // Body
+    gfx.fillStyle(bodyColor, p.alpha);
+    gfx.fillEllipse(bodyCx, bodyCy, bodyLen, bodyH);
+
+    // Head — at the front, in the direction of travel
+    const headCx = bodyCx + p.dir * bodyLen * 0.48;
+    const headCy = bodyCy - bodyH * 0.15;
+    const headR  = bodyH * 0.6;
+    gfx.fillStyle(bodyColor, p.alpha);
+    gfx.fillCircle(headCx, headCy, headR);
+
+    // Ear — small triangle on top of the head
+    gfx.fillStyle(accentColor, p.alpha);
+    gfx.fillTriangle(
+      headCx - p.dir * headR * 0.3, headCy - headR * 0.7,
+      headCx + p.dir * headR * 0.5, headCy - headR * 0.7,
+      headCx + p.dir * headR * 0.1, headCy - headR * 1.6,
+    );
+
+    // Snout
+    gfx.fillStyle(accentColor, p.alpha);
+    gfx.fillRect(
+      Math.round(headCx + p.dir * headR * 0.6),
+      Math.round(headCy - 0.5),
+      Math.round(headR * 0.6) || 1,
+      1,
+    );
+  }
+
+  /** Returns the centre x of every pedestrian currently in the 'walk' phase. */
+  getXPositions(): number[] {
+    const out: number[] = [];
+    for (const p of this.pedestrians) {
+      if (p.phase.k === 'walk') out.push(p.x + p.w / 2);
+    }
+    return out;
   }
 
   private makePedSprites(
@@ -346,6 +463,7 @@ export class PedestrianManager {
       turnAtX: null,
       sprite,
       shadowSprite,
+      pet: pickPet(),
     };
     this.pedestrians.push(p);
     this.syncGO(p);
@@ -377,6 +495,7 @@ export class PedestrianManager {
       turnAtX: null,
       sprite,
       shadowSprite,
+      pet: pickPet(),
     };
     this.pedestrians.push(p);
     this.syncGO(p);
@@ -429,6 +548,7 @@ export class PedestrianManager {
   destroy(): void {
     for (const p of this.pedestrians) { p.sprite.destroy(); p.shadowSprite.destroy(); }
     this.pedShadowGfx.destroy();
+    this.petGfx.destroy();
     this.pedestrians = [];
   }
 }
