@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
+import { STAR_KEY, STAR_CORE_R } from './StarAssets';
 
 interface Star {
   baseX: number;
   y: number;
   radius: number;
   brightness: number;
+  sprite: Phaser.GameObjects.Image;
 }
 
 interface ShootingStar {
@@ -20,11 +22,13 @@ const SHOOT_DURATION  = 0.45;  // seconds
 const SHOOT_SPEED     = 520;   // px/s
 const SHOOT_MIN_WAIT  = 20_000;
 const SHOOT_MAX_WAIT  = 60_000;
+const SHOOT_SEGMENTS  = 6;
+
+const STAR_TINT = 0xffeedd;
 
 export class Stars {
   private stars: Star[] = [];
-  private gfx: Phaser.GameObjects.Graphics;
-  private shootGfx: Phaser.GameObjects.Graphics;
+  private shootSprites: Phaser.GameObjects.Image[] = [];
   private readonly STAR_COUNT = 50;
   private groundY: number;
   private width: number;
@@ -35,21 +39,35 @@ export class Stars {
   private shootTimer = SHOOT_MIN_WAIT + Math.random() * (SHOOT_MAX_WAIT - SHOOT_MIN_WAIT);
 
   constructor(scene: Phaser.Scene, groundY: number) {
-    this.gfx      = scene.add.graphics().setDepth(2);
-    this.shootGfx = scene.add.graphics().setDepth(2.1)
-      .setBlendMode(Phaser.BlendModes.ADD);
     this.groundY = groundY;
     this.width   = scene.scale.width;
 
     const skyHeight = groundY * 0.65;
 
     for (let i = 0; i < this.STAR_COUNT; i++) {
+      const radius = Math.random() * 1.2 + 0.4;
+      const sprite = scene.add.image(0, 0, STAR_KEY)
+        .setDepth(2)
+        .setTint(STAR_TINT)
+        .setScale(radius / STAR_CORE_R)
+        .setVisible(false);
       this.stars.push({
         baseX:      Math.random() * this.width * 1.5 - this.width * 0.25,
         y:          Math.random() * skyHeight,
-        radius:     Math.random() * 1.2 + 0.4,
+        radius,
         brightness: Math.random() * 0.7 + 0.3,
+        sprite,
       });
+    }
+
+    // Pool of glow sprites for the shooting star's tail segments + bright tip.
+    for (let i = 0; i < SHOOT_SEGMENTS + 1; i++) {
+      this.shootSprites.push(
+        scene.add.image(0, 0, STAR_KEY)
+          .setDepth(2.1)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setVisible(false),
+      );
     }
   }
 
@@ -59,10 +77,10 @@ export class Stars {
 
     if (starAlpha === 0) {
       if (this._starsWereVisible) {
-        this.gfx.clear();
+        for (const star of this.stars) star.sprite.setVisible(false);
         this._starsWereVisible = false;
       }
-      this.shootGfx.clear();
+      for (const sp of this.shootSprites) sp.setVisible(false);
       this.shooting = null;
       return;
     }
@@ -77,34 +95,20 @@ export class Stars {
     this._starsWereVisible = true;
     this._lastDrawnAngle = sunAngle;
 
-    this.gfx.clear();
     const scrollOffset = (sunAngle / (Math.PI * 2)) * width * 0.5;
 
     for (const star of this.stars) {
       const x        = star.baseX + scrollOffset;
       const wrappedX = ((x % (width * 1.5)) + (width * 1.5)) % (width * 1.5) - width * 0.25;
-      const inBottom = star.y > this.groundY * 0.5;
-
-      if (!inBottom) {
-        const glowAlpha = starAlpha * 0.08;
-        this.gfx.fillStyle(0xffeedd, glowAlpha * 0.3);
-        this.gfx.fillCircle(wrappedX, star.y, star.radius * 2.5);
-        this.gfx.fillStyle(0xffeedd, glowAlpha * 0.6);
-        this.gfx.fillCircle(wrappedX, star.y, star.radius * 1.6);
-        this.gfx.fillStyle(0xffeedd, glowAlpha);
-        this.gfx.fillCircle(wrappedX, star.y, star.radius * 0.8);
-      }
-
-      this.gfx.fillStyle(0xffeedd, starAlpha * star.brightness);
-      this.gfx.fillCircle(wrappedX, star.y, star.radius);
+      star.sprite.setPosition(wrappedX, star.y);
+      star.sprite.setAlpha(starAlpha * star.brightness);
+      star.sprite.setVisible(true);
     }
 
     this.tickShooting(delta / 1000, elevation, starAlpha);
   }
 
   private tickShooting(dt: number, elevation: number, starAlpha: number): void {
-    this.shootGfx.clear();
-
     if (this.shooting) {
       const s = this.shooting;
       s.t += dt;
@@ -114,6 +118,7 @@ export class Stars {
       if (s.t >= SHOOT_DURATION) {
         this.shooting = null;
         this.shootTimer = SHOOT_MIN_WAIT + Math.random() * (SHOOT_MAX_WAIT - SHOOT_MIN_WAIT);
+        for (const sp of this.shootSprites) sp.setVisible(false);
         return;
       }
 
@@ -122,24 +127,25 @@ export class Stars {
       const fadeOut = Math.max(0, 1 - (s.t - (SHOOT_DURATION - 0.15)) / 0.15);
       const alpha   = fadeIn * fadeOut * starAlpha;
 
-      // Draw fading tail — segments spaced along velocity vector backward from tip
+      // Position fading tail segments along the velocity vector, backward from the tip
       const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
       const ux    = s.vx / speed;
       const uy    = s.vy / speed;
-      const segments = 6;
-      for (let k = 1; k <= segments; k++) {
-        const frac = k / segments;
+      for (let k = 1; k <= SHOOT_SEGMENTS; k++) {
+        const frac = k / SHOOT_SEGMENTS;
         const dist = frac * s.tailLen;
-        const tx   = s.x - ux * dist;
-        const ty   = s.y - uy * dist;
-        const sa   = alpha * (1 - frac) * 0.65;
-        const r    = 1.1 * (1 - frac * 0.5);
-        this.shootGfx.fillStyle(0xffffff, sa);
-        this.shootGfx.fillCircle(Math.round(tx), Math.round(ty), r);
+        const sp = this.shootSprites[k - 1];
+        sp.setPosition(s.x - ux * dist, s.y - uy * dist);
+        sp.setScale((1.1 * (1 - frac * 0.5)) / STAR_CORE_R);
+        sp.setAlpha(alpha * (1 - frac) * 0.65);
+        sp.setVisible(true);
       }
       // Bright tip
-      this.shootGfx.fillStyle(0xffffff, alpha);
-      this.shootGfx.fillCircle(Math.round(s.x), Math.round(s.y), 1.5);
+      const tip = this.shootSprites[SHOOT_SEGMENTS];
+      tip.setPosition(s.x, s.y);
+      tip.setScale(1.5 / STAR_CORE_R);
+      tip.setAlpha(alpha);
+      tip.setVisible(true);
 
     } else if (elevation < -0.08) {
       this.shootTimer -= dt * 1000;
@@ -173,7 +179,7 @@ export class Stars {
   }
 
   destroy(): void {
-    this.gfx.destroy();
-    this.shootGfx.destroy();
+    for (const star of this.stars) star.sprite.destroy();
+    for (const sp of this.shootSprites) sp.destroy();
   }
 }
