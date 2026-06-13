@@ -1288,7 +1288,7 @@ export class WaterArea {
           const botFade  = Math.min(1, (WATER_H - rawDepth) / 8);
           if (topFade < 0.05 || botFade < 0.05) continue;
 
-          const baseAlpha = dayA * 0.2025 * topFade * botFade;
+          const baseAlpha = dayA * 0.13 * topFade * botFade;
           if (baseAlpha < 0.01) continue;
 
           // Multi-harmonic smooth envelope — determines the y-centre for each crest
@@ -1310,7 +1310,7 @@ export class WaterArea {
           //   Pass B — fringe layer:  stride 9, seg  8-11 px,  noise ±2.3 px, shifted 4 px
           const passes = [
             { stride: 12, segBase: 22, noiseAmp: 1.6, xOff: 0, aScale: 1.00 },
-            { stride: 18, segBase: 18, noiseAmp: 2.3, xOff: 7, aScale: 0.58 },
+            { stride: 18, segBase: 18, noiseAmp: 2.3, xOff: 7, aScale: 0.42 },
           ] as const;
 
           for (const pd of passes) {
@@ -1341,12 +1341,17 @@ export class WaterArea {
               const segLen = Math.min(pd.segBase + lenVar, w - x);
               if (segLen <= 0) continue;
 
-              // Line width varies — ~30% of strokes are 3 px, rest 2 px
-              const lineW = Math.sin(x * 0.91 + wi * 4.7) > 0.45 ? 3 : 2;
+              // Line width — mostly thin (1px); occasional thicker (2px)
+              // patches drift along the wave over time (via -t terms) so the
+              // thicker stretches travel with the crest rather than sitting
+              // fixed at the same x-positions.
+              const thickPhase = Math.sin(x * 0.05 + wi * 3.1 - t * 1.4)
+                               + Math.sin(x * 0.21 + wi * 5.3 - t * 0.7) * 0.6;
+              const lineW = thickPhase > 1.0 ? 2 : 1;
 
-              // Subtle colour variation: pale blue-white → pure white
+              // Subtle colour variation: pale blue-white → soft white
               const colorT    = (Math.sin(x * 0.17 + wi * 4.3 + t * 1.8) + 1) * 0.5;
-              const waveColor = lerpColor(0xBED8F5, 0xFFFFFF, colorT);
+              const waveColor = lerpColor(0xBED8F5, 0xEAF4FF, colorT);
 
               // Draw stroke as a curved polyline (5 pts) following the wave envelope
               // so the stroke itself tilts and bends with the wave rather than
@@ -1368,7 +1373,7 @@ export class WaterArea {
                 const px4 = x + 5;
                 const pn0 = Math.sin(x   * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp + Math.sin(x   * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
                 const pn4 = Math.sin(px4 * 0.38 + wi * 6.1 + t * 5.0) * pd.noiseAmp + Math.sin(px4 * 1.19 + wi * 2.7 + t * 3.5) * pd.noiseAmp * 0.5;
-                gfx.lineStyle(lineW, waveColor, Math.min(1, a * 1.8));
+                gfx.lineStyle(lineW, waveColor, Math.min(0.8, a * 1.3));
                 gfx.beginPath();
                 gfx.moveTo(x,   envY(x)   + pn0);
                 gfx.lineTo(px4, envY(px4) + pn4);
