@@ -54,7 +54,6 @@ export interface WaterPalette {
   rockBase: number; rockMid: number; rockLight: number; rockWet: number;
   mossGreen: number; mossDark: number;
   dockWood: number; pierWood: number;
-  pedColors: readonly number[];
   towelColors: readonly number[];
 }
 

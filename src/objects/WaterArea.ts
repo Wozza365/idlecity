@@ -3,6 +3,7 @@ import { ROAD_H, VERGE_H, WATER_H } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { WaterPalette } from '../theme/ThemeTypes';
+import { type PersonDef, PERSON_DEFS, walkAnimKey } from './PedestrianAssets';
 import {
   PIER_KEY, PIER_ORIGIN_X, PIER_ORIGIN_Y,
   CAFE_KEY, CAFE_ORIGIN_X, CAFE_ORIGIN_Y,
@@ -13,6 +14,13 @@ const NIGHT_TINT = 0x5a6680;
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
+
+// ── Beach people — reuse path-pedestrian character sprites ─────────────────────
+const BEACH_PERSON_WALK_FRAMERATE = 4;
+const BEACH_PERSON_H_MIN = 9;  // px — slightly smaller than path pedestrians (background); varies +0..4 via (i % 5)
+const BEACH_PERSON_SHADOW_ALPHA = 0.25;
+const BEACH_PERSON_DEPTH        = 5.665;
+const BEACH_PERSON_SHADOW_DEPTH = 5.663;
 
 // ── Water critters — jumping fish + paddling ducks ─────────────────────────────
 const FISH_MIN_INTERVAL     = 6000;  // ms between jumps (min)
@@ -96,7 +104,7 @@ interface BeachPerson {
   bottomY: number;
   dir: 1 | -1;
   speed: number;
-  color: number;
+  def: PersonDef;
   towelColor: number;
   w: number;
   h: number;
@@ -105,6 +113,8 @@ interface BeachPerson {
   alpha: number;
   xMin: number;
   xMax: number;
+  sprite: Phaser.GameObjects.Sprite;
+  shadowSprite: Phaser.GameObjects.Sprite;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -776,10 +786,55 @@ export class WaterArea {
     }
   }
 
+  private setupPersonAnimations(): void {
+    for (const def of PERSON_DEFS) {
+      const key = walkAnimKey(def.key);
+      if (this.scene.anims.exists(key)) continue;
+      if (!this.scene.textures.exists(def.key)) continue;
+      this.scene.anims.create({
+        key,
+        frames: this.scene.anims.generateFrameNumbers(def.key, { start: 0, end: def.frameCount - 1 }),
+        frameRate: BEACH_PERSON_WALK_FRAMERATE,
+        repeat: -1,
+      });
+    }
+  }
+
+  private makeBeachPersonSprites(
+    x: number, bottomY: number, w: number, h: number, dir: 1 | -1, def: PersonDef,
+  ): { sprite: Phaser.GameObjects.Sprite; shadowSprite: Phaser.GameObjects.Sprite } {
+    // Added first so it sits behind the main sprite (lower depth).
+    const shadowSprite = this.scene.add.sprite(x, bottomY, def.key)
+      .setOrigin(0.5, 1)
+      .setDisplaySize(w + 1, h + 1)
+      .setFlipX(dir === -1)
+      .setTint(0x000000)
+      .setTintMode(Phaser.TintModes.FILL)
+      .setDepth(BEACH_PERSON_SHADOW_DEPTH);
+
+    const sprite = this.scene.add.sprite(x, bottomY, def.key)
+      .setOrigin(0.5, 1)
+      .setDisplaySize(w, h)
+      .setFlipX(dir === -1)
+      .setDepth(BEACH_PERSON_DEPTH);
+
+    return { sprite, shadowSprite };
+  }
+
+  private destroyBeachPeople(): void {
+    for (const p of this._people) {
+      p.sprite.destroy();
+      p.shadowSprite.destroy();
+    }
+    this._people = [];
+  }
+
   private initBeachPeople(): void {
+    this.destroyBeachPeople();
+    this.setupPersonAnimations();
+
     const { _level: lv, _beachEndX: bx, _waterY: wy } = this;
     const count = Math.min(3 + Math.floor(lv * 0.55), 8);
-    this._people = [];
 
     const xMin = 8;
     const xMax = bx - 14;
@@ -790,20 +845,39 @@ export class WaterArea {
       const x       = xMin + ((i * 67 + 13) % Math.max(1, xMax - xMin));
       const bottomY = yMin + ((i * 41 + 7)  % Math.max(1, yMax - yMin));
       const isSit   = i % 3 === 0;
+      const dir: 1 | -1 = i % 2 === 0 ? 1 : -1;
+      const def = PERSON_DEFS[i % PERSON_DEFS.length];
+      const h   = BEACH_PERSON_H_MIN + (i % 5);
+      const w   = h * (def.frameWidth / def.frameHeight);
+
+      const { sprite, shadowSprite } = this.makeBeachPersonSprites(x, bottomY, w, h, dir, def);
+
+      if (isSit) {
+        // Neutral/standing pose (frame 0) — no walk cycle while sitting.
+        sprite.setFrame(0);
+        shadowSprite.setFrame(0);
+      } else if (this.scene.anims.exists(walkAnimKey(def.key))) {
+        sprite.play(walkAnimKey(def.key));
+        sprite.anims.setProgress(Math.random());
+        shadowSprite.setFrame(sprite.frame.name);
+      }
+
       this._people.push({
         x,
         bottomY,
-        dir:        i % 2 === 0 ? 1 : -1,
+        dir,
         speed:      4 + (i % 5) * 2.5,
-        color:      this._palette.pedColors[i % this._palette.pedColors.length],
+        def,
         towelColor: this._palette.towelColors[i % this._palette.towelColors.length],
-        w:          3 + (i % 3),
-        h:          8 + (i % 5),
+        w,
+        h,
         phase:      isSit ? 'sit' : 'walk',
         phaseTimer: isSit ? 8000 + (i * 3000) % 12000 : 4000 + (i * 2500) % 8000,
         alpha:      1,
         xMin,
         xMax,
+        sprite,
+        shadowSprite,
       });
     }
   }
@@ -819,6 +893,12 @@ export class WaterArea {
     const dt = delta / 1000;
 
     const brightness = Math.max(0.25, Math.min(1, (elevation + 0.2) / 0.4));
+    const tint = dimColor(lerpColor(0xffffff, NIGHT_TINT, this._nightFactor), brightness);
+
+    const pgfx = this.beachPeopleGfx;
+    const sgfx = this.beachShadowGfx;
+    pgfx.clear();
+    sgfx.clear();
 
     for (const p of this._people) {
       p.alpha += (targetAlpha - p.alpha) * Math.min(1, dt * 1.5);
@@ -831,6 +911,10 @@ export class WaterArea {
         if (p.phaseTimer <= 0) {
           p.phase = 'sit';
           p.phaseTimer = 7000 + Math.random() * 12000;
+          // Stop the walk cycle and settle into a neutral/flat pose.
+          p.sprite.anims.stop();
+          p.sprite.setFrame(0);
+          p.shadowSprite.setFrame(0);
         }
       } else {
         p.phaseTimer -= delta;
@@ -838,31 +922,35 @@ export class WaterArea {
           p.phase = 'walk';
           p.phaseTimer = 3000 + Math.random() * 7000;
           p.dir = Math.random() < 0.5 ? 1 : -1;
+          if (this.scene.anims.exists(walkAnimKey(p.def.key))) {
+            p.sprite.play(walkAnimKey(p.def.key));
+            p.sprite.anims.setProgress(Math.random());
+          }
         }
       }
-    }
 
-    const pgfx = this.beachPeopleGfx;
-    const sgfx = this.beachShadowGfx;
-    pgfx.clear();
-    sgfx.clear();
+      const x = Math.round(p.x);
+      const y = Math.round(p.bottomY);
 
-    for (const p of this._people) {
+      p.sprite.setPosition(x, y);
+      p.sprite.setFlipX(p.dir === -1);
+      p.sprite.setAlpha(p.alpha);
+      p.sprite.setTint(tint);
+
+      p.shadowSprite.setPosition(x, y);
+      p.shadowSprite.setFlipX(p.dir === -1);
+      p.shadowSprite.setFrame(p.sprite.frame.name);
+      p.shadowSprite.setAlpha(p.alpha * BEACH_PERSON_SHADOW_ALPHA);
+
       if (p.alpha < 0.01) continue;
-      const drawColor = dimColor(p.color, brightness);
-      const top = Math.round(p.bottomY - p.h);
-      const x   = Math.round(p.x);
 
       if (p.phase === 'sit') {
         pgfx.fillStyle(p.towelColor, p.alpha * 0.9);
-        pgfx.fillRect(x - 4, Math.round(p.bottomY) - 3, p.w + 6, 4);
+        pgfx.fillRect(x - Math.round(p.w / 2) - 3, y - 3, Math.round(p.w) + 6, 4);
       }
 
       sgfx.fillStyle(0x000000, 0.2 * p.alpha);
-      sgfx.fillRect(x, Math.round(p.bottomY) + 1, p.w + 3, 3);
-
-      pgfx.fillStyle(drawColor, p.alpha);
-      pgfx.fillRect(x, top, p.w, Math.round(p.h));
+      sgfx.fillEllipse(x, y + 1, p.w * 1.1, 2);
     }
 
     // Fade foam sprites with daylight
@@ -1646,6 +1734,7 @@ export class WaterArea {
     for (const nl of this._nativeLights) this.scene.lights.removeLight(nl);
     this._nativeLights = [];
     this.destroyFoamSprites();
+    this.destroyBeachPeople();
     this.waterGfx.destroy();
     this.skyReflectGfx.destroy();
     this.shadowGfx.destroy();

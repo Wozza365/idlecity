@@ -29,6 +29,19 @@ function getPositions(width: number, start: number, spacing: number): number[] {
   return arr;
 }
 
+// Deterministic per-tree pseudo-random stream (mulberry32) — gives each tree
+// a stable "shape" (scale/flip/rotation/offset) that doesn't reshuffle on
+// every redraw (level-ups, resizes, daily seasonal re-tints).
+function treeRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 interface Cyclist { x: number; speed: number; dir: 1 | -1; sprite: Phaser.GameObjects.Sprite; }
 
 export class VergeRiver {
@@ -532,16 +545,27 @@ export class VergeRiver {
     const trunkKey  = `trunk_${tier}`;
     const canopyKey = `canopy_${tier}`;
 
-    for (const tx of this.treeXs) {
+    this.treeXs.forEach((tx, i) => {
+      // Per-tree shape jitter — stable across redraws, varies canopy size,
+      // mirroring and a slight tilt/offset so trees aren't all clones.
+      const rng     = treeRng(i * 7919 + 1);
+      const scaleJ  = 0.88 + rng() * 0.24;  // ±12%
+      const flip    = rng() < 0.5;
+      const angle   = (rng() - 0.5) * 14;   // ±7°
+      const offX    = (rng() - 0.5) * 4;    // ±2px
+      const offY    = (rng() - 0.5) * 2;    // ±1px
+
       const trunk = this.scene.add.image(tx, trunkBaseY, trunkKey)
         .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
         .setDepth(8.49)
         .setTint(trunkTint);
 
-      const cnp = this.scene.add.image(tx, canopyY, canopyKey)
+      const cnp = this.scene.add.image(tx + offX, canopyY + offY, canopyKey)
         .setOrigin(0.5, 0.5)
         .setDepth(8.5)
-        .setScale(canopyScale)
+        .setScale(canopyScale * scaleJ)
+        .setAngle(angle)
+        .setFlipX(flip)
         .setTint(canopyTint);
 
       const extras: Phaser.GameObjects.Image[] = [];
@@ -554,10 +578,13 @@ export class VergeRiver {
         ];
         const clusterScale = (canopyR * 0.4) / CANOPY_SMALL_R;
         for (const o of offsets) {
-          const extra = this.scene.add.image(tx + o.dx, canopyY + o.dy, 'canopy_small')
+          const dx = flip ? -o.dx : o.dx;
+          const extra = this.scene.add.image(tx + offX + dx, canopyY + offY + o.dy, 'canopy_small')
             .setOrigin(0.5, 0.5)
             .setDepth(8.51)
-            .setScale(clusterScale)
+            .setScale(clusterScale * scaleJ)
+            .setAngle(angle)
+            .setFlipX(flip)
             .setTint(canopyTint)
             .setAlpha(o.a);
           extras.push(extra);
@@ -565,7 +592,7 @@ export class VergeRiver {
       }
 
       this.treeImages.push({ trunk, canopy: cnp, extras });
-    }
+    });
   }
 
   // ── Lamp posts (depth 8.5) ────────────────────────────────────────
