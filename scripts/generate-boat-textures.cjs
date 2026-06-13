@@ -1,4 +1,4 @@
-// Generates small pixel-art boat textures (assets/boats/*.png) to replace the
+// Generates pixel-art boat textures (assets/boats/*.png) to replace the
 // procedurally-drawn (Graphics-primitive) boats in src/objects/Boat.ts.
 //
 // Run: node scripts/generate-boat-textures.cjs
@@ -46,19 +46,23 @@ function drawNavLights(cv, y0, h, rectW, w) {
 }
 
 // ── Boat definitions (mirrors src/objects/BoatAssets.ts) ──────────────────
+// Sizes are roughly 2.4x-3.2x the original, with smaller craft scaled up
+// more (for visibility) and the largest vessels scaled up less. cruise_ship
+// is an all-new mega-boat — a "legendary" sibling to container_ship.
 const BOATS = [
-  { key: 'rowboat',        w: 20, h:  7, bowW: 3, hull: 0x8B5E3C, accent: 0xA0724E },
-  { key: 'motorboat',      w: 36, h: 10, bowW: 5, hull: 0xEEEEDD, accent: 0x4488CC },
-  { key: 'fishing_boat',   w: 30, h: 11, bowW: 4, hull: 0x3A5C7A, accent: 0xCC3333, extraTop: 4 },
-  { key: 'sailboat',       w: 28, h:  9, bowW: 4, hull: 0xF5F5E8, accent: 0xCC8844, extraTop: 18 },
-  { key: 'kayak',          w: 22, h:  5, bowW: 3, hull: 0xFF7744, accent: 0xFFAA22 },
-  { key: 'speedboat',      w: 38, h:  8, bowW: 6, hull: 0xCC2222, accent: 0xFFFFFF },
-  { key: 'tugboat',        w: 40, h: 14, bowW: 5, hull: 0x222233, accent: 0xFF4400, extraTop: 10 },
-  { key: 'yacht',          w: 54, h: 13, bowW: 7, hull: 0xF8F8F2, accent: 0x888899, extraTop: 22 },
-  { key: 'pedalo',         w: 22, h: 10, bowW: 3, hull: 0xFFDD22, accent: 0xFF9900 },
-  { key: 'houseboat',      w: 60, h: 18, bowW: 4, hull: 0x9B7A4A, accent: 0xC89A60 },
-  { key: 'ferry',          w: 68, h: 16, bowW: 6, hull: 0xE2E2E2, accent: 0x3366AA },
-  { key: 'container_ship', w: 88, h: 20, bowW: 5, hull: 0x182838, accent: 0x3A88AA },
+  { key: 'rowboat',        w: 60,  h: 20, bowW:  9, hull: 0x8B5E3C, accent: 0xA0724E },
+  { key: 'motorboat',      w: 100, h: 28, bowW: 14, hull: 0xEEEEDD, accent: 0x4488CC },
+  { key: 'fishing_boat',   w: 84,  h: 30, bowW: 11, hull: 0x3A5C7A, accent: 0xCC3333, extraTop: 12 },
+  { key: 'sailboat',       w: 80,  h: 26, bowW: 11, hull: 0xF5F5E8, accent: 0xCC8844, extraTop: 42 },
+  { key: 'kayak',          w: 70,  h: 16, bowW: 10, hull: 0xFF7744, accent: 0xFFAA22 },
+  { key: 'speedboat',      w: 108, h: 22, bowW: 17, hull: 0xCC2222, accent: 0xFFFFFF },
+  { key: 'tugboat',        w: 108, h: 36, bowW: 14, hull: 0x222233, accent: 0xFF4400, extraTop: 28 },
+  { key: 'yacht',          w: 145, h: 35, bowW: 19, hull: 0xF8F8F2, accent: 0x888899, extraTop: 57 },
+  { key: 'pedalo',         w: 70,  h: 28, bowW: 10, hull: 0xFFDD22, accent: 0xFF9900 },
+  { key: 'houseboat',      w: 144, h: 42, bowW: 10, hull: 0x9B7A4A, accent: 0xC89A60 },
+  { key: 'ferry',          w: 162, h: 36, bowW: 14, hull: 0xE2E2E2, accent: 0x3366AA },
+  { key: 'container_ship', w: 210, h: 46, bowW: 12, hull: 0x182838, accent: 0x3A88AA },
+  { key: 'cruise_ship',    w: 340, h: 64, bowW: 24, hull: 0xF5F5F0, accent: 0xCC3333, extraTop: 54 },
 ];
 
 // ── Type-specific details ──────────────────────────────────────────────
@@ -68,109 +72,276 @@ const DETAILS = {
     for (let y = y0 + 2; y < y0 + h - 1; y += 2) {
       for (let x = 2; x < rectW - 1; x++) cv.set(x, y, darken(hull, 0.18), 110);
     }
-    const sx = Math.floor(rectW * 0.55);
-    for (let y = y0 + 1; y < y0 + h - 1; y++) cv.set(sx, y, lighten(hull, 0.3), 220);
-    cv.set(Math.floor(rectW * 0.22), y0, 0x5A3A1A);
-    cv.set(Math.floor(rectW * 0.78), y0, 0x5A3A1A);
+    // bench seats
+    for (const sx of [Math.floor(rectW * 0.32), Math.floor(rectW * 0.62)]) {
+      for (let y = y0 + 2; y < y0 + h - 2; y++) cv.set(sx, y, lighten(hull, 0.32), 220);
+      cv.set(sx, y0 + 1, 0x5A3A1A);
+      cv.set(sx, y0 + h - 2, 0x5A3A1A);
+    }
+    // oar resting along the inside of the hull
+    for (let x = 3; x < rectW - 3; x++) cv.set(x, y0 + 1, 0x8B5A2B, 180);
+    cv.circle(rectW - 4, y0 + 1, 1, 0xC8A46E, 200);
   },
 
   motorboat(cv, c) {
     const { y0, h, rectW, accent } = c;
     const sy = y0 + Math.floor(h / 2);
+    // racing stripe
     for (let x = 2; x < rectW - 1; x++) { cv.set(x, sy, accent); cv.set(x, sy + 1, accent); }
-    for (let y = y0 + 1; y < y0 + 3; y++) for (let x = rectW - 8; x < rectW - 1; x++) cv.set(x, y, 0x88CCFF, 170);
+    // windshield/cabin near the bow
+    const cx0 = rectW - 22, cw = 18;
+    cv.rect(cx0, y0 + 2, cw, h - 5, lighten(accent, 0.3), 220);
+    for (let wx = cx0 + 2; wx < cx0 + cw - 2; wx += 4) cv.rect(wx, y0 + 3, 2, h - 8, 0x88CCFF, 200);
+    // chrome bow rail
     for (let y = y0; y < y0 + h; y++) for (let x = 0; x < 3; x++) cv.set(x, y, 0x555555);
+    for (let y = y0; y < y0 + h; y++) cv.set(1, y, 0xAAAAAA, 180);
   },
 
   fishing_boat(cv, c) {
     const { y0, h, rectW, accent, extraTop } = c;
-    const cx0 = Math.floor(rectW * 0.25), cw = Math.floor(rectW * 0.4);
-    cv.rect(cx0, y0 + 1, cw, h - 3, accent, 230);
-    for (let x = cx0 + 1; x < cx0 + cw - 1; x += 3) cv.set(x, y0 + 2, 0x222222, 160);
-    // antenna poking above the cabin
-    cv.line(cx0 + Math.floor(cw / 2), y0, cx0 + Math.floor(cw / 2), y0 - extraTop + 1, 0x333333);
-    // coiled rope on stern
-    cv.circle(3, y0 + h - 3, 1, 0x886644, 200);
+    const cx0 = Math.floor(rectW * 0.22), cw = Math.floor(rectW * 0.42);
+    // cabin
+    cv.rect(cx0, y0 + 2, cw, h - 5, accent, 235);
+    // cabin roof, rising into the extraTop region
+    const roofH = Math.floor(extraTop * 0.4);
+    cv.rect(cx0 - 1, y0 - roofH, cw + 2, roofH + 2, darken(accent, 0.35), 240);
+    // windows
+    for (let wx = cx0 + 2; wx < cx0 + cw - 2; wx += 4) cv.rect(wx, y0 + 3, 2, 3, 0xBFE6FF, 220);
+    // mast/antenna with nav light
+    const mastX = cx0 + Math.floor(cw / 2);
+    cv.line(mastX, y0 - roofH, mastX, y0 - extraTop + 1, 0x333333);
+    cv.set(mastX, y0 - extraTop + 1, 0xFF4444);
+    // crane arm toward the stern
+    cv.line(2, y0 + 1, Math.floor(rectW * 0.16), y0 - 2, 0x886644, 220);
+    // coiled rope on the stern deck
+    cv.circle(3, y0 + h - 3, 2, 0x886644, 200);
+    // net texture along the gunwale
+    for (let x = Math.floor(rectW * 0.6); x < rectW - 2; x += 2) cv.set(x, y0 + 1, 0xCCCCCC, 140);
   },
 
   sailboat(cv, c) {
-    const { y0, h, rectW, accent, extraTop } = c;
-    const mastX = rectW - 6;
+    const { y0, h, rectW, accent, extraTop, bowW } = c;
+    const mastX = rectW - 14;
     const topY = y0 - extraTop + 1;
     cv.line(mastX, topY, mastX, y0 + h - 2, 0x8B6914);
-    cv.triangle(mastX, topY, mastX, y0 + Math.floor(h / 2), rectW - 2, topY + 2, 0xFFFFF0, 230);
+    // mainsail
+    cv.triangle(mastX, topY, mastX, y0 + Math.floor(h / 2), rectW - 2, topY + Math.floor(extraTop * 0.6), 0xFFFFF0, 235);
+    // small foresail (jib), warm-tinted so it reads against the white mainsail
+    cv.triangle(
+      mastX, topY + Math.floor(extraTop * 0.35),
+      mastX, y0 + Math.floor(h * 0.5),
+      rectW + Math.floor(bowW * 0.7), y0 + Math.floor(h * 0.35),
+      lighten(accent, 0.55), 230,
+    );
+    // pennant at the masthead
+    cv.triangle(mastX, topY, mastX + 7, topY + 2, mastX, topY + 4, accent, 230);
+    // hull stripe
     for (let x = 1; x < rectW - 1; x++) cv.set(x, y0 + h - 2, accent, 220);
+    // deck railing posts
+    for (let x = 2; x < mastX - 2; x += 5) cv.set(x, y0 + 1, 0xCCCCCC, 140);
   },
 
   kayak(cv, c) {
     const { y0, h, rectW, accent } = c;
-    for (let x = 1; x < rectW - 1; x++) cv.set(x, y0 + Math.floor((h - 1) / 2), accent, 200);
-    cv.circle(Math.floor(rectW / 2), y0 + Math.floor((h - 1) / 2), 1, 0x222222, 220);
+    const midY = y0 + Math.floor((h - 1) / 2);
+    // hull centreline stripe
+    for (let x = 1; x < rectW - 1; x++) cv.set(x, midY, accent, 200);
+    // cockpit rim
+    cv.ellipse(Math.floor(rectW * 0.4), midY, 6, Math.floor(h * 0.32), darken(accent, 0.3), 200);
+    cv.ellipse(Math.floor(rectW * 0.4), midY, 5, Math.floor(h * 0.22), 0x333333, 220);
+    // paddler — torso + head
+    cv.rect(Math.floor(rectW * 0.36), midY - 3, 5, 5, 0xE0B080, 230);
+    cv.circle(Math.floor(rectW * 0.4), midY - 5, 2, 0xC89060, 230);
+    // double-bladed paddle, diagonal across the kayak
+    cv.line(Math.floor(rectW * 0.18), midY - 5, Math.floor(rectW * 0.62), midY + 5, 0x8B5A2B, 220);
+    cv.rect(Math.floor(rectW * 0.16) - 1, midY - 6, 4, 2, 0xDDDDDD, 220);
+    cv.rect(Math.floor(rectW * 0.62) - 1, midY + 4, 4, 2, 0xDDDDDD, 220);
   },
 
   speedboat(cv, c) {
     const { y0, h, rectW, accent } = c;
     for (let x = 2; x < rectW - 1; x++) { cv.set(x, y0, accent, 230); cv.set(x, y0 + h - 1, accent, 230); }
-    for (let y = y0 + 1; y < y0 + 3; y++) for (let x = rectW - 9; x < rectW - 2; x++) cv.set(x, y, 0x88CCFF, 170);
+    // racing stripe through the middle
+    const my = y0 + Math.floor(h / 2);
+    for (let x = 2; x < rectW - 1; x++) cv.set(x, my, darken(accent, 0.25), 200);
+    // windshield
+    for (let y = y0 + 2; y < y0 + 5; y++) for (let x = rectW - 22; x < rectW - 3; x++) cv.set(x, y, 0x88CCFF, 180);
+    cv.rect(rectW - 23, y0 + 1, 1, 5, 0x333333);
+    // engine hatch at the stern
+    cv.rect(2, y0 + 3, 6, h - 6, darken(accent, 0.4), 210);
   },
 
   tugboat(cv, c) {
     const { y0, h, rectW, accent, extraTop } = c;
-    const cx0 = Math.floor(rectW * 0.18), cw = Math.floor(rectW * 0.45);
-    cv.rect(cx0, y0 + 1, cw, h - 2, accent, 235);
-    for (let wy = y0 + 2; wy < y0 + h - 3; wy += 3) {
-      for (let wx = cx0 + 2; wx < cx0 + cw - 2; wx += 4) cv.set(wx, wy, 0xCCEEFF, 255);
+    const cx0 = Math.floor(rectW * 0.18), cw = Math.floor(rectW * 0.40);
+    // wheelhouse — roughly 60% of the hull's height, leaving an open deck astern
+    const houseH = Math.floor(h * 0.6);
+    cv.rect(cx0, y0 + 1, cw, houseH, accent, 235);
+    // wheelhouse roof (set back, narrower)
+    const upperH = Math.floor(extraTop * 0.35);
+    const cw2 = Math.floor(cw * 0.7), cx02 = cx0 + Math.floor((cw - cw2) / 2);
+    cv.rect(cx02, y0 - upperH, cw2, upperH + 1, lighten(accent, 0.15), 235);
+    // two rows of windows on the wheelhouse
+    for (const wy of [y0 + 3, y0 + houseH - 2]) {
+      for (let wx = cx0 + 2; wx < cx0 + cw - 2; wx += 4) cv.rect(wx, wy, 2, 2, 0xCCEEFF, 255);
     }
-    // funnel
+    // roof windows
+    for (let wx = cx02 + 1; wx < cx02 + cw2 - 1; wx += 3) cv.set(wx, y0 - upperH + 1, 0xCCEEFF, 255);
+    // funnel with stripe and a wisp of smoke
     const fx = cx0 + Math.floor(cw / 2);
-    cv.rect(fx - 1, y0 - extraTop + 2, 3, extraTop - 1, 0x333333);
-    cv.rect(fx - 1, y0 - extraTop + 2, 3, 2, accent);
+    cv.rect(fx - 2, y0 - extraTop + 2, 5, extraTop - 2, 0x333333);
+    cv.rect(fx - 2, y0 - extraTop + 2, 5, 3, accent);
+    cv.circle(fx, y0 - extraTop, 2, 0x888888, 120);
+    // tire fenders along the open aft deck
+    for (let x = cx0 + cw + 4; x < rectW - 4; x += 7) cv.circle(x, y0 + h - 1, 2, 0x222222, 200);
   },
 
   yacht(cv, c) {
-    const { y0, h, rectW, extraTop } = c;
-    cv.rect(Math.floor(rectW * 0.15), y0 + 1, Math.floor(rectW * 0.45), h - 4, 0xF0F0EE, 235);
-    const mastX = rectW - 9;
+    const { y0, h, rectW, accent, extraTop } = c;
+    // main cabin, sitting on the main deck — accent-tinted so it reads
+    // against the pale hull instead of blending into it
+    const cabinColor = lighten(accent, 0.55);
+    const dx0 = Math.floor(rectW * 0.12), dw = Math.floor(rectW * 0.5);
+    const cabinH = Math.floor(h * 0.55);
+    cv.rect(dx0, y0 + 1, dw, cabinH, cabinColor, 235);
+    cv.rect(dx0, y0 + 1, dw, 1, lighten(cabinColor, 0.25), 235);
+    for (let wx = dx0 + 2; wx < dx0 + dw - 2; wx += 4) cv.rect(wx, y0 + 3, 2, 2, 0x336688, 220);
+    // upper deck, set back and narrower, standing directly on the cabin roof
+    const upperH = Math.floor(cabinH * 0.7);
+    const dw2 = Math.floor(dw * 0.6), dx02 = dx0 + Math.floor((dw - dw2) / 2);
+    cv.rect(dx02, y0 - upperH + 1, dw2, upperH, lighten(cabinColor, 0.3), 235);
+    for (let wx = dx02 + 1; wx < dx02 + dw2 - 1; wx += 3) cv.set(wx, y0 - upperH + 2, 0x336688, 220);
+    // railing along the main deck
+    for (let x = dx0; x < dx0 + dw; x += 3) cv.set(x, y0, 0xCCCCCC, 160);
+    // mast + mainsail
+    const mastX = rectW - 18;
     const topY = y0 - extraTop + 1;
     cv.line(mastX, topY, mastX, y0 + h - 2, 0xAA9966);
-    cv.triangle(mastX, topY, mastX, y0 + Math.floor(h / 2), rectW - 2, topY + 2, 0xFFFFF8, 230);
+    cv.triangle(mastX, topY, mastX, y0 + Math.floor(h / 2), rectW - 2, topY + Math.floor(extraTop * 0.55), 0xFFFFF8, 230);
+    // pennant
+    cv.triangle(mastX, topY, mastX + 8, topY + 2, mastX, topY + 5, accent, 230);
+    // sundeck circle near the stern
+    cv.circle(Math.floor(rectW * 0.18), y0, 3, 0xCCCCCC, 180);
   },
 
   pedalo(cv, c) {
     const { y0, h, rectW, accent } = c;
-    cv.circle(3, y0, 2, accent, 230);
-    cv.circle(3, y0 + h - 1, 2, accent, 230);
-    cv.circle(3, y0, 1, 0xDD8800, 230);
-    cv.circle(3, y0 + h - 1, 1, 0xDD8800, 230);
-    for (let x = 4; x < rectW - 2; x++) cv.set(x, y0, accent, 180);
+    // pedal wheels with spokes
+    for (const wy of [y0 + 2, y0 + h - 3]) {
+      cv.circle(4, wy, 4, accent, 230);
+      cv.circle(4, wy, 2, 0xDD8800, 230);
+      cv.line(0, wy, 8, wy, darken(accent, 0.3), 200);
+      cv.line(4, wy - 4, 4, wy + 4, darken(accent, 0.3), 200);
+    }
+    // seat cushions
+    for (const sy of [y0 + 4, y0 + h - 8]) cv.rect(10, sy, Math.floor(rectW * 0.4), 4, lighten(accent, 0.3), 220);
+    // canopy posts + roof
+    for (const px of [10, 10 + Math.floor(rectW * 0.4) - 2]) cv.line(px, y0, px, y0 + h - 9, 0xCCCCCC, 200);
+    cv.rect(8, y0, Math.floor(rectW * 0.4) + 4, 1, lighten(accent, 0.5), 220);
+    // accent trim along the hull
+    for (let x = 12; x < rectW - 2; x++) cv.set(x, y0 + h - 1, accent, 160);
   },
 
   houseboat(cv, c) {
     const { y0, h, rectW, accent } = c;
-    const hx0 = 4, hw = rectW - 9;
-    cv.rect(hx0, y0 + 1, hw, h - 3, accent, 240);
-    for (let x = hx0; x < hx0 + hw; x++) cv.set(x, y0 + 1, darken(accent, 0.3), 240);
-    for (let wx = hx0 + 2; wx < hx0 + hw - 2; wx += 6) cv.rect(wx, y0 + 3, 3, h - 7, 0xFFEE99, 200);
+    const hx0 = 4, hw = rectW - 12;
+    // main cabin
+    cv.rect(hx0, y0 + 6, hw, h - 9, accent, 240);
+    cv.rect(hx0, y0 + 6, hw, 1, darken(accent, 0.3), 240);
+    // upper deck, set back
+    const hw2 = Math.floor(hw * 0.7), hx02 = hx0 + Math.floor((hw - hw2) / 2);
+    cv.rect(hx02, y0 + 1, hw2, 5, lighten(accent, 0.2), 240);
+    cv.rect(hx02, y0 + 1, hw2, 1, darken(accent, 0.25), 240);
+    // upper-deck railing
+    for (let x = hx02; x < hx02 + hw2; x += 2) cv.set(x, y0, 0xDDDDDD, 160);
+    // ground-floor windows — two rows of small square windows, with plain
+    // cabin wall visible between them
+    for (let wx = hx0 + 3; wx < hx0 + hw - 3; wx += 6) {
+      cv.rect(wx, y0 + 10, 3, 4, 0xFFEE99, 200);
+      cv.rect(wx, y0 + h - 9, 3, 4, 0xFFEE99, 200);
+    }
+    // upper-deck windows
+    for (let wx = hx02 + 2; wx < hx02 + hw2 - 2; wx += 5) cv.set(wx, y0 + 3, 0xFFEE99, 200);
   },
 
   ferry(cv, c) {
     const { y0, h, rectW, accent } = c;
-    cv.rect(2, y0 + 1, rectW - 4, 4, accent, 220);
+    cv.rect(2, y0 + 1, rectW - 4, h - 4, accent, 220);
+    // three window rows
     for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + 2, 3, 2, 0x88BBDD, 210);
-    for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + h - 4, 3, 2, 0xFFEECC, 200);
+    for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + Math.floor(h / 2), 3, 2, 0x88BBDD, 210);
+    for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + h - 6, 3, 2, 0xFFEECC, 200);
+    // bridge structure toward the bow
+    const bw = Math.floor(rectW * 0.2), bx0 = rectW - bw - Math.floor(rectW * 0.08);
+    cv.rect(bx0, y0, bw, 2, 0xDDDDDD, 230);
+    for (let wx = bx0 + 1; wx < bx0 + bw - 1; wx += 2) cv.set(wx, y0, 0x336688, 220);
+    // life rafts along the lower hull edge
+    for (let x = 10; x < rectW - 10; x += 14) cv.circle(x, y0 + h - 1, 2, 0xFF7700, 220);
   },
 
   container_ship(cv, c) {
     const { y0, h, rectW } = c;
-    const colors = [0xFF4444, 0x44AA44, 0x4444FF, 0xFFAA22, 0xFF44AA, 0x44FFAA];
-    const cw = 9, gap = 1, rowH = Math.floor((h - 4) / 2);
+    const colors = [0xFF4444, 0x44AA44, 0x4444FF, 0xFFAA22, 0xFF44AA, 0x44FFAA, 0xAA66FF];
+    const cw = 14, gap = 1, rowH = Math.floor((h - 6) / 3);
     let ci = 0;
-    for (let cx = 3; cx + cw < rectW - 13; cx += cw + gap) {
-      cv.rect(cx, y0 + 2, cw, rowH, colors[ci % colors.length], 235);
-      cv.rect(cx, y0 + 2 + rowH + 1, cw, rowH, colors[(ci + 3) % colors.length], 235);
+    for (let cx = 4; cx + cw < rectW - 26; cx += cw + gap) {
+      for (let row = 0; row < 3; row++) {
+        cv.rect(cx, y0 + 2 + row * (rowH + 1), cw, rowH, colors[(ci + row) % colors.length], 235);
+      }
       ci++;
     }
-    cv.rect(rectW - 13, y0 + 1, 11, h - 2, 0xCCCCCC, 235);
+    // bridge superstructure at the stern
+    const bx0 = rectW - 26;
+    cv.rect(bx0, y0 + 1, 24, h - 2, 0xCCCCCC, 235);
+    for (let wy = y0 + 3; wy < y0 + h - 4; wy += 4) {
+      for (let wx = bx0 + 3; wx < bx0 + 21; wx += 4) cv.set(wx, wy, 0x6699CC, 220);
+    }
+    cv.rect(bx0 + 2, y0, 20, 1, 0xFFFFFF, 230);
+  },
+
+  // ── New mega-boat ─────────────────────────────────────────────────────
+  // A multi-deck cruise liner: white upper-deck superstructure (with three
+  // rows of cabin windows) over a steel-blue lower hull (portholes) and a
+  // dark waterline, plus twin funnels, a forward bridge and a pool deck —
+  // all standing on the main deck (row y0), so they read as part of the hull
+  // rather than floating above it.
+  cruise_ship(cv, c) {
+    const { y0, h, rectW, accent, extraTop } = c;
+    const hull2 = 0x2E4A66; // steel-blue lower hull, distinct from the white superstructure
+
+    // steel-blue lower hull band with two rows of portholes
+    const lowerY = y0 + 26, lowerH = 30;
+    cv.rect(0, lowerY, rectW, lowerH, hull2, 255);
+    cv.rect(0, lowerY, rectW, 1, lighten(hull2, 0.2), 255);
+    for (let x = 8; x < rectW - 8; x += 10) cv.circle(x, lowerY + 9, 1, 0xBBDDFF, 200);
+    for (let x = 8; x < rectW - 8; x += 10) cv.circle(x, lowerY + 19, 1, 0xBBDDFF, 200);
+
+    // dark waterline along the very bottom
+    cv.rect(0, y0 + h - 8, rectW, 8, darken(hull2, 0.45), 255);
+
+    // white upper decks — three rows of cabin windows
+    for (let d = 0; d < 3; d++) {
+      const dy = y0 + 2 + d * 8;
+      for (let wx = 6; wx < rectW - 6; wx += 5) cv.rect(wx, dy + 2, 3, 3, 0x336688, 220);
+    }
+    // lifeboats slung below the boat deck
+    for (let x = 8; x < rectW - 8; x += 16) cv.rect(x, y0 + 24, 8, 3, 0xFF7700, 220);
+
+    // twin funnels, standing on the main deck
+    const funnelH = Math.floor(extraTop * 0.65), funnelTop = y0 - funnelH;
+    for (const fx of [Math.floor(rectW * 0.6), Math.floor(rectW * 0.72)]) {
+      cv.rect(fx, funnelTop, 10, funnelH, darken(accent, 0.2), 255);
+      cv.rect(fx, funnelTop, 10, 3, accent, 255);
+    }
+    // forward bridge, standing on the main deck near the bow
+    const bridgeW = Math.floor(rectW * 0.18), bridgeH = Math.floor(extraTop * 0.5);
+    const bridgeX = rectW - bridgeW - 10, bridgeTop = y0 - bridgeH;
+    cv.rect(bridgeX, bridgeTop, bridgeW, bridgeH, 0xEEEEEE, 250);
+    for (let wx = bridgeX + 2; wx < bridgeX + bridgeW - 2; wx += 3) cv.set(wx, bridgeTop + 2, 0x88CCFF, 220);
+
+    // small pool deck between the funnels and the bridge
+    const poolH = 8, poolW = Math.floor(rectW * 0.18), poolX = Math.floor(rectW * 0.4);
+    cv.rect(poolX, y0 - poolH, poolW, poolH, 0x55AADD, 230);
   },
 };
 

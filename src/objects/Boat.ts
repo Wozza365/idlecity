@@ -8,7 +8,7 @@ const NIGHT_TINT = 0x5a6680;
 export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 
 const DOCK_SLOW_DIST = 90;
-const OFFSCREEN_BUFFER = 130;
+const OFFSCREEN_MARGIN = 30; // extra px beyond the boat's own width before despawn
 
 export interface BoatConfig {
   def: BoatDef;
@@ -126,7 +126,7 @@ export class Boat {
       this.sternLight.y = bobY;
     }
 
-    return this.x > this.sceneWidth + OFFSCREEN_BUFFER;
+    return this.x - this.def.w / 2 > this.sceneWidth + OFFSCREEN_MARGIN;
   }
 
   updateLighting(elevation: number): void {

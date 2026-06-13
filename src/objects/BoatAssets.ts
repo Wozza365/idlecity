@@ -33,22 +33,23 @@ const RARITY_WEIGHTS: Record<BoatRarity, number> = {
 
 export const BOAT_DEFS: readonly BoatDef[] = [
   // common
-  { key: 'rowboat',        w: 20,  h:  7, texH:  7, rarity: 'common',    speed: 20,  canDock: false },
-  { key: 'motorboat',      w: 36,  h: 10, texH: 10, rarity: 'common',    speed: 62,  canDock: true  },
-  { key: 'fishing_boat',   w: 30,  h: 11, texH: 15, rarity: 'common',    speed: 26,  canDock: true  },
+  { key: 'rowboat',        w: 60,  h: 20, texH:  20, rarity: 'common',    speed: 20,  canDock: false },
+  { key: 'motorboat',      w: 100, h: 28, texH:  28, rarity: 'common',    speed: 62,  canDock: true  },
+  { key: 'fishing_boat',   w: 84,  h: 30, texH:  42, rarity: 'common',    speed: 26,  canDock: true  },
   // uncommon
-  { key: 'sailboat',       w: 28,  h:  9, texH: 27, rarity: 'uncommon',  speed: 32,  canDock: true  },
-  { key: 'kayak',          w: 22,  h:  5, texH:  5, rarity: 'uncommon',  speed: 44,  canDock: false },
-  { key: 'speedboat',      w: 38,  h:  8, texH:  8, rarity: 'uncommon',  speed: 92,  canDock: false },
+  { key: 'sailboat',       w: 80,  h: 26, texH:  68, rarity: 'uncommon',  speed: 32,  canDock: true  },
+  { key: 'kayak',          w: 70,  h: 16, texH:  16, rarity: 'uncommon',  speed: 44,  canDock: false },
+  { key: 'speedboat',      w: 108, h: 22, texH:  22, rarity: 'uncommon',  speed: 92,  canDock: false },
   // rare
-  { key: 'tugboat',        w: 40,  h: 14, texH: 24, rarity: 'rare',      speed: 36,  canDock: true  },
-  { key: 'yacht',          w: 54,  h: 13, texH: 35, rarity: 'rare',      speed: 44,  canDock: true  },
-  { key: 'pedalo',         w: 22,  h: 10, texH: 10, rarity: 'rare',      speed: 14,  canDock: false },
+  { key: 'tugboat',        w: 108, h: 36, texH:  64, rarity: 'rare',      speed: 36,  canDock: true  },
+  { key: 'yacht',          w: 145, h: 35, texH:  92, rarity: 'rare',      speed: 44,  canDock: true  },
+  { key: 'pedalo',         w: 70,  h: 28, texH:  28, rarity: 'rare',      speed: 14,  canDock: false },
   // very_rare
-  { key: 'houseboat',      w: 60,  h: 18, texH: 18, rarity: 'very_rare', speed: 16,  canDock: true  },
-  { key: 'ferry',          w: 68,  h: 16, texH: 16, rarity: 'very_rare', speed: 44,  canDock: true  },
+  { key: 'houseboat',      w: 144, h: 42, texH:  42, rarity: 'very_rare', speed: 16,  canDock: true  },
+  { key: 'ferry',          w: 162, h: 36, texH:  36, rarity: 'very_rare', speed: 44,  canDock: true  },
   // legendary
-  { key: 'container_ship', w: 88,  h: 20, texH: 20, rarity: 'legendary', speed: 28,  canDock: false },
+  { key: 'container_ship', w: 210, h: 46, texH:  46, rarity: 'legendary', speed: 28,  canDock: false },
+  { key: 'cruise_ship',    w: 340, h: 64, texH: 118, rarity: 'legendary', speed: 18,  canDock: false },
 ];
 
 export const ALL_BOAT_KEYS: readonly string[] = BOAT_DEFS.map(d => d.key);
