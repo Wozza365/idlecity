@@ -64,9 +64,14 @@ export function pickRandomBoat(): BoatDef {
   return BOAT_DEFS[0];
 }
 
+// Transparent border added around every boat texture by
+// generate-boat-textures.cjs so a dark outline can be drawn around the
+// whole silhouette without clipping.
+const TEX_PAD = 1;
+
 /** Vertical origin (0–1) so the hull's centre stays anchored even when the
  *  texture extends upward for a mast or funnel. */
 export function boatOriginY(def: BoatDef): number {
   const extraTop = def.texH - def.h;
-  return (extraTop + def.h / 2) / def.texH;
+  return (extraTop + TEX_PAD + def.h / 2) / (def.texH + TEX_PAD * 2);
 }

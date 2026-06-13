@@ -1,6 +1,11 @@
 // Generates pixel-art boat textures (assets/boats/*.png) to replace the
 // procedurally-drawn (Graphics-primitive) boats in src/objects/Boat.ts.
 //
+// Every texture gets a 1px transparent border (TEX_PAD) so a dark outline
+// can be drawn cleanly around the whole silhouette without clipping —
+// boatOriginY() in src/objects/BoatAssets.ts compensates for this border
+// when anchoring the sprite to the hull's vertical centre.
+//
 // Run: node scripts/generate-boat-textures.cjs
 'use strict';
 
@@ -11,17 +16,56 @@ const { Canvas, lighten, darken } = require('./pixel-canvas.cjs');
 const OUT_DIR = path.join(__dirname, '..', 'assets', 'boats');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
+const TEX_PAD = 1;
+const OUTLINE = 0x16212C;
+
+// Offsets every draw call by (ox, oy) so detail functions can keep using
+// 0-based coordinates while the underlying canvas carries a transparent
+// border for the outline pass.
+class OffsetCanvas {
+  constructor(cv, ox, oy) { this.cv = cv; this.ox = ox; this.oy = oy; }
+  set(x, y, hex, a) { this.cv.set(x + this.ox, y + this.oy, hex, a); }
+  rect(x, y, w, h, hex, a) { this.cv.rect(x + this.ox, y + this.oy, w, h, hex, a); }
+  circle(cx, cy, r, hex, a) { this.cv.circle(cx + this.ox, cy + this.oy, r, hex, a); }
+  ellipse(cx, cy, rx, ry, hex, a) { this.cv.ellipse(cx + this.ox, cy + this.oy, rx, ry, hex, a); }
+  line(x0, y0, x1, y1, hex, a) { this.cv.line(x0 + this.ox, y0 + this.oy, x1 + this.ox, y1 + this.oy, hex, a); }
+  triRight(x0, x1, cy, halfH, hex, a) { this.cv.triRight(x0 + this.ox, x1 + this.ox, cy + this.oy, halfH, hex, a); }
+  triangle(x1, y1, x2, y2, x3, y3, hex, a) {
+    this.cv.triangle(x1 + this.ox, y1 + this.oy, x2 + this.ox, y2 + this.oy, x3 + this.ox, y3 + this.oy, hex, a);
+  }
+}
+
+// Fills every fully-transparent pixel that touches an opaque pixel with a
+// dark outline colour, giving each sprite a crisp silhouette against the
+// water regardless of hull colour.
+function applyOutline(cv, color = OUTLINE, threshold = 24) {
+  const { w, h, data } = cv;
+  const orig = new Uint8ClampedArray(w * h);
+  for (let i = 0; i < w * h; i++) orig[i] = data[i * 4 + 3];
+  const opaque = (x, y) => x >= 0 && y >= 0 && x < w && y < h && orig[y * w + x] > threshold;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (orig[y * w + x] > threshold) continue;
+      if (opaque(x - 1, y) || opaque(x + 1, y) || opaque(x, y - 1) || opaque(x, y + 1)) {
+        cv.set(x, y, color, 255);
+      }
+    }
+  }
+}
+
 // ── Shared hull/deck rendering ──────────────────────────────────────────
 function drawHull(cv, y0, w, h, rectW, hull) {
   const hi  = lighten(hull, 0.22);
-  const lo  = darken(hull, 0.5);
-  const mid = lighten(hull, 0.07);
+  const mid = lighten(hull, 0.08);
+  const lo  = darken(hull, 0.35);
+  const lo2 = darken(hull, 0.6);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < rectW; x++) {
       let col = hull;
       if (y === 0) col = hi;
-      else if (y === h - 1) col = lo;
-      else if ((x * 13 + y * 7) % 5 === 0) col = mid;
+      else if (y === h - 1) col = lo2;
+      else if (y === h - 2) col = lo;
+      else if (y % 3 === 0) col = mid;
       cv.set(x, y0 + y, col);
     }
   }
@@ -123,16 +167,26 @@ const DETAILS = {
     const { y0, h, rectW, accent, extraTop, bowW } = c;
     const mastX = rectW - 14;
     const topY = y0 - extraTop + 1;
+    const mastBaseY = y0 + Math.floor(h / 2);
+    const clewX = rectW - 2, clewY = topY + Math.floor(extraTop * 0.6);
+    const sailColor = 0xFFFFF0;
     cv.line(mastX, topY, mastX, y0 + h - 2, 0x8B6914);
     // mainsail
-    cv.triangle(mastX, topY, mastX, y0 + Math.floor(h / 2), rectW - 2, topY + Math.floor(extraTop * 0.6), 0xFFFFF0, 235);
-    // small foresail (jib), warm-tinted so it reads against the white mainsail
-    cv.triangle(
-      mastX, topY + Math.floor(extraTop * 0.35),
-      mastX, y0 + Math.floor(h * 0.5),
-      rectW + Math.floor(bowW * 0.7), y0 + Math.floor(h * 0.35),
-      lighten(accent, 0.55), 230,
-    );
+    cv.triangle(mastX, topY, mastX, mastBaseY, clewX, clewY, sailColor, 235);
+    // boom — spar along the sail's foot
+    cv.line(mastX, mastBaseY, clewX, clewY, 0x8B6914);
+    // leech shading so the mainsail reads as a curved surface, not a flat
+    // wedge of colour
+    cv.line(mastX, topY, clewX, clewY, darken(sailColor, 0.18));
+    // small foresail (jib), warm-tinted so it reads against the white
+    // mainsail, with both edges stroked for definition
+    const jibColor = lighten(accent, 0.4);
+    const jibLuffY = topY + Math.floor(extraTop * 0.35);
+    const jibFootY = y0 + Math.floor(h * 0.5);
+    const jibTipX = rectW + Math.floor(bowW * 0.7), jibTipY = y0 + Math.floor(h * 0.35);
+    cv.triangle(mastX, jibLuffY, mastX, jibFootY, jibTipX, jibTipY, jibColor, 230);
+    cv.line(mastX, jibLuffY, jibTipX, jibTipY, darken(jibColor, 0.3));
+    cv.line(mastX, jibFootY, jibTipX, jibTipY, darken(jibColor, 0.3));
     // pennant at the masthead
     cv.triangle(mastX, topY, mastX + 7, topY + 2, mastX, topY + 4, accent, 230);
     // hull stripe
@@ -177,6 +231,8 @@ const DETAILS = {
     // wheelhouse — roughly 60% of the hull's height, leaving an open deck astern
     const houseH = Math.floor(h * 0.6);
     cv.rect(cx0, y0 + 1, cw, houseH, accent, 235);
+    // shadow line where the wheelhouse meets the deck
+    cv.rect(cx0, y0 + houseH, cw, 1, darken(accent, 0.35), 235);
     // wheelhouse roof (set back, narrower)
     const upperH = Math.floor(extraTop * 0.35);
     const cw2 = Math.floor(cw * 0.7), cx02 = cx0 + Math.floor((cw - cw2) / 2);
@@ -206,6 +262,8 @@ const DETAILS = {
     cv.rect(dx0, y0 + 1, dw, cabinH, cabinColor, 235);
     cv.rect(dx0, y0 + 1, dw, 1, lighten(cabinColor, 0.25), 235);
     for (let wx = dx0 + 2; wx < dx0 + dw - 2; wx += 4) cv.rect(wx, y0 + 3, 2, 2, 0x336688, 220);
+    // shadow line where the cabin meets the main deck
+    cv.rect(dx0, y0 + cabinH, dw, 1, darken(cabinColor, 0.35), 235);
     // upper deck, set back and narrower, standing directly on the cabin roof
     const upperH = Math.floor(cabinH * 0.7);
     const dw2 = Math.floor(dw * 0.6), dx02 = dx0 + Math.floor((dw - dw2) / 2);
@@ -271,12 +329,15 @@ const DETAILS = {
     for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + 2, 3, 2, 0x88BBDD, 210);
     for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + Math.floor(h / 2), 3, 2, 0x88BBDD, 210);
     for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + h - 6, 3, 2, 0xFFEECC, 200);
+    // accent stripe along the waterline
+    for (let x = 1; x < rectW - 1; x++) cv.set(x, y0 + h - 3, lighten(accent, 0.5), 210);
     // bridge structure toward the bow
     const bw = Math.floor(rectW * 0.2), bx0 = rectW - bw - Math.floor(rectW * 0.08);
     cv.rect(bx0, y0, bw, 2, 0xDDDDDD, 230);
     for (let wx = bx0 + 1; wx < bx0 + bw - 1; wx += 2) cv.set(wx, y0, 0x336688, 220);
-    // life rafts along the lower hull edge
-    for (let x = 10; x < rectW - 10; x += 14) cv.circle(x, y0 + h - 1, 2, 0xFF7700, 220);
+    // life rings along the lower hull edge, sized to stay clear of the
+    // canvas edge so they don't get clipped into wedge shapes
+    for (let x = 10; x < rectW - 10; x += 14) cv.circle(x, y0 + h - 3, 1, 0xFF7700, 220);
   },
 
   container_ship(cv, c) {
@@ -349,17 +410,19 @@ const DETAILS = {
 for (const def of BOATS) {
   const extraTop = def.extraTop ?? 0;
   const texH = def.h + extraTop;
-  const cv = new Canvas(def.w, texH);
+  const cv = new Canvas(def.w + TEX_PAD * 2, texH + TEX_PAD * 2);
+  const ocv = new OffsetCanvas(cv, TEX_PAD, TEX_PAD);
   const y0 = extraTop;
   const rectW = def.w - def.bowW;
 
-  drawHull(cv, y0, def.w, def.h, rectW, def.hull);
-  drawDeck(cv, y0, rectW, def.h, def.hull);
-  DETAILS[def.key](cv, { ...def, y0, rectW });
-  drawNavLights(cv, y0, def.h, rectW, def.w);
+  drawHull(ocv, y0, def.w, def.h, rectW, def.hull);
+  drawDeck(ocv, y0, rectW, def.h, def.hull);
+  DETAILS[def.key](ocv, { ...def, y0, rectW });
+  drawNavLights(ocv, y0, def.h, rectW, def.w);
+  applyOutline(cv);
 
   const outPath = path.join(OUT_DIR, `${def.key}.png`);
   fs.writeFileSync(outPath, cv.toBuffer());
-  console.log(`  wrote ${def.key}.png  ${def.w}x${texH}`);
+  console.log(`  wrote ${def.key}.png  ${cv.w}x${cv.h}`);
 }
 console.log(`Done. ${BOATS.length} boat textures written to ${OUT_DIR}`);
