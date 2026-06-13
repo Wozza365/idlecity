@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H, VERGE_H, lerpColor } from '../constants';
+import { ROAD_H, VERGE_H, lerpColor, multiplyColor } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { VergePalette, ThemeParams } from '../theme/ThemeTypes';
@@ -9,6 +9,7 @@ import {
   LAMP_ORIGIN_X, LAMP_ORIGIN_Y,
   BOLLARD_ORIGIN_X, BOLLARD_ORIGIN_Y,
 } from './VergeFurnitureAssets';
+import { FLOWER_KEYS } from './FlowerAssets';
 
 const CYCLE_H = 14;
 const NIGHT_TINT = 0x5a6680;
@@ -42,6 +43,9 @@ export class VergeRiver {
   private benchImages:   Phaser.GameObjects.Image[] = [];
   private lampImages:    Phaser.GameObjects.Image[] = [];
   private bollardImages: Phaser.GameObjects.Image[] = [];
+
+  private wildflowers:      Array<{ img: Phaser.GameObjects.Image; color: number }> = [];
+  private flowerBedFlowers: Array<{ img: Phaser.GameObjects.Image; color: number }> = [];
 
   private lampSpots:        SoftSpotLight[]                              = [];
   private lampBulbs:        Array<Extract<LightSource, { type?: 'point' }>> = [];
@@ -119,8 +123,18 @@ export class VergeRiver {
     if (level >= 8)  this.drawCyclePath(gfx, width, vergeY);
     if (level >= 13) this.drawPaving(gfx, width, vergeY);
     // Wildflowers only before flower beds take over (levels 3–4)
-    if (level >= 3 && level <= 4) this.drawWildflowers(gfx, level, width, vergeY);
-    if (level >= 5)  this.drawFlowerBeds(this.flowerGfx, level, width, vergeY);
+    if (level >= 3 && level <= 4) {
+      this.drawWildflowers(gfx, level, width, vergeY);
+    } else if (this.wildflowers.length > 0) {
+      for (const f of this.wildflowers) f.img.destroy();
+      this.wildflowers = [];
+    }
+    if (level >= 5) {
+      this.drawFlowerBeds(this.flowerGfx, level, width, vergeY);
+    } else if (this.flowerBedFlowers.length > 0) {
+      for (const f of this.flowerBedFlowers) f.img.destroy();
+      this.flowerBedFlowers = [];
+    }
 
     if (level >= 9) {
       this.drawBollards(width, vergeY);
@@ -362,33 +376,42 @@ export class VergeRiver {
   // ── Wildflowers ───────────────────────────────────────────────────
 
   private drawWildflowers(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
+    for (const f of this.wildflowers) f.img.destroy();
+    this.wildflowers = [];
+
     const petalColors = [0xff6b8a, 0xffee44, 0xff9144, 0xcc88ff, 0x80deea, 0xffcc44, 0xff88bb, 0xaaee66];
     const bottomBand  = level >= 8 ? VERGE_H - CYCLE_H : VERGE_H;
     const count       = Math.floor(width / 14);
+    const nightTint   = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
     for (let i = 0; i < count; i++) {
       const fx = ((i * 41 + 17) % Math.max(1, Math.floor(width) - 10)) + 5;
       const fy = vergeY + 12 + ((i * 19 + 7) % Math.max(1, bottomBand - 26));
       // Stem
       gfx.fillStyle(0x3a7a2a, 0.7);
       gfx.fillRect(fx, fy + 2, 1, 5);
-      // Outer petals ring
-      const petal = petalColors[i % petalColors.length];
-      gfx.fillStyle(petal, 0.85);
-      gfx.fillCircle(fx, fy, 3);
-      // Centre dot
-      gfx.fillStyle(0xffee88, 0.9);
-      gfx.fillCircle(fx, fy, 1);
+      // Bloom
+      const color = petalColors[i % petalColors.length];
+      const key   = FLOWER_KEYS[i % FLOWER_KEYS.length];
+      const img = this.scene.add.image(fx, fy, key)
+        .setOrigin(0.5, 0.5)
+        .setDepth(6.05)
+        .setTint(multiplyColor(color, nightTint));
+      this.wildflowers.push({ img, color });
     }
   }
 
   // ── Flower beds ───────────────────────────────────────────────────
 
   private drawFlowerBeds(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
+    for (const f of this.flowerBedFlowers) f.img.destroy();
+    this.flowerBedFlowers = [];
+
     const allColors = this._palette.flowerColors;
     const { spacing } = treeGeom(level);
     const bottomBand = level >= 8 ? CYCLE_H + 14 : 14;
     const bedTop = vergeY + VERGE_H - bottomBand - 18;
     const bedH   = 16;
+    const nightTint = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
 
     for (let tx = spacing / 2; tx < width; tx += spacing * 2) {
       const gx = Math.round(tx - spacing / 2 + 14);
@@ -402,18 +425,21 @@ export class VergeRiver {
       gfx.fillRect(gx, bedTop, gw, 1);
 
       const rows = [
-        { y: bedTop + 4,  r: 3, step: 6, offset: 0 },
-        { y: bedTop + 9,  r: 3, step: 6, offset: 3 },
-        { y: bedTop + 13, r: 3, step: 6, offset: 0 },
+        { y: bedTop + 4,  step: 6, offset: 0 },
+        { y: bedTop + 9,  step: 6, offset: 3 },
+        { y: bedTop + 13, step: 6, offset: 0 },
       ];
 
       for (const row of rows) {
         for (let fx = gx + row.offset + 3; fx < gx + gw - 3; fx += row.step) {
           const h = (Math.imul(fx | 0, 374761393) ^ Math.imul(row.y | 0, 668265261)) >>> 0;
-          gfx.fillStyle(allColors[h % allColors.length], 0.77);
-          gfx.fillCircle(fx, row.y, row.r);
-          gfx.fillStyle(0xffffff, 0.4);
-          gfx.fillCircle(fx - 1, row.y - 1, 1);
+          const color = allColors[h % allColors.length];
+          const key   = FLOWER_KEYS[h % FLOWER_KEYS.length];
+          const img = this.scene.add.image(fx, row.y, key)
+            .setOrigin(0.5, 0.5)
+            .setDepth(6.11)
+            .setTint(multiplyColor(color, nightTint));
+          this.flowerBedFlowers.push({ img, color });
         }
       }
 
@@ -645,6 +671,10 @@ export class VergeRiver {
     for (const img of this.benchImages)   img.setTint(tint);
     for (const img of this.lampImages)    img.setTint(tint);
     for (const img of this.bollardImages) img.setTint(tint);
+
+    // Flower blooms combine their palette tint with the night tint
+    for (const f of this.wildflowers)      f.img.setTint(multiplyColor(f.color, tint));
+    for (const f of this.flowerBedFlowers) f.img.setTint(multiplyColor(f.color, tint));
   }
 
   destroy(): void {
@@ -654,6 +684,8 @@ export class VergeRiver {
     for (const img of this.benchImages)   img.destroy();
     for (const img of this.lampImages)    img.destroy();
     for (const img of this.bollardImages) img.destroy();
+    for (const f of this.wildflowers)      f.img.destroy();
+    for (const f of this.flowerBedFlowers) f.img.destroy();
     this.vergeGfx.destroy();
     this.flowerGfx.destroy();
     this.cyclistGfx.destroy();

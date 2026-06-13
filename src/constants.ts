@@ -121,6 +121,16 @@ export function lerpColor(a: number, b: number, t: number): number {
   return (r << 16) | (g << 8) | bl;
 }
 
+/** Component-wise multiply of two colours (each channel /255) — used to
+ *  combine a per-instance tint (e.g. a flower's petal colour) with a
+ *  global tint (e.g. night darkening) into a single Phaser tint value. */
+export function multiplyColor(a: number, b: number): number {
+  const r  = Math.round(((a >> 16) & 0xff) * ((b >> 16) & 0xff) / 255);
+  const g  = Math.round(((a >> 8)  & 0xff) * ((b >> 8)  & 0xff) / 255);
+  const bl = Math.round( (a        & 0xff) * ( b        & 0xff) / 255);
+  return (r << 16) | (g << 8) | bl;
+}
+
 export function sunColorAtElevation(elev: number): number {
   const t = Math.max(0, Math.min(1, elev));
   if (t < 0.20) return lerpColor(0xff3300, 0xffaa33, t / 0.20);
