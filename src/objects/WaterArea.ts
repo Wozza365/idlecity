@@ -3,6 +3,13 @@ import { ROAD_H, VERGE_H, WATER_H } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { WaterPalette } from '../theme/ThemeTypes';
+import {
+  PIER_KEY, PIER_ORIGIN_X, PIER_ORIGIN_Y,
+  CAFE_KEY, CAFE_ORIGIN_X, CAFE_ORIGIN_Y,
+  HUT_KEY, HUT_ORIGIN_X, HUT_ORIGIN_Y,
+} from './WaterStructureAssets';
+
+const NIGHT_TINT = 0x5a6680;
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
@@ -145,6 +152,9 @@ export class WaterArea {
   private _lighthouseX    = 0;
   private _lighthouseTopY = 0;
   private _lhTowerImg: Phaser.GameObjects.Image | null = null;
+  private _pierImg: Phaser.GameObjects.Image | null = null;
+  private _cafeImg: Phaser.GameObjects.Image | null = null;
+  private _hutImg: Phaser.GameObjects.Image | null = null;
   private _dockSlots: number[] = [];
 
   // Beach people
@@ -241,12 +251,12 @@ export class WaterArea {
 
     this.drawWaterAndCoast();
 
-    if (level >= 3) this.drawPier();
-    if (level >= 4) this.drawBeachCafe();
+    if (level >= 3) this.drawPier(); else this._pierImg?.setVisible(false);
+    if (level >= 4) this.drawBeachCafe(); else this._cafeImg?.setVisible(false);
     if (level >= 5) this.drawDock();
     else { this._dockGlows = []; }
     if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
-    else { this._buoys = []; }
+    else { this._buoys = []; this._hutImg?.setVisible(false); }
     if (level >= 8) { this.drawLighthouseIsland(); this.drawLighthouse(); }
     else { this._lhTowerImg?.setVisible(false); }
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
@@ -360,86 +370,29 @@ export class WaterArea {
   // ── Pier (level 3+) ───────────────────────────────────────────────────────
 
   private drawPier(): void {
-    const gfx = this.structGfx;
     const { _waterY: wy, _pierX: px } = this;
-    const pierW = 18;
-    const pierH = 30; // ends at wy+68, well above boat lane (wy+75)
-    const planks = 5;
 
-    // Pier deck
-    gfx.fillStyle(this._palette.pierWood, 1);
-    gfx.fillRect(px - pierW / 2, wy + BEACH_SHORE_H - 10, pierW, pierH);
-
-    // Plank lines
-    gfx.fillStyle(0x000000, 0.13);
-    for (let i = 0; i <= planks; i++) {
-      const py2 = wy + BEACH_SHORE_H - 10 + Math.round((i / planks) * pierH);
-      gfx.fillRect(px - pierW / 2, py2, pierW, 1);
+    if (!this._pierImg) {
+      this._pierImg = this.scene.add.image(px, wy, PIER_KEY)
+        .setOrigin(PIER_ORIGIN_X, PIER_ORIGIN_Y)
+        .setDepth(5.7);
+    } else {
+      this._pierImg.setPosition(px, wy).setVisible(true);
     }
-
-    // Side railings
-    gfx.fillStyle(0x8A6030, 1);
-    gfx.fillRect(px - pierW / 2 - 2, wy + BEACH_SHORE_H - 10, 3, pierH);
-    gfx.fillRect(px + pierW / 2 - 1, wy + BEACH_SHORE_H - 10, 3, pierH);
-
-    // Railing posts
-    gfx.fillStyle(0x9A7040, 1);
-    for (let i = 0; i <= 4; i++) {
-      const py2 = wy + BEACH_SHORE_H - 10 + Math.round((i / 4) * pierH);
-      gfx.fillRect(px - pierW / 2 - 2, py2 - 1, 3, 2);
-      gfx.fillRect(px + pierW / 2 - 1, py2 - 1, 3, 2);
-    }
-
-    // Pier end platform + mooring posts
-    gfx.fillStyle(this._palette.pierWood, 1);
-    gfx.fillRect(px - pierW / 2 - 4, wy + BEACH_SHORE_H - 10 + pierH - 5, pierW + 8, 8);
-    gfx.fillStyle(0x6A4818, 1);
-    gfx.fillRect(px - pierW / 2 - 3, wy + BEACH_SHORE_H - 10 + pierH - 2, 3, 6);
-    gfx.fillRect(px + pierW / 2 + 1, wy + BEACH_SHORE_H - 10 + pierH - 2, 3, 6);
   }
 
   // ── Beach café (level 4+) ─────────────────────────────────────────────────
 
   private drawBeachCafe(): void {
-    const gfx = this.structGfx;
     const { _waterY: wy, _cafeX: cx } = this;
-    const cafeW = 60;
-    const cafeH = 26;
-    const cafeY = wy + 2;
 
-    gfx.fillStyle(0xF5E6CC, 1);
-    gfx.fillRect(cx, cafeY, cafeW, cafeH);
-
-    // Roof
-    gfx.fillStyle(0xB06030, 1);
-    gfx.fillRect(cx - 2, cafeY - 5, cafeW + 4, 7);
-
-    // Awning stripes
-    const stripeW = 6;
-    for (let s = 0; s < Math.ceil(cafeW / stripeW); s++) {
-      gfx.fillStyle(s % 2 === 0 ? 0x00CED1 : 0xFF8C00, 1);
-      gfx.fillRect(cx + s * stripeW, cafeY + 9, Math.min(stripeW, cafeW - s * stripeW), 5);
+    if (!this._cafeImg) {
+      this._cafeImg = this.scene.add.image(cx, wy, CAFE_KEY)
+        .setOrigin(CAFE_ORIGIN_X, CAFE_ORIGIN_Y)
+        .setDepth(5.7);
+    } else {
+      this._cafeImg.setPosition(cx, wy).setVisible(true);
     }
-
-    // Windows
-    gfx.fillStyle(0x88CCFF, 0.7);
-    gfx.fillRect(cx + 4, cafeY + 9, 12, 10);
-    gfx.fillRect(cx + 22, cafeY + 9, 12, 10);
-
-    // Door
-    gfx.fillStyle(0x7A4010, 1);
-    gfx.fillRect(cx + cafeW - 16, cafeY + 11, 10, cafeH - 11);
-
-    // Sign
-    gfx.fillStyle(0x4A2C0A, 1);
-    gfx.fillRect(cx + 35, cafeY + 4, 18, 7);
-    gfx.fillStyle(0xFFEE88, 1);
-    gfx.fillRect(cx + 37, cafeY + 5, 14, 5);
-
-    // Outdoor table
-    gfx.fillStyle(0x888888, 1);
-    gfx.fillRect(cx + cafeW + 4, cafeY + 13, 14, 2);
-    gfx.fillRect(cx + cafeW + 9, cafeY + 15, 4, 8);
   }
 
   // ── Dock / harbour (level 5+) ─────────────────────────────────────────────
@@ -537,38 +490,16 @@ export class WaterArea {
   // ── Lifeguard hut (level 7+) ──────────────────────────────────────────────
 
   private drawLifeguardHut(): void {
-    const gfx = this.structGfx;
     const { _waterY: wy, _beachEndX: bx } = this;
-    const hx  = Math.floor(bx * 0.42);
-    const hutH = 20;
-    const hutW = 26;
-    const hutY = wy + 5;
+    const hx = Math.floor(bx * 0.42);
 
-    gfx.fillStyle(0x8B6914, 1);
-    gfx.fillRect(hx + 3, hutY + hutH, 4, 8);
-    gfx.fillRect(hx + hutW - 7, hutY + hutH, 4, 8);
-
-    gfx.fillStyle(0xF0F0F0, 1);
-    gfx.fillRect(hx, hutY, hutW, hutH);
-
-    for (let i = 0; i < 4; i++) {
-      gfx.fillStyle(i % 2 === 0 ? 0xDD2222 : 0xFFFFFF, 1);
-      gfx.fillRect(hx - 1 + i * 7, hutY - 4, 7, 6);
+    if (!this._hutImg) {
+      this._hutImg = this.scene.add.image(hx, wy, HUT_KEY)
+        .setOrigin(HUT_ORIGIN_X, HUT_ORIGIN_Y)
+        .setDepth(5.7);
+    } else {
+      this._hutImg.setPosition(hx, wy).setVisible(true);
     }
-    gfx.fillStyle(0xDD2222, 1);
-    gfx.fillRect(hx - 1, hutY - 4, hutW + 2, 1);
-
-    gfx.fillStyle(0x88CCFF, 0.7);
-    gfx.fillRect(hx + 3, hutY + 3, 9, 8);
-    gfx.fillStyle(0xBB5500, 1);
-    gfx.fillRect(hx + hutW - 12, hutY + 8, 8, hutH - 8);
-
-    gfx.fillStyle(0xFF2222, 1);
-    gfx.fillRect(hx + hutW + 1, hutY - 10, 12, 8);
-    gfx.fillStyle(0xFFFFFF, 1);
-    gfx.fillRect(hx + hutW + 4, hutY - 8, 5, 4);
-    gfx.fillStyle(0x888888, 1);
-    gfx.fillRect(hx + hutW + 1, hutY - 14, 2, hutH + 14);
   }
 
   // ── Lighthouse rocky island (level 8+) ─────────────────────────────────────
@@ -1674,6 +1605,13 @@ export class WaterArea {
     this._nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
     const nf = this._nightFactor;
 
+    // Pier / café / lifeguard hut — manual night tint (these images skip
+    // the Light2D pipeline, same as cyclist/furniture sprites).
+    const structTint = lerpColor(0xffffff, NIGHT_TINT, nf);
+    this._pierImg?.setTint(structTint);
+    this._cafeImg?.setTint(structTint);
+    this._hutImg?.setTint(structTint);
+
     // Dock spots
     for (const s of this._dockSpots) s.setIntensity(nf * 3.0);
     for (const b of this._dockBulbs) (b as { intensity: number }).intensity = nf * 220;
@@ -1718,6 +1656,9 @@ export class WaterArea {
     this.islandGfx.destroy();
     this.crittersGfx.destroy();
     this._lhTowerImg?.destroy();
+    this._pierImg?.destroy();
+    this._cafeImg?.destroy();
+    this._hutImg?.destroy();
     if (this.scene.textures.exists(LH_TEX_KEY)) this.scene.textures.remove(LH_TEX_KEY);
   }
 }
