@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
+import { lerpColor } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
-import { type BoatDef, drawBoatShape } from './BoatAssets';
+import { type BoatDef, boatOriginY } from './BoatAssets';
+
+const NIGHT_TINT = 0x5a6680;
 
 export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 
@@ -17,7 +20,7 @@ export interface BoatConfig {
 }
 
 export class Boat {
-  private readonly gfx: Phaser.GameObjects.Graphics;
+  private readonly image: Phaser.GameObjects.Image;
   private readonly def: BoatDef;
   private x: number;
   readonly y: number;
@@ -58,7 +61,9 @@ export class Boat {
 
     // Above the wave fx (5.85) so boats sit on top of the water/waves, but
     // below the lighthouse island layer (5.86) so it stays in front of boats.
-    this.gfx = scene.add.graphics().setDepth(5.855);
+    this.image = scene.add.image(x, y, def.key)
+      .setOrigin(0.5, boatOriginY(def))
+      .setDepth(5.855);
 
     // Port (top/city-side) = red
     this.portLight = {
@@ -76,14 +81,6 @@ export class Boat {
       radius: 9, color: 0xffffff, intensity: 0, noOcclusion: true,
     } : null;
 
-    this.redraw();
-  }
-
-  private redraw(): void {
-    const gfx = this.gfx;
-    gfx.clear();
-    drawBoatShape(gfx, this.def, this.nightFactor);
-    gfx.setPosition(this.x, this.y);
   }
 
   /** Returns true when the boat has left the right edge and should be removed. */
@@ -118,7 +115,7 @@ export class Boat {
     this.bobPhase += dt * 1.2;
     const bobY = this.y + Math.sin(this.bobPhase) * 1.2;
 
-    this.gfx.setPosition(this.x, bobY);
+    this.image.setPosition(this.x, bobY);
 
     this.portLight.x = this.x;
     this.portLight.y = bobY - this.def.h / 2 + 2;
@@ -136,7 +133,7 @@ export class Boat {
     if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
     this._lastLightingElevation = elevation;
     this.nightFactor = Math.max(0, Math.min(1, (0.15 - elevation) / 0.25));
-    this.redraw();
+    this.image.setTint(lerpColor(0xffffff, NIGHT_TINT, this.nightFactor));
 
     this.portLight.intensity      = this.nightFactor * 25;
     this.starboardLight.intensity = this.nightFactor * 25;
@@ -144,6 +141,6 @@ export class Boat {
   }
 
   destroy(): void {
-    this.gfx.destroy();
+    this.image.destroy();
   }
 }

@@ -31,6 +31,7 @@ import { WaterArea } from '../objects/WaterArea';
 import { BoatManager } from '../objects/BoatManager';
 import { ALL_CAR_KEYS, getCarUrl } from '../objects/CarAssets';
 import { PERSON_DEFS, getPersonUrl } from '../objects/PedestrianAssets';
+import { ALL_BOAT_KEYS, getBoatUrl } from '../objects/BoatAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
 import { Rain } from '../objects/Rain';
@@ -156,6 +157,10 @@ export class GameScene extends Phaser.Scene {
     for (const def of PERSON_DEFS) {
       const url = getPersonUrl(def.key);
       if (url) this.load.spritesheet(def.key, url, { frameWidth: def.frameWidth, frameHeight: def.frameHeight });
+    }
+    for (const key of ALL_BOAT_KEYS) {
+      const url = getBoatUrl(key);
+      if (url) this.load.image(key, url);
     }
     loadHtAssets(this);
   }
