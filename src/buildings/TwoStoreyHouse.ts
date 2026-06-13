@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { YARD_H } from '../constants';
 import { type DoorEntrance } from './types';
+import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -43,7 +44,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, initialParticles?: SmokeParticle[]) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, params: ThemeParams, initialParticles?: SmokeParticle[]) {
     super(scene, 0, 0);
 
     const w        = plotWidth;
@@ -60,7 +61,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const floorDivY = top + upperH;
 
     // ── Body — warm limestone ──────────────────────────────────
-    const body = scene.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, 0xf2ead8);
+    const body = scene.add.rectangle(bx + bw / 2, top + bodyH / 2, bw, bodyH, palette.wall);
     body.setLighting(true);
     this.add(body);
 
@@ -68,7 +69,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Foundation ────────────────────────────────────────────
-    gfx.fillStyle(0x9e9890, 1);
+    gfx.fillStyle(palette.foundation, 1);
     gfx.fillRect(bx, buildGY - foundH, bw, foundH);
     gfx.lineStyle(1, 0x7e7870, 1);
     gfx.moveTo(bx, buildGY - foundH).lineTo(bx + bw, buildGY - foundH).strokePath();
@@ -82,9 +83,9 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     gfx.fillRect(bx, floorDivY + 5, bw, 1);        // highlight below
 
     // ── Front yard lawn ───────────────────────────────────────
-    gfx.fillStyle(0x5a8c3a, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
-    gfx.fillStyle(0x4a7a2e, 1);
+    gfx.fillStyle(palette.yardAccent, 1);
     gfx.fillRect(x, buildGY, w, 2);
 
     // ── Roof params ───────────────────────────────────────────
@@ -98,11 +99,11 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const chimneyTopY = top - roofH - 2;
     this.chimneyX    = chx + Math.round(cw / 2);
     this.chimneyTopY = chimneyTopY;
-    gfx.fillStyle(0x9a3e2e, 1);
+    gfx.fillStyle(palette.chimney, 1);
     gfx.fillRect(chx, chimneyTopY, cw, top - chimneyTopY);
 
     // ── Roof ──────────────────────────────────────────────────
-    gfx.fillStyle(0xa03828, 1);
+    gfx.fillStyle(palette.roof, 1);
     gfx.fillTriangle(bx - ov, top, bx + bw + ov, top, mid, top - roofH);
 
     // Lv 23+: gable window
@@ -112,18 +113,18 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       const gh2 = Math.round(roofH * 0.28);
       const gx2 = mid - Math.round(gw2 / 2);
       const gy2 = top - roofH + Math.round(roofH * 0.24);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.windowFrame, 1);
       gfx.fillRect(gx2, gy2, gw2, gh2);
-      gfx.fillStyle(0x8ab4cc, 1);
+      gfx.fillStyle(palette.windowGlassDay, 1);
       gfx.fillRect(gx2 + 2, gy2 + 2, gw2 - 4, gh2 - 4);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.windowFrame, 1);
       gfx.fillRect(gx2 + 2, gy2 + 2 + Math.round((gh2 - 4) / 2), gw2 - 4, 2);
       gfx.fillRect(gx2 + 2 + Math.round((gw2 - 4) / 2), gy2 + 2, 2, gh2 - 4);
       gableRect = { gpx: gx2 + 2, gpy: gy2 + 2, gpw: gw2 - 4, gph: gh2 - 4 };
     }
 
     // Rake trim + eave soffit
-    gfx.lineStyle(2, 0xf0e4cc, 1);
+    gfx.lineStyle(2, palette.trim, 1);
     gfx.moveTo(bx - ov, top).lineTo(mid, top - roofH).strokePath();
     gfx.moveTo(bx + bw + ov, top).lineTo(mid, top - roofH).strokePath();
     gfx.lineStyle(2, 0xede0c8, 1);
@@ -179,16 +180,16 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       }
 
       // White frame
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.windowFrame, 1);
       gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
 
       // Glass panes
       const sashH = Math.round(wh / 2) - 1;
-      gfx.fillStyle(0x8ab4cc, 1);
+      gfx.fillStyle(palette.windowGlassDay, 1);
       gfx.fillRect(wxx, wy, ww, sashH);
-      gfx.fillStyle(0x9ec2d8, 1);
+      gfx.fillStyle(palette.windowGlassDayAlt, 1);
       gfx.fillRect(wxx, wy + sashH + 2, ww, wh - sashH - 2);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.windowFrame, 1);
       gfx.fillRect(wxx, wy + sashH, ww, 2);
       gfx.fillRect(wxx + Math.round(ww / 2) - 1, wy, 2, wh);
 
@@ -223,11 +224,11 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
        .lineTo(portX + portW, dy - 9).strokePath();
 
     // Door surround + body
-    gfx.fillStyle(0xffffff, 1);
+    gfx.fillStyle(palette.windowFrame, 1);
     gfx.fillRect(dx - 3, dy - 2, dw + 6, dh + 2);
-    gfx.fillStyle(0x8a2010, 1);
+    gfx.fillStyle(palette.door, 1);
     gfx.fillRect(dx, dy, dw, dh);
-    gfx.fillStyle(0xa02818, 1);
+    gfx.fillStyle(palette.doorAccent, 1);
     gfx.fillRect(dx + pInset, dy + 4,      dw - pInset * 2, ph);
     gfx.fillRect(dx + pInset, dy + ph + 8, dw - pInset * 2, ph);
     gfx.lineStyle(1, 0x601408, 1);
@@ -305,7 +306,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const fencePosts: Array<{ cx: number; cy: number }> = [];
     if (level >= 24) {
       const fenceBot = gy - 2;
-      gfx.fillStyle(0xe8e4d8, 1);
+      gfx.fillStyle(palette.fence, 1);
       gfx.fillRect(x, fenceBot - 7, w, 2);
       const n = 6, spacing = w / n;
       for (let i = 0; i < n; i++) {
@@ -363,14 +364,14 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     const halfWw = Math.round(ww / 2);
 
     for (const [wxx, wy] of [[wx1, wyUp], [wx2, wyUp], [wx1, wyLo], [wx2, wyLo]] as [number, number][]) {
-      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: 0x8ab4cc, lowerDay: 0x9ec2d8, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
+      this.windowRects.push({ wx: wxx, wy, ww, wh, sashH, halfWw, upperDay: palette.windowGlassDay, lowerDay: palette.windowGlassDayAlt, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       for (const [offX, offY, pw, ph] of [
         [0,          0,          halfWw - 1,      sashH],
         [halfWw + 1, 0,          ww - halfWw - 1, sashH],
         [0,          sashH + 2,  halfWw - 1,      wh - sashH - 2],
         [halfWw + 1, sashH + 2,  ww - halfWw - 1, wh - sashH - 2],
       ] as [number, number, number, number][]) {
-        this.windowLights.push(scene.lights.addLight(wxx + offX + pw / 2, wy + offY + ph / 2, 64, 0xffaa44, 0));
+        this.windowLights.push(scene.lights.addLight(wxx + offX + pw / 2, wy + offY + ph / 2, 64, params.windowGlowColor, 0));
       }
     }
 
@@ -378,14 +379,14 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
       const { gpx, gpy, gpw, gph } = gableRect;
       const gSashH  = Math.round(gph / 2);
       const gHalfWw = Math.round(gpw / 2);
-      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: 0x8ab4cc, lowerDay: 0x8ab4cc, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
+      this.windowRects.push({ wx: gpx, wy: gpy, ww: gpw, wh: gph, sashH: gSashH, halfWw: gHalfWw, upperDay: palette.windowGlassDay, lowerDay: palette.windowGlassDay, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
       for (const [offX, offY, pw, ph] of [
         [0,           0,          gHalfWw - 1,       gSashH],
         [gHalfWw + 1, 0,          gpw - gHalfWw - 1, gSashH],
         [0,           gSashH + 2, gHalfWw - 1,       gph - gSashH - 2],
         [gHalfWw + 1, gSashH + 2, gpw - gHalfWw - 1, gph - gSashH - 2],
       ] as [number, number, number, number][]) {
-        this.windowLights.push(scene.lights.addLight(gpx + offX + pw / 2, gpy + offY + ph / 2, 48, 0xffaa44, 0));
+        this.windowLights.push(scene.lights.addLight(gpx + offX + pw / 2, gpy + offY + ph / 2, 48, params.windowGlowColor, 0));
       }
     }
 

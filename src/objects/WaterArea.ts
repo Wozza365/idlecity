@@ -2,21 +2,7 @@ import Phaser from 'phaser';
 import { ROAD_H, VERGE_H, WATER_H } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
-
-// ── Palette ───────────────────────────────────────────────────────────────────
-
-const WATER_TOP  = 0x1A5C9E;
-const WATER_BOT  = 0x3AA0DC;
-const SAND_COLOR = 0xD4B483;
-const SAND_WET   = 0xB8946A;
-const ROCK_BASE  = 0x5A5A5A;
-const ROCK_MID   = 0x6E6E6E;
-const ROCK_LIGHT = 0x888888;
-const ROCK_WET   = 0x474D55;
-const MOSS_GREEN = 0x6E8B3D;
-const MOSS_DARK  = 0x4F6B2A;
-const DOCK_WOOD  = 0xA0784A;
-const PIER_WOOD  = 0xB8884E;
+import type { WaterPalette } from '../theme/ThemeTypes';
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
@@ -43,10 +29,6 @@ for (let col = 0; col < LH_BASE_W; col++) {
     ? 0
     : Math.round(LH_TOWER_H * (dx - LH_TOP_W) / (LH_BASE_W - LH_TOP_W));
 }
-
-// People
-const PED_COLORS   = [0xff6b6b, 0xffd93d, 0x6bcb77, 0x4d96ff, 0xc77dff, 0xff9f43, 0x00d2d3, 0xff6bcd];
-const TOWEL_COLORS = [0xE63946, 0x4CC9F0, 0xF4D35E, 0x3A86FF, 0xFFB347, 0xFF6BBA, 0x06D6A0, 0xB5838D];
 
 // ── Beach person AI ───────────────────────────────────────────────────────────
 
@@ -95,9 +77,10 @@ export class WaterArea {
   private islandGfx:       Phaser.GameObjects.Graphics; // 5.86 – lighthouse island (above wave fx)
 
   // Layout
-  private _level  = 0;
-  private _width  = 0;
-  private _waterY = 0;
+  private _level   = 0;
+  private _width   = 0;
+  private _waterY  = 0;
+  private _palette!: WaterPalette;
   private _beachEndX  = 0;
   private _transEndX  = 0; // where rocky area starts (after transition)
   private _pierX      = 0;
@@ -174,10 +157,11 @@ export class WaterArea {
     this.islandGfx      = scene.add.graphics().setDepth(5.86).setLighting(true);
   }
 
-  render(level: number, width: number, groundY: number): void {
-    this._level  = level;
-    this._width  = width;
-    this._waterY = groundY + ROAD_H + VERGE_H;
+  render(level: number, width: number, groundY: number, palette: WaterPalette): void {
+    this._level   = level;
+    this._width   = width;
+    this._waterY  = groundY + ROAD_H + VERGE_H;
+    this._palette = palette;
     this._dockSlots = [];
 
     // Layout geometry
@@ -222,13 +206,13 @@ export class WaterArea {
     const BAND = 4;
     for (let i = 0; i < WATER_H; i += BAND) {
       const t = i / WATER_H;
-      gfx.fillStyle(lerpColor(WATER_TOP, WATER_BOT, t), 1);
+      gfx.fillStyle(lerpColor(this._palette.waterTop, this._palette.waterBot, t), 1);
       gfx.fillRect(0, wy + i, w, Math.min(BAND, WATER_H - i));
     }
 
     // ── Sandy beach (left) ──
     if (this._level >= 1) {
-      gfx.fillStyle(SAND_COLOR, 1);
+      gfx.fillStyle(this._palette.sand, 1);
       gfx.fillRect(0, wy, bx, BEACH_SHORE_H);
 
       // Wet sand — gently curved bottom edge using thin horizontal strips
@@ -237,7 +221,7 @@ export class WaterArea {
         // Gentle sinusoidal variation: center dips slightly further into water
         const dip = Math.round(Math.sin(t * Math.PI) * 4);
         const wh  = 7 + dip;
-        gfx.fillStyle(SAND_WET, 1);
+        gfx.fillStyle(this._palette.sandWet, 1);
         gfx.fillRect(col, wy + BEACH_SHORE_H - wh, 2, wh);
       }
       // White foam strip at water's edge
@@ -266,21 +250,21 @@ export class WaterArea {
         const sx = bx + Math.floor(t0 * transW);
         const sw = Math.max(1, Math.ceil(t1 * transW) - Math.floor(t0 * transW));
         const sh = Math.round(BEACH_SHORE_H * (1 - tSmooth) + ROCK_SHORE_H * tSmooth);
-        const color = lerpColor(SAND_COLOR, ROCK_BASE, tSmooth);
+        const color = lerpColor(this._palette.sand, this._palette.rockBase, tSmooth);
         gfx.fillStyle(color, 1);
         gfx.fillRect(sx, wy, sw, sh);
         // Top edge highlight
-        gfx.fillStyle(lerpColor(0xE8D0A0, ROCK_LIGHT, tSmooth), 0.4);
+        gfx.fillStyle(lerpColor(0xE8D0A0, this._palette.rockLight, tSmooth), 0.4);
         gfx.fillRect(sx, wy, sw, 1);
       }
 
       // ── Rocky coastline (right) — pixel-art layered blocks ──
       // Base fill
-      gfx.fillStyle(ROCK_BASE, 1);
+      gfx.fillStyle(this._palette.rockBase, 1);
       gfx.fillRect(tx, wy, w - tx, ROCK_SHORE_H);
 
       // Top face highlight (lighter)
-      gfx.fillStyle(ROCK_LIGHT, 1);
+      gfx.fillStyle(this._palette.rockLight, 1);
       gfx.fillRect(tx, wy, w - tx, 3);
 
       // Horizontal strata cracks
@@ -294,10 +278,10 @@ export class WaterArea {
         const rw   = 9 + (seed % 5);
         const rh   = 2 + (seed % 3);
         const ry2  = wy + 2 + (seed % 6);
-        gfx.fillStyle(ROCK_MID, 1);
+        gfx.fillStyle(this._palette.rockMid, 1);
         gfx.fillRect(rx, ry2, rw, rh);
         // Pixel highlight
-        gfx.fillStyle(ROCK_LIGHT, 0.7);
+        gfx.fillStyle(this._palette.rockLight, 0.7);
         gfx.fillRect(rx, ry2, rw, 1);
       }
 
@@ -318,7 +302,7 @@ export class WaterArea {
     const planks = 5;
 
     // Pier deck
-    gfx.fillStyle(PIER_WOOD, 1);
+    gfx.fillStyle(this._palette.pierWood, 1);
     gfx.fillRect(px - pierW / 2, wy + BEACH_SHORE_H - 10, pierW, pierH);
 
     // Plank lines
@@ -342,7 +326,7 @@ export class WaterArea {
     }
 
     // Pier end platform + mooring posts
-    gfx.fillStyle(PIER_WOOD, 1);
+    gfx.fillStyle(this._palette.pierWood, 1);
     gfx.fillRect(px - pierW / 2 - 4, wy + BEACH_SHORE_H - 10 + pierH - 5, pierW + 8, 8);
     gfx.fillStyle(0x6A4818, 1);
     gfx.fillRect(px - pierW / 2 - 3, wy + BEACH_SHORE_H - 10 + pierH - 2, 3, 6);
@@ -422,7 +406,7 @@ export class WaterArea {
     gfx.fillRect(dx2 - 4, deckEnd, 4, waterBeamEnd - deckEnd);
 
     // Main dock body — starts from land edge (wy) and sticks out into water
-    gfx.fillStyle(DOCK_WOOD, 1);
+    gfx.fillStyle(this._palette.dockWood, 1);
     gfx.fillRect(dx1, wy, dockW, deckEnd - wy);
 
     // Horizontal plank lines
@@ -534,9 +518,9 @@ export class WaterArea {
     gfx.fillEllipse(cx, topY + 50, 48, 22);
 
     // ── Submerged rock base — small, rounded, dark wet stone ──
-    gfx.fillStyle(ROCK_WET, 1);
+    gfx.fillStyle(this._palette.rockWet, 1);
     gfx.fillEllipse(cx, topY + 48, 40, 18);
-    gfx.fillStyle(dimColor(ROCK_WET, 0.7), 1);
+    gfx.fillStyle(dimColor(this._palette.rockWet, 0.7), 1);
     gfx.fillEllipse(cx, topY + 52, 32, 12);
 
     // ── Jagged dry peaks rising above the waterline, each lit on the left
@@ -546,9 +530,9 @@ export class WaterArea {
       { x0: cx + 0,  x1: cx + 16, ax: cx + 8, ay: topY + 34 },
     ];
     for (const p of peaks) {
-      gfx.fillStyle(ROCK_BASE, 1);
+      gfx.fillStyle(this._palette.rockBase, 1);
       gfx.fillTriangle(p.x0, baseY, p.x1, baseY, p.ax, p.ay);
-      gfx.fillStyle(ROCK_LIGHT, 0.8);
+      gfx.fillStyle(this._palette.rockLight, 0.8);
       gfx.fillTriangle(p.x0, baseY, p.ax, p.ay, (p.x0 + p.ax) / 2, baseY);
       gfx.fillStyle(0x404040, 0.55);
       gfx.fillTriangle(p.x1, baseY, p.ax, p.ay, (p.x1 + p.ax) / 2, baseY);
@@ -560,9 +544,9 @@ export class WaterArea {
     gfx.fillRect(cx + 2,  topY + 42, 9, 2);
 
     // ── Moss patch on the highest peak ──
-    gfx.fillStyle(MOSS_DARK, 0.9);
+    gfx.fillStyle(this._palette.mossDark, 0.9);
     gfx.fillEllipse(cx - 11, topY + 29, 9, 4);
-    gfx.fillStyle(MOSS_GREEN, 0.9);
+    gfx.fillStyle(this._palette.mossGreen, 0.9);
     gfx.fillEllipse(cx - 12, topY + 28, 6, 2.5);
 
     // ── Foam where waves break against the rock ──
@@ -574,11 +558,11 @@ export class WaterArea {
     }
 
     // ── Tiny companion boulder ──
-    gfx.fillStyle(ROCK_WET, 1);
+    gfx.fillStyle(this._palette.rockWet, 1);
     gfx.fillEllipse(cx - 26, topY + 54, 14, 8);
-    gfx.fillStyle(ROCK_BASE, 1);
+    gfx.fillStyle(this._palette.rockBase, 1);
     gfx.fillTriangle(cx - 32, topY + 52, cx - 21, topY + 52, cx - 27, topY + 43);
-    gfx.fillStyle(ROCK_LIGHT, 0.8);
+    gfx.fillStyle(this._palette.rockLight, 0.8);
     gfx.fillTriangle(cx - 32, topY + 52, cx - 27, topY + 43, cx - 29, topY + 52);
     gfx.fillStyle(0xFFFFFF, 0.3);
     gfx.fillCircle(cx - 33, topY + 56, 1.5);
@@ -815,8 +799,8 @@ export class WaterArea {
         bottomY,
         dir:        i % 2 === 0 ? 1 : -1,
         speed:      4 + (i % 5) * 2.5,
-        color:      PED_COLORS[i % PED_COLORS.length],
-        towelColor: TOWEL_COLORS[i % TOWEL_COLORS.length],
+        color:      this._palette.pedColors[i % this._palette.pedColors.length],
+        towelColor: this._palette.towelColors[i % this._palette.towelColors.length],
         w:          3 + (i % 3),
         h:          8 + (i % 5),
         phase:      isSit ? 'sit' : 'walk',

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { YARD_H } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
+import type { BuildingPalette } from '../theme/ThemeTypes';
 
 export class EmptyPlot extends Phaser.GameObjects.Container {
   private signBulbGfx: Phaser.GameObjects.Graphics | null = null;
@@ -20,7 +21,7 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
     return this.outlinePoints;
   }
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, palette: BuildingPalette) {
     super(scene, 0, 0);
 
     const gfx     = scene.add.graphics();
@@ -29,11 +30,11 @@ export class EmptyPlot extends Phaser.GameObjects.Container {
     const dirtTop = gy - YARD_H;
 
     // ── Dirt plot ─────────────────────────────────────────────────────────────
-    gfx.fillStyle(0x7a5228, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, dirtTop, w, YARD_H);
-    gfx.fillStyle(0x5c3c18, 1);
+    gfx.fillStyle(palette.yardAccent, 1);
     gfx.fillRect(x, dirtTop, w, 2);
-    gfx.fillStyle(0x5c3c18, 1);
+    gfx.fillStyle(palette.yardAccent, 1);
     for (let i = 0; i < 5; i++) {
       const px = x + Math.round(((i + 0.5) / 5) * w);
       gfx.fillRect(px - 2, dirtTop + 5, 5, 2);

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ROAD_H, ROAD_DIVIDER_H } from '../constants';
+import type { RoadPalette } from '../theme/ThemeTypes';
 
 export class Road {
   private gfx:        Phaser.GameObjects.Graphics;
@@ -24,7 +25,7 @@ export class Road {
     gfx.fillRect(0, this._groundY, this._width, ROAD_H);
   }
 
-  render(level: number, width: number, groundY: number): void {
+  render(level: number, width: number, groundY: number, palette: RoadPalette): void {
     this._level   = level;
     this._width   = width;
     this._groundY = groundY;
@@ -39,9 +40,9 @@ export class Road {
     }
     if (level <= 2) {
       // Earthy brown base with scattered clods and pebbles — no ruts
-      gfx.fillStyle(0x6b4c2a, 1);
+      gfx.fillStyle(palette.dirtBase, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      const dc = [0x9a7050, 0xb48860, 0x7a5530, 0xc89060, 0x4a3018, 0x8a6040, 0xd4a870];
+      const dc = palette.dirtSpecks;
       for (let row = 0; row < 10; row++) {
         const baseY = gy + 4 + row * 7;
         let px = Math.imul(row, 127) % 23;
@@ -60,14 +61,14 @@ export class Road {
     }
     if (level <= 4) {
       // Warm grey base
-      gfx.fillStyle(0x7c7260, 1);
+      gfx.fillStyle(palette.cobbleBase, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
       // Tyre-compacted tracks
-      gfx.fillStyle(0x585048, 1);
+      gfx.fillStyle(palette.cobbleTracks, 1);
       gfx.fillRect(0, gy + 12, width, 14);
       gfx.fillRect(0, gy + 46, width, 14);
       // Angular crushed-stone chips
-      const gc = [0xa89880, 0xc4b8a8, 0x666058, 0xd8ccbc, 0x484440, 0x908070];
+      const gc = palette.cobbleChips;
       for (let row = 0; row < 9; row++) {
         const py = gy + 4 + row * 8;
         for (let px = (row & 1) * 6; px < width; px += 12) {
@@ -81,17 +82,17 @@ export class Road {
     }
     if (level <= 6) {
       const midY = gy + ROAD_H / 2;
-      gfx.fillStyle(0x333333, 1);
+      gfx.fillStyle(palette.asphalt, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.asphaltLines, 1);
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
       return;
     }
     if (level === 7) {
       const midY = gy + ROAD_H / 2;
-      gfx.fillStyle(0x333333, 1);
+      gfx.fillStyle(palette.asphalt, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.asphaltLines, 1);
       gfx.fillRect(0, gy + 2, width, 2);
       gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, midY - 1, 20, 2);
@@ -100,29 +101,29 @@ export class Road {
     if (level <= 9) {
       // Level 8–9: two lanes with solid grey centre divider
       const midY = gy + ROAD_H / 2;
-      gfx.fillStyle(0x333333, 1);
+      gfx.fillStyle(palette.asphalt, 1);
       gfx.fillRect(0, gy, width, ROAD_H);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.asphaltLines, 1);
       gfx.fillRect(0, gy + 2, width, 2);
       gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
-      gfx.fillStyle(0x888888, 1);
+      gfx.fillStyle(palette.divider, 1);
       gfx.fillRect(0, midY - ROAD_DIVIDER_H / 2, width, ROAD_DIVIDER_H);
       return;
     }
     // Level 10: highway — 2 lanes each direction, grey centre divider
     const midY = gy + ROAD_H / 2;
-    gfx.fillStyle(0x222222, 1);
+    gfx.fillStyle(palette.highway, 1);
     gfx.fillRect(0, gy, width, ROAD_H);
-    gfx.fillStyle(0xffd700, 1);
+    gfx.fillStyle(palette.highwayLines, 1);
     gfx.fillRect(0, gy + 2, width, 2);
     gfx.fillRect(0, gy + ROAD_H - 4, width, 2);
     // Lane dividers at 25% and 75% (50% is replaced by the grey divider)
-    gfx.fillStyle(0xffffff, 1);
+    gfx.fillStyle(palette.asphaltLines, 1);
     for (const frac of [0.25, 0.75]) {
       const dy = Math.round(gy + ROAD_H * frac) - 1;
       for (let px = 0; px < width; px += 34) gfx.fillRect(px, dy, 20, 2);
     }
-    gfx.fillStyle(0x888888, 1);
+    gfx.fillStyle(palette.divider, 1);
     gfx.fillRect(0, midY - ROAD_DIVIDER_H / 2, width, ROAD_DIVIDER_H);
   }
 }

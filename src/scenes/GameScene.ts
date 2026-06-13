@@ -39,6 +39,9 @@ import { WeatherAccumulation } from '../objects/WeatherAccumulation';
 import { SeasonSystem } from '../game/SeasonSystem';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
+import { getTheme } from '../theme/themes';
+import type { ThemeDefinition } from '../theme/ThemeTypes';
+import { LoadingScreen } from '../ui/LoadingScreen';
 
 // ── Bottom-sheet panel tuning ───────────────────────────────────────────────
 const PANEL_SLIDE_MS = 280;
@@ -68,7 +71,9 @@ export class GameScene extends Phaser.Scene {
   private roadUI!: RoadUI;
   private devPanel!: DevPanel;
   private menuUI!: MenuUI;
+  private loadingScreen!: LoadingScreen;
   private saveNotification!: Phaser.GameObjects.Text;
+  private activeTheme!: ThemeDefinition;
 
   // World-layer managers
   private sky!: Sky;
@@ -153,7 +158,6 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.lights.enable();
-    this.lights.setAmbientColor(0x888888);
 
     this.seasons             = new SeasonSystem(this.state.season);
     this.rain                = new Rain(this);
@@ -174,6 +178,8 @@ export class GameScene extends Phaser.Scene {
     this.boatManager = new BoatManager(this);
     this.sunMoon    = new SunMoon(this, this.groundY);
     this.stars      = new Stars(this, this.groundY);
+
+    this.loadingScreen = new LoadingScreen(this, this.scale.width, this.scale.height);
 
     // Build all layout-dependent visuals
     this.buildLayout();
@@ -296,6 +302,8 @@ export class GameScene extends Phaser.Scene {
 
   private buildLayout(): void {
     const { width, height } = this.scale;
+    this.activeTheme = getTheme(this.state.selectedSkin);
+    this.lights.setAmbientColor(this.activeTheme.params.ambientLightColor);
 
     this.sky.rebuild();
     this.clouds.rebuild(width, this.groundY);
@@ -318,9 +326,9 @@ export class GameScene extends Phaser.Scene {
       .setDepth(9.9)
       .setLighting(false);
 
-    this.road.render(this.state.road.level, width, this.groundY);
-    this.vergeRiver.render(this.state.verge.level, width, this.groundY);
-    this.waterArea!.render(this.state.water.level, width, this.groundY);
+    this.road.render(this.state.road.level, width, this.groundY, this.activeTheme.palette.road);
+    this.vergeRiver.render(this.state.verge.level, width, this.groundY, this.activeTheme.palette.verge, this.activeTheme.params);
+    this.waterArea!.render(this.state.water.level, width, this.groundY, this.activeTheme.palette.water);
 
     this.lightingSystem?.destroy();
     this.lightingSystem = new LightingSystem(this, this.groundY, DEV_PANEL_OFFSET + DEV_PANEL_H);
@@ -331,7 +339,7 @@ export class GameScene extends Phaser.Scene {
 
     this.carManager?.destroy();
     this.carManager = new CarManager(this);
-    this.carManager.rebuild(this.state.road.level, this.groundY);
+    this.carManager.rebuild(this.state.road.level, this.groundY, this.activeTheme.params.carSpeedMultiplier);
     this.carManager.attachLights(this.lightingSystem);
     for (const l of this.vergeRiver.extraLights) this.lightingSystem.addLight(l);
     for (const l of this.waterArea!.extraLights)  this.lightingSystem.addLight(l);
@@ -348,7 +356,7 @@ export class GameScene extends Phaser.Scene {
     this.boatManager!.attachLights(this.lightingSystem);
 
     this.pedestrianManager?.destroy();
-    this.pedestrianManager = new PedestrianManager(this, this.groundY, this.plotWidth);
+    this.pedestrianManager = new PedestrianManager(this, this.groundY, this.plotWidth, this.activeTheme.params.pedestrianSpeedMultiplier);
 
     this.panelChrome.draw(width, this.panelTop, this.collapsedPanelTop, this.colTop, this.sectionW);
 
@@ -424,14 +432,14 @@ export class GameScene extends Phaser.Scene {
     if (this.menuUI) {
       this.menuUI.resize(width, height);
     } else {
-      this.menuUI = new MenuUI(this, width, height, () => this.state);
+      this.menuUI = new MenuUI(this, width, height, () => this.state, (i) => this.onSkinSelect(i));
     }
 
     this.applyPanelOffset(this.panelOffset);
 
     this.refreshButtons();
     this.statsBar.update(this.state.gold, this.taxRate);
-    this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY, this.seasons?.winterWeight ?? 0, this.seasons?.springWeight ?? 0, this.seasons?.weatherIntensity ?? 0);
+    this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY, this.seasons?.winterWeight ?? 0, this.seasons?.springWeight ?? 0, this.seasons?.weatherIntensity ?? 0, this.activeTheme.palette.sky);
     this.sunMoon.update(this.sunAngle, width, this.groundY, this.collapsedPanelTop, this.state.plots, this.plotWidth);
   }
 
@@ -451,6 +459,7 @@ export class GameScene extends Phaser.Scene {
     this.sunMoon.resize(width);
     this.stars.resize();
     this.saveNotification?.setPosition(width - 12, 12);
+    this.loadingScreen?.resize(width, height);
 
     this.buildLayout();
   }
@@ -708,17 +717,35 @@ export class GameScene extends Phaser.Scene {
     this.refreshButtons();
   }
 
+  // ── Skin/theme switching ───────────────────────────────────────────────────
+
+  private applySkin(index: number): void {
+    if (this.state.selectedSkin === index) return;
+    this.state.selectedSkin = index;
+    saveGame(this.state);
+    this.loadingScreen.show();
+    this.time.delayedCall(0, () => {
+      this.buildLayout();
+      this.loadingScreen.hide();
+    });
+  }
+
+  private onSkinSelect(index: number): void {
+    this.applySkin(index);
+    this.menuUI.refreshSkinsTab();
+  }
+
   private onRoadUpgrade(): void {
     const cost = roadUpgradeCost(this.state.road.level);
     if (this.state.gold < cost) return;
 
     this.state.gold -= cost;
     this.state.road.level = Math.min(this.state.road.level + 1, MAX_ROAD_LEVEL);
-    this.road.render(this.state.road.level, this.scale.width, this.groundY);
+    this.road.render(this.state.road.level, this.scale.width, this.groundY, this.activeTheme.palette.road);
     if (this.carManager && this.lightingSystem) {
       if (this.carManager.needsRebuild(this.state.road.level)) {
         this.carManager.detachLights(this.lightingSystem);
-        this.carManager.rebuild(this.state.road.level, this.groundY);
+        this.carManager.rebuild(this.state.road.level, this.groundY, this.activeTheme.params.carSpeedMultiplier);
         this.carManager.attachLights(this.lightingSystem);
       } else {
         const added = this.carManager.upgradeInPlace(this.state.road.level, this.groundY);
@@ -753,7 +780,7 @@ export class GameScene extends Phaser.Scene {
     this.state.verge.level++;
 
     for (const l of this.vergeRiver.extraLights) this.lightingSystem?.removeLight(l);
-    this.vergeRiver.render(this.state.verge.level, this.scale.width, this.groundY);
+    this.vergeRiver.render(this.state.verge.level, this.scale.width, this.groundY, this.activeTheme.palette.verge, this.activeTheme.params);
     for (const l of this.vergeRiver.extraLights) this.lightingSystem?.addLight(l);
     this.lightingSystem?.setTreeOccluders(this.vergeRiver.getTreeOccluders());
 
@@ -785,7 +812,7 @@ export class GameScene extends Phaser.Scene {
     this.state.water.level++;
 
     for (const l of this.waterArea!.extraLights) this.lightingSystem?.removeLight(l);
-    this.waterArea!.render(this.state.water.level, this.scale.width, this.groundY);
+    this.waterArea!.render(this.state.water.level, this.scale.width, this.groundY, this.activeTheme.palette.water);
     for (const l of this.waterArea!.extraLights) this.lightingSystem?.addLight(l);
 
     this.boatManager!.rebuild(this.state.water.level, this.groundY);
@@ -906,7 +933,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const elev = Math.sin(this.sunAngle);
-    this.sky.updateGradient(elev, this.scale.width, this.groundY, this.seasons.winterWeight, this.seasons.springWeight, this.seasons.weatherIntensity);
+    this.sky.updateGradient(elev, this.scale.width, this.groundY, this.seasons.winterWeight, this.seasons.springWeight, this.seasons.weatherIntensity, this.activeTheme.palette.sky);
 
     this.sunMoon.update(this.sunAngle, this.scale.width, this.groundY, this.collapsedPanelTop, this.state.plots, this.plotWidth, this.seasons.moonPhase, this.seasons.c1);
     const shadowAlpha = this.sunMoon.shadowAlpha;
@@ -1070,8 +1097,8 @@ export class GameScene extends Phaser.Scene {
     const plot = this.state.plots[index];
 
     const building = plot.unlocked
-      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level, savedParticles)
-      : new EmptyPlot(this, x, this.plotWidth, this.groundY);
+      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level, this.activeTheme.palette.building, this.activeTheme.params, savedParticles)
+      : new EmptyPlot(this, x, this.plotWidth, this.groundY, this.activeTheme.palette.building.emptyPlot);
 
     building.setDepth(9);
     this.add.existing(building);

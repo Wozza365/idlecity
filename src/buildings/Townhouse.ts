@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
 import { type DoorEntrance } from './types';
+import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -33,14 +34,14 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private flickerFreqs:   number[] = [];
   private lastSleepHour  = -1;
   private pendingSleepAt = Infinity;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
+  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; dayColor: number; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
   private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
   private _neonX = 0;
   private _neonY = 0;
   private _neonPhase = 0;
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, params: ThemeParams) {
     super(scene, 0, 0);
 
     const w       = plotWidth;
@@ -54,7 +55,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     const bodyH   = bodyBot - bodyTop;
 
     // ── Brick body ────────────────────────────────────────────────
-    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyH, 0xb04030);
+    const body = scene.add.rectangle(bx + bw / 2, (bodyTop + bodyBot) / 2, bw, bodyH, palette.wall);
     body.setLighting(true);
     this.add(body);
 
@@ -62,7 +63,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Foundation ────────────────────────────────────────────────
-    gfx.fillStyle(0x9a8870, 1);
+    gfx.fillStyle(palette.foundation, 1);
     gfx.fillRect(bx, bodyBot, bw, FOUND_H);
     gfx.lineStyle(1, 0x7a6850, 1);
     gfx.moveTo(bx, bodyBot).lineTo(bx + bw, bodyBot).strokePath();
@@ -86,7 +87,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
 
     // ── Sidewalk ──────────────────────────────────────────────────
-    gfx.fillStyle(0xc8b898, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
     gfx.lineStyle(1, 0xb0a080, 0.4);
     for (let px = x + 30; px < x + w; px += 30) {
@@ -139,7 +140,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
         }
 
         // White surround
-        gfx.fillStyle(0xffffff, 1);
+        gfx.fillStyle(palette.windowFrame, 1);
         gfx.fillRect(wxx - 2, wy - 2, ww + 4, wh + 4);
 
         // Lv 28+: stone sill
@@ -150,10 +151,10 @@ export class Townhouse extends Phaser.GameObjects.Container {
           gfx.fillRect(wxx - 3, wy + wh + 5, ww + 6, 1);
         }
 
-        this.windowRects.push({ wx: wxx, wy, ww, wh, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
+        this.windowRects.push({ wx: wxx, wy, ww, wh, dayColor: palette.windowGlassDay, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
         this.windowLights.push(
-          scene.lights.addLight(wxx + Math.round(ww * 0.25), wy + wh / 2, 92, 0xffaa44, 0),
-          scene.lights.addLight(wxx + Math.round(ww * 0.75), wy + wh / 2, 92, 0xffaa44, 0),
+          scene.lights.addLight(wxx + Math.round(ww * 0.25), wy + wh / 2, 92, params.windowGlowColor, 0),
+          scene.lights.addLight(wxx + Math.round(ww * 0.75), wy + wh / 2, 92, params.windowGlowColor, 0),
         );
       }
     }
@@ -167,7 +168,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
       const gfWy = bodyBot - actualFH + Math.round((actualFH - wh) / 2);
       if (gfWy >= bodyTop + 2 && gfWy + wh <= bodyBot - 2) {
         // Surround
-        gfx.fillStyle(0xffffff, 1);
+        gfx.fillStyle(palette.windowFrame, 1);
         gfx.fillRect(gfWx - 2, gfWy - 2, ww + 4, wh + 4);
         if (level >= 28) {
           gfx.fillStyle(0xd0c4b0, 1);
@@ -175,10 +176,10 @@ export class Townhouse extends Phaser.GameObjects.Container {
           gfx.fillStyle(0xb0a080, 1);
           gfx.fillRect(gfWx - 3, gfWy + wh + 5, ww + 6, 1);
         }
-        this.windowRects.push({ wx: gfWx, wy: gfWy, ww, wh, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
+        this.windowRects.push({ wx: gfWx, wy: gfWy, ww, wh, dayColor: palette.windowGlassDay, isTv: Math.random() < 0.2, flickerFreq: 0.5 + Math.random() * 2.5, tvColor: randTvColor(), asleep: false });
         this.windowLights.push(
-          scene.lights.addLight(gfWx + Math.round(ww * 0.25), gfWy + wh / 2, 92, 0xffaa44, 0),
-          scene.lights.addLight(gfWx + Math.round(ww * 0.75), gfWy + wh / 2, 92, 0xffaa44, 0),
+          scene.lights.addLight(gfWx + Math.round(ww * 0.25), gfWy + wh / 2, 92, params.windowGlowColor, 0),
+          scene.lights.addLight(gfWx + Math.round(ww * 0.75), gfWy + wh / 2, 92, params.windowGlowColor, 0),
         );
       }
     }
@@ -211,11 +212,11 @@ export class Townhouse extends Phaser.GameObjects.Container {
     // Lv 38+: fanlight
     if (level >= 38) {
       const flH = 8;
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.windowFrame, 1);
       gfx.fillRect(dx - 2, dy - flH, dw + 4, flH + 1);
-      gfx.fillStyle(0x8ab4cc, 1);
+      gfx.fillStyle(palette.windowGlassDay, 1);
       gfx.fillRect(dx - 1, dy - flH + 1, dw + 2, flH - 1);
-      gfx.lineStyle(1, 0xffffff, 1);
+      gfx.lineStyle(1, palette.windowFrame, 1);
       const fMid = dx + Math.round(dw / 2);
       for (let fi = 1; fi < 4; fi++) {
         gfx.moveTo(fMid, dy).lineTo(dx + Math.round(dw * fi / 4), dy - flH + 1).strokePath();
@@ -225,22 +226,22 @@ export class Townhouse extends Phaser.GameObjects.Container {
     // Lv 37+: door sidelights
     if (level >= 37) {
       const slW = Math.round(dw * 0.22);
-      gfx.fillStyle(0xffffff, 1);
+      gfx.fillStyle(palette.windowFrame, 1);
       gfx.fillRect(dx - 3 - slW, dy + 2, slW, dh - 4);
       gfx.fillRect(dx + dw + 3, dy + 2, slW, dh - 4);
-      gfx.fillStyle(0x8ab4cc, 1);
+      gfx.fillStyle(palette.windowGlassDay, 1);
       gfx.fillRect(dx - 2 - slW, dy + 3, slW - 2, dh - 6);
       gfx.fillRect(dx + dw + 4, dy + 3, slW - 2, dh - 6);
     }
 
     // Door surround + body
-    gfx.fillStyle(0xffffff, 1);
+    gfx.fillStyle(palette.windowFrame, 1);
     gfx.fillRect(dx - 3, dy, dw + 6, dh);
-    gfx.fillStyle(0x0a0a08, 1);
+    gfx.fillStyle(palette.door, 1);
     gfx.fillRect(dx, dy, dw, dh);
     const pI = Math.round(dw * 0.15);
     const ph = Math.round(dh * 0.28);
-    gfx.fillStyle(0x1a1410, 1);
+    gfx.fillStyle(palette.doorAccent, 1);
     gfx.fillRect(dx + pI, dy + 5,       dw - pI * 2, ph);
     gfx.fillRect(dx + pI, dy + ph + 10, dw - pI * 2, ph);
     gfx.fillStyle(0xd4a820, 1);
@@ -515,9 +516,9 @@ export class Townhouse extends Phaser.GameObjects.Container {
 
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
-    for (const { wx, wy, ww, wh, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
+    for (const { wx, wy, ww, wh, dayColor, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
       if (asleep) {
-        gfx.fillStyle(lerpColor(0x8ab4cc, 0x0a0f18, t), 1);
+        gfx.fillStyle(lerpColor(dayColor, 0x0a0f18, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, 0.4);
         gfx.fillRect(wx + Math.round(ww / 2) - 1, wy, 2, wh);
@@ -525,8 +526,8 @@ export class Townhouse extends Phaser.GameObjects.Container {
       }
       const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
       const color   = isTv
-        ? lerpColor(0x8ab4cc, tvColor, t * tvFlick)
-        : lerpColor(0x8ab4cc, 0xffcc66, t);
+        ? lerpColor(dayColor, tvColor, t * tvFlick)
+        : lerpColor(dayColor, 0xffcc66, t);
       gfx.fillStyle(color, 1);
       gfx.fillRect(wx, wy, ww, wh);
       gfx.fillStyle(0xffffff, 1);

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { YARD_H, buildingHeight } from '../constants';
 import { type DoorEntrance } from './types';
+import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -21,7 +22,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
   private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; accent: boolean }> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
-  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number) {
+  constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, _params: ThemeParams) {
     super(scene, 0, 0);
 
     const w       = plotWidth;
@@ -37,14 +38,14 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
     const upperBx     = level >= 88 ? x + Math.round((w - upperBw) / 2) : x;
 
     // ── Main glass body ───────────────────────────────────────────
-    const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, 0x0e1824);
+    const body = scene.add.rectangle(x + w / 2, top + h / 2, w, h, palette.wall);
     body.setLighting(true);
     this.add(body);
 
     // Upper setback section (fractionally lighter)
     if (setbackH > 0) {
       const upper = scene.add.rectangle(
-        upperBx + upperBw / 2, top + setbackH / 2, upperBw, setbackH, 0x162030,
+        upperBx + upperBw / 2, top + setbackH / 2, upperBw, setbackH, palette.wallShade,
       );
       upper.setLighting(true);
       this.add(upper);
@@ -54,7 +55,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
     gfx.setLighting(true);
 
     // ── Roof cap ──────────────────────────────────────────────────
-    gfx.fillStyle(0x1c2c3c, 1);
+    gfx.fillStyle(palette.roof, 1);
     gfx.fillRect(x, top, w, 3);
 
     // ── Lv 91+: observation crown ring ───────────────────────────
@@ -66,7 +67,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
     }
 
     // ── Sidewalk / plaza ──────────────────────────────────────────
-    gfx.fillStyle(0x989088, 1);
+    gfx.fillStyle(palette.yardGround, 1);
     gfx.fillRect(x, buildGY, w, YARD_H);
     // Lv 98+: illuminated plaza tiles
     if (level >= 98) {
@@ -127,7 +128,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
 
       for (let c = 0; c < cols; c++) {
         const wxx = Math.round(x + hGap * (c + 1) - ww / 2);
-        gfx.fillStyle(isAccent ? 0x2c5880 : 0x0e2030, 1);
+        gfx.fillStyle(isAccent ? palette.glass : palette.glassShade, 1);
         gfx.fillRect(wxx, wy, ww, wh);
         this.windowRects.push({ wx: wxx, wy, ww, wh, accent: isAccent });
       }

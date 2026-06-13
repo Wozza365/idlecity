@@ -76,11 +76,13 @@ export class PedestrianManager {
   // ordering relative to Graphics.
   private pedShadowGfx: Phaser.GameObjects.Graphics;
   private _hadPedsLastFrame = false;
+  private _speedMultiplier = 1;
 
-  constructor(scene: Phaser.Scene, groundY: number, plotWidth: number) {
+  constructor(scene: Phaser.Scene, groundY: number, plotWidth: number, speedMultiplier = 1) {
     this.scene      = scene;
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
+    this._speedMultiplier = speedMultiplier;
     this.pedShadowGfx = scene.add.graphics().setDepth(9.09);
     this.offscreenTimer = 1000 + Math.random() * 2000;
     this.doorTimer      = 3000 + Math.random() * 2000;
@@ -101,9 +103,10 @@ export class PedestrianManager {
     }
   }
 
-  rebuild(groundY: number, plotWidth: number): void {
+  rebuild(groundY: number, plotWidth: number, speedMultiplier = 1): void {
     this.groundY    = groundY;
     this.plotWidth  = plotWidth;
+    this._speedMultiplier = speedMultiplier;
     for (const p of this.pedestrians) { p.sprite.destroy(); p.shadowSprite.destroy(); }
     this.pedestrians    = [];
     this.offscreenTimer = 800  + Math.random() * 1500;
@@ -323,7 +326,7 @@ export class PedestrianManager {
     const targetY = footTop + Math.random() * YARD_H;
     const jitter  = (Math.random() * 2 - 1) * DOOR_SPAWN_POS_JITTER;
     const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-    const speed   = PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED);
+    const speed   = (PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED)) * this._speedMultiplier;
     const x       = door.x + jitter - w / 2;
 
     const { sprite, shadowSprite } = this.makePedSprites(x, door.y, w, h, dir, def);
@@ -357,7 +360,7 @@ export class PedestrianManager {
     const footTop = this.groundY - YARD_H;
     const bottomY = footTop + Math.random() * YARD_H;
     const x       = -(w + 2);
-    const speed   = PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED);
+    const speed   = (PED_MIN_SPEED + Math.random() * (PED_MAX_SPEED - PED_MIN_SPEED)) * this._speedMultiplier;
 
     const { sprite, shadowSprite } = this.makePedSprites(x, bottomY, w, h, 1, def);
     sprite.anims.timeScale = speed / PED_BASE_SPEED;
