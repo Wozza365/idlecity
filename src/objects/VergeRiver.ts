@@ -3,8 +3,10 @@ import { ROAD_H, VERGE_H, lerpColor } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { VergePalette, ThemeParams } from '../theme/ThemeTypes';
+import { CYCLIST_KEYS, CYCLIST_ORIGIN_Y, CYCLIST_FRAME_COUNT, cyclistAnimKey } from './CyclistAssets';
 
 const CYCLE_H = 14;
+const NIGHT_TINT = 0x5a6680;
 
 function treeGeom(level: number) {
   if (level >= 14) return { trunkH: 30, canopyR: 21, spacing: 80 };
@@ -18,7 +20,7 @@ function getPositions(width: number, start: number, spacing: number): number[] {
   return arr;
 }
 
-interface Cyclist { x: number; speed: number; dir: 1 | -1; color: number; }
+interface Cyclist { x: number; speed: number; dir: 1 | -1; sprite: Phaser.GameObjects.Sprite; }
 
 export class VergeRiver {
   private readonly scene: Phaser.Scene;
@@ -47,6 +49,7 @@ export class VergeRiver {
   private _palette!: VergePalette;
   private _params!:  ThemeParams;
   private _lastLightingElevation = NaN;
+  private _nightFactor = 0;
 
   // Seasonal colour weights — updated once per game day, trigger tree/grass redraw
   private _autumnWeight = 0;
@@ -69,10 +72,25 @@ export class VergeRiver {
     this.scene         = scene;
     this.vergeGfx      = scene.add.graphics().setDepth(6).setLighting(true);
     this.flowerGfx     = scene.add.graphics().setDepth(6.1); // no lighting — preserves true flower colours
-    this.cyclistGfx    = scene.add.graphics().setDepth(6.5).setLighting(true);
+    this.cyclistGfx    = scene.add.graphics().setDepth(6.4); // cyclist shadows, behind their sprites
     this.shadowGfx     = scene.add.graphics().setDepth(7.1);
     this.treeGfx       = scene.add.graphics().setDepth(8.5).setLighting(true);
     this.grassSeasonGfx = scene.add.graphics().setDepth(6.02).setLighting(true);
+    this.setupCyclistAnimations();
+  }
+
+  private setupCyclistAnimations(): void {
+    for (const key of CYCLIST_KEYS) {
+      const anim = cyclistAnimKey(key);
+      if (this.scene.anims.exists(anim)) continue;
+      if (!this.scene.textures.exists(key)) continue;
+      this.scene.anims.create({
+        key:        anim,
+        frames:     this.scene.anims.generateFrameNumbers(key, { start: 0, end: CYCLIST_FRAME_COUNT - 1 }),
+        frameRate:  6,
+        repeat:     -1,
+      });
+    }
   }
 
   render(level: number, width: number, groundY: number, palette: VergePalette, params: ThemeParams): void {
@@ -169,6 +187,7 @@ export class VergeRiver {
     if (level >= 9) {
       if (this.cyclists.length === 0) this.spawnCyclists(level, width);
     } else {
+      for (const c of this.cyclists) c.sprite.destroy();
       this.cyclists = [];
       this.cyclistGfx.clear();
     }
@@ -523,13 +542,29 @@ export class VergeRiver {
   private spawnCyclists(level: number, width: number): void {
     const count = Math.min(2 + Math.floor(level / 4), 6);
     this.cyclists = [];
+
+    const vergeY   = this._groundY + ROAD_H;
+    const pathMidY = vergeY + VERGE_H - CYCLE_H + Math.floor(CYCLE_H / 2);
+    const tint     = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
+
     for (let i = 0; i < count; i++) {
-      this.cyclists.push({
-        x: (width * (i + 1)) / (count + 1),
-        speed: 32 + (i % 3) * 15,
-        dir: i % 2 === 0 ? 1 : -1,
-        color: this._palette.cyclistColors[i % this._palette.cyclistColors.length],
-      });
+      const dir: 1 | -1 = i % 2 === 0 ? 1 : -1;
+      const x   = (width * (i + 1)) / (count + 1);
+      const key = CYCLIST_KEYS[i % CYCLIST_KEYS.length];
+
+      const sprite = this.scene.add.sprite(x, pathMidY, key)
+        .setOrigin(0.5, CYCLIST_ORIGIN_Y)
+        .setDepth(6.5)
+        .setFlipX(dir === -1)
+        .setTint(tint);
+
+      const anim = cyclistAnimKey(key);
+      if (this.scene.anims.exists(anim)) {
+        sprite.play(anim);
+        sprite.anims.setProgress(Math.random());
+      }
+
+      this.cyclists.push({ x, speed: 32 + (i % 3) * 15, dir, sprite });
     }
   }
 
@@ -540,40 +575,20 @@ export class VergeRiver {
     }
 
     const vergeY   = this._groundY + ROAD_H;
-    const pathTopY = vergeY + VERGE_H - CYCLE_H;
-    const pathMidY = pathTopY + Math.floor(CYCLE_H / 2);
+    const pathMidY = vergeY + VERGE_H - CYCLE_H + Math.floor(CYCLE_H / 2);
     const dt       = delta / 1000;
-
-    for (const c of this.cyclists) {
-      c.x += c.speed * c.dir * dt;
-      if (c.x > this._width + 60) c.x = -60;
-      if (c.x < -60)              c.x = this._width + 60;
-    }
 
     const gfx = this.cyclistGfx;
     gfx.clear();
+    gfx.fillStyle(0x000000, 0.2);
 
     for (const c of this.cyclists) {
-      const cx = c.x;
-      const bh = 9;
-      const bodyTop = pathMidY - bh;
+      c.x += c.speed * c.dir * dt;
+      if (c.x > this._width + 20) c.x = -20;
+      if (c.x < -20)              c.x = this._width + 20;
 
-      gfx.fillStyle(0x000000, 0.2);
-      gfx.fillEllipse(cx, pathMidY + 2, 10, 4);
-      gfx.fillStyle(0x1a1a2e, 1);
-      gfx.fillCircle(cx - 4, pathMidY, 4);
-      gfx.fillCircle(cx + 4, pathMidY, 4);
-      gfx.fillStyle(0x808080, 0.5);
-      gfx.fillCircle(cx - 4, pathMidY, 2);
-      gfx.fillCircle(cx + 4, pathMidY, 2);
-      gfx.fillStyle(0x888888, 1);
-      gfx.fillRect(cx - 4, pathMidY - 1, 8, 2);
-      gfx.fillStyle(c.color, 1);
-      gfx.fillRect(cx - 2, bodyTop, 5, bh);
-      gfx.fillStyle(0x303040, 1);
-      gfx.fillCircle(cx, bodyTop - 3, 4);
-      gfx.fillStyle(c.color, 0.65);
-      gfx.fillRect(cx - 2, bodyTop - 6, 4, 2);
+      c.sprite.setPosition(c.x, pathMidY);
+      gfx.fillEllipse(c.x, pathMidY + 5, 14, 3);
     }
   }
 
@@ -621,11 +636,17 @@ export class VergeRiver {
 
     // flowerGfx skips the Light2D pipeline so manually darken it to match the verge
     this.flowerGfx.setAlpha(1.0 - nightFactor * 0.78);
+
+    // Cyclist sprites skip the Light2D pipeline too — tint manually like boats
+    this._nightFactor = nightFactor;
+    const tint = lerpColor(0xffffff, NIGHT_TINT, nightFactor);
+    for (const c of this.cyclists) c.sprite.setTint(tint);
   }
 
   destroy(): void {
     for (const l of this.lampNativeLights)    this.scene.lights.removeLight(l);
     for (const l of this.bollardNativeLights) this.scene.lights.removeLight(l);
+    for (const c of this.cyclists) c.sprite.destroy();
     this.vergeGfx.destroy();
     this.flowerGfx.destroy();
     this.cyclistGfx.destroy();
