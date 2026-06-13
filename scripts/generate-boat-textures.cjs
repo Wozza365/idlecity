@@ -95,9 +95,9 @@ function drawNavLights(cv, y0, h, rectW, w) {
 // is an all-new mega-boat — a "legendary" sibling to container_ship.
 const BOATS = [
   { key: 'rowboat',        w: 60,  h: 20, bowW:  9, hull: 0x8B5E3C, accent: 0xA0724E },
-  { key: 'motorboat',      w: 100, h: 28, bowW: 14, hull: 0xEEEEDD, accent: 0x4488CC },
+  { key: 'motorboat',      w: 100, h: 28, bowW: 14, hull: 0x1A4E8A, accent: 0xFFFFFF },
   { key: 'fishing_boat',   w: 84,  h: 30, bowW: 11, hull: 0x3A5C7A, accent: 0xCC3333, extraTop: 12 },
-  { key: 'sailboat',       w: 80,  h: 26, bowW: 11, hull: 0xF5F5E8, accent: 0xCC8844, extraTop: 42 },
+  { key: 'sailboat',       w: 80,  h: 26, bowW: 11, hull: 0x2A5C8A, accent: 0xE8C070, extraTop: 42 },
   { key: 'kayak',          w: 70,  h: 16, bowW: 10, hull: 0xFF7744, accent: 0xFFAA22 },
   { key: 'speedboat',      w: 108, h: 22, bowW: 17, hull: 0xCC2222, accent: 0xFFFFFF },
   { key: 'tugboat',        w: 108, h: 36, bowW: 14, hull: 0x222233, accent: 0xFF4400, extraTop: 28 },
@@ -128,17 +128,36 @@ const DETAILS = {
   },
 
   motorboat(cv, c) {
-    const { y0, h, rectW, accent } = c;
-    const sy = y0 + Math.floor(h / 2);
-    // racing stripe
-    for (let x = 2; x < rectW - 1; x++) { cv.set(x, sy, accent); cv.set(x, sy + 1, accent); }
-    // windshield/cabin near the bow
-    const cx0 = rectW - 22, cw = 18;
-    cv.rect(cx0, y0 + 2, cw, h - 5, lighten(accent, 0.3), 220);
-    for (let wx = cx0 + 2; wx < cx0 + cw - 2; wx += 4) cv.rect(wx, y0 + 3, 2, h - 8, 0x88CCFF, 200);
-    // chrome bow rail
-    for (let y = y0; y < y0 + h; y++) for (let x = 0; x < 3; x++) cv.set(x, y, 0x555555);
-    for (let y = y0; y < y0 + h; y++) cv.set(1, y, 0xAAAAAA, 180);
+    const { y0, h, rectW, hull, accent } = c;
+    // Bold white waterline stripe (3px) — the signature feature of a fast launch
+    const stripeTop = y0 + Math.floor(h * 0.3);
+    for (let x = 1; x < rectW - 1; x++) {
+      cv.set(x, stripeTop,     accent, 240);
+      cv.set(x, stripeTop + 1, accent, 240);
+      cv.set(x, stripeTop + 2, accent, 200);
+    }
+    // Open cockpit covering the forward third — windshield + interior
+    const cpX = rectW - 30, cpW = 28;
+    const cpH = h - 6;
+    cv.rect(cpX, y0 + 2, cpW, cpH, lighten(hull, 0.18), 230);
+    // Angled windshield glass (wider at top, narrower at bottom)
+    for (let y = y0 + 2; y <= y0 + 2 + Math.floor(cpH * 0.55); y++) {
+      const slant = Math.floor((y - y0 - 2) * 0.25);
+      for (let x = cpX + slant; x < cpX + cpW - 1; x++) cv.set(x, y, 0x99CCFF, 200);
+    }
+    // Windshield chrome frame
+    cv.line(cpX,     y0 + 2, cpX,     y0 + 2 + Math.floor(cpH * 0.55), 0xDDDDDD, 220);
+    cv.line(cpX + cpW - 1, y0 + 2, cpX + cpW - 1, y0 + 2 + Math.floor(cpH * 0.55), 0xDDDDDD, 220);
+    // Steering wheel silhouette
+    cv.circle(cpX + Math.floor(cpW * 0.4), y0 + 3 + Math.floor(cpH * 0.55), 2, 0xAA8833, 200);
+    // Engine cowl at stern — ribbed hatch
+    const cowlX = 2, cowlW = Math.floor(rectW * 0.22);
+    cv.rect(cowlX, y0 + 3, cowlW, h - 6, darken(hull, 0.15), 235);
+    for (let x = cowlX + 2; x < cowlX + cowlW; x += 3) cv.set(x, y0 + 4, 0x000000, 60);
+    // Chrome nose rail
+    for (let y = y0 + 1; y < y0 + h - 1; y++) cv.set(0, y, lighten(hull, 0.5), 180);
+    // Rope cleat on foredeck
+    cv.rect(cowlX + cowlW + 2, y0 + 2, 3, 2, 0xCCCCCC, 200);
   },
 
   fishing_boat(cv, c) {
@@ -164,35 +183,45 @@ const DETAILS = {
   },
 
   sailboat(cv, c) {
-    const { y0, h, rectW, accent, extraTop, bowW } = c;
+    const { y0, h, rectW, hull, accent, extraTop, bowW } = c;
     const mastX = rectW - 14;
     const topY = y0 - extraTop + 1;
     const mastBaseY = y0 + Math.floor(h / 2);
-    const clewX = rectW - 2, clewY = topY + Math.floor(extraTop * 0.6);
-    const sailColor = 0xFFFFF0;
-    cv.line(mastX, topY, mastX, y0 + h - 2, 0x8B6914);
-    // mainsail
-    cv.triangle(mastX, topY, mastX, mastBaseY, clewX, clewY, sailColor, 235);
-    // boom — spar along the sail's foot
-    cv.line(mastX, mastBaseY, clewX, clewY, 0x8B6914);
-    // leech shading so the mainsail reads as a curved surface, not a flat
-    // wedge of colour
-    cv.line(mastX, topY, clewX, clewY, darken(sailColor, 0.18));
-    // small foresail (jib), warm-tinted so it reads against the white
-    // mainsail, with both edges stroked for definition
-    const jibColor = lighten(accent, 0.4);
-    const jibLuffY = topY + Math.floor(extraTop * 0.35);
-    const jibFootY = y0 + Math.floor(h * 0.5);
-    const jibTipX = rectW + Math.floor(bowW * 0.7), jibTipY = y0 + Math.floor(h * 0.35);
-    cv.triangle(mastX, jibLuffY, mastX, jibFootY, jibTipX, jibTipY, jibColor, 230);
-    cv.line(mastX, jibLuffY, jibTipX, jibTipY, darken(jibColor, 0.3));
-    cv.line(mastX, jibFootY, jibTipX, jibTipY, darken(jibColor, 0.3));
-    // pennant at the masthead
-    cv.triangle(mastX, topY, mastX + 7, topY + 2, mastX, topY + 4, accent, 230);
-    // hull stripe
-    for (let x = 1; x < rectW - 1; x++) cv.set(x, y0 + h - 2, accent, 220);
-    // deck railing posts
-    for (let x = 2; x < mastX - 2; x += 5) cv.set(x, y0 + 1, 0xCCCCCC, 140);
+    const clewX = rectW - 2, clewY = topY + Math.floor(extraTop * 0.58);
+    // Mast — dark wood
+    cv.line(mastX, topY, mastX, y0 + h - 2, 0x6B4C1A);
+    // Mainsail — golden/amber canvas so it reads clearly against sky and hull
+    const sailColor = accent; // 0xE8C070 warm amber
+    cv.triangle(mastX, topY, mastX, mastBaseY, clewX, clewY, sailColor, 240);
+    // Sail shading — darker along the leech for curvature
+    cv.line(mastX, topY, clewX, clewY, darken(sailColor, 0.22), 200);
+    // Horizontal batten lines across the sail for texture
+    for (let i = 1; i <= 3; i++) {
+      const batY = topY + Math.floor((mastBaseY - topY) * (i / 4));
+      const batX = mastX + Math.floor((clewX - mastX) * (i / 4));
+      cv.line(mastX, batY, batX, batY + Math.floor((clewY - mastBaseY) * (i / 4)), darken(sailColor, 0.12), 160);
+    }
+    // Boom — spar along the sail's foot
+    cv.line(mastX, mastBaseY, clewX, clewY, 0x6B4C1A);
+    // Jib/foresail — bright white so it contrasts with amber mainsail
+    const jibLuffY = topY + Math.floor(extraTop * 0.28);
+    const jibFootY = y0 + Math.floor(h * 0.55);
+    const jibTipX = rectW + Math.floor(bowW * 0.75), jibTipY = y0 + Math.floor(h * 0.3);
+    cv.triangle(mastX, jibLuffY, mastX, jibFootY, jibTipX, jibTipY, 0xFFFFFF, 235);
+    // Jib edges outlined dark so it reads against the amber main
+    cv.line(mastX, jibLuffY, jibTipX, jibTipY, darken(0xFFFFFF, 0.35), 180);
+    cv.line(mastX, jibFootY, jibTipX, jibTipY, darken(0xFFFFFF, 0.35), 180);
+    // Pennant — amber pennant at masthead
+    cv.triangle(mastX, topY, mastX + 8, topY + 2, mastX, topY + 5, 0xFF4444, 240);
+    // Hull accent stripe (dark waterline)
+    for (let x = 1; x < rectW - 1; x++) cv.set(x, y0 + h - 2, darken(hull, 0.3), 220);
+    // Cabin hatch — small rectangle on deck
+    cv.rect(4, y0 + 2, 10, h - 6, lighten(hull, 0.25), 220);
+    cv.rect(5, y0 + 3, 3, 3, 0x88AACC, 200);
+    // Deck cleat near stern
+    cv.rect(Math.floor(rectW * 0.12), y0 + 2, 3, 2, 0xCCCCCC, 200);
+    // Lifeline posts along deck
+    for (let x = 16; x < mastX - 3; x += 6) cv.set(x, y0 + 1, 0xCCCCCC, 160);
   },
 
   kayak(cv, c) {
@@ -213,16 +242,38 @@ const DETAILS = {
   },
 
   speedboat(cv, c) {
-    const { y0, h, rectW, accent } = c;
-    for (let x = 2; x < rectW - 1; x++) { cv.set(x, y0, accent, 230); cv.set(x, y0 + h - 1, accent, 230); }
-    // racing stripe through the middle
-    const my = y0 + Math.floor(h / 2);
-    for (let x = 2; x < rectW - 1; x++) cv.set(x, my, darken(accent, 0.25), 200);
-    // windshield
-    for (let y = y0 + 2; y < y0 + 5; y++) for (let x = rectW - 22; x < rectW - 3; x++) cv.set(x, y, 0x88CCFF, 180);
-    cv.rect(rectW - 23, y0 + 1, 1, 5, 0x333333);
-    // engine hatch at the stern
-    cv.rect(2, y0 + 3, 6, h - 6, darken(accent, 0.4), 210);
+    const { y0, h, rectW, hull, accent } = c;
+    // White top-deck stripe along the top half — classic red-white speedboat livery
+    for (let x = 1; x < rectW - 1; x++) {
+      cv.set(x, y0,     accent, 235);
+      cv.set(x, y0 + 1, accent, 235);
+      cv.set(x, y0 + 2, accent, 200);
+    }
+    // White stripe also along the waterline
+    for (let x = 1; x < rectW - 1; x++) {
+      cv.set(x, y0 + h - 1, accent, 220);
+      cv.set(x, y0 + h - 2, accent, 160);
+    }
+    // Open cockpit: sits in the forward third, slightly inset from waterline
+    const cockpitX = rectW - 30, cockpitW = 26;
+    cv.rect(cockpitX, y0 + 3, cockpitW, h - 6, 0x111111, 200);
+    // Windshield glass — angled slab in upper cockpit area
+    const wsH = Math.max(3, Math.floor((h - 6) * 0.55));
+    for (let y = y0 + 3; y < y0 + 3 + wsH; y++) {
+      const slant = Math.floor((y - y0 - 3) * 0.3);
+      for (let x = cockpitX + slant; x < cockpitX + cockpitW - 1; x++) cv.set(x, y, 0x88DDFF, 185);
+    }
+    // Windshield frame bar
+    cv.set(cockpitX, y0 + 3, 0xDDDDDD, 220);
+    cv.set(cockpitX, y0 + 3 + wsH, 0xDDDDDD, 220);
+    // Engine cowl — ribbed hatch at stern end
+    const cowlX = 2, cowlW = 14;
+    cv.rect(cowlX, y0 + 2, cowlW, h - 4, darken(hull, 0.2), 230);
+    for (let y = y0 + 3; y < y0 + h - 2; y += 2) cv.set(cowlX + 2, y, 0x000000, 80);
+    for (let y = y0 + 3; y < y0 + h - 2; y += 2) cv.set(cowlX + 5, y, 0x000000, 80);
+    for (let y = y0 + 3; y < y0 + h - 2; y += 2) cv.set(cowlX + 9, y, 0x000000, 80);
+    // Chrome exhaust pipe at stern
+    cv.rect(2, y0 + Math.floor(h / 2) - 1, 3, 2, 0x888888, 200);
   },
 
   tugboat(cv, c) {
@@ -301,43 +352,97 @@ const DETAILS = {
   },
 
   houseboat(cv, c) {
-    const { y0, h, rectW, accent } = c;
-    const hx0 = 4, hw = rectW - 12;
-    // main cabin
-    cv.rect(hx0, y0 + 6, hw, h - 9, accent, 240);
-    cv.rect(hx0, y0 + 6, hw, 1, darken(accent, 0.3), 240);
-    // upper deck, set back
-    const hw2 = Math.floor(hw * 0.7), hx02 = hx0 + Math.floor((hw - hw2) / 2);
-    cv.rect(hx02, y0 + 1, hw2, 5, lighten(accent, 0.2), 240);
-    cv.rect(hx02, y0 + 1, hw2, 1, darken(accent, 0.25), 240);
-    // upper-deck railing
-    for (let x = hx02; x < hx02 + hw2; x += 2) cv.set(x, y0, 0xDDDDDD, 160);
-    // ground-floor windows — two rows of small square windows, with plain
-    // cabin wall visible between them
-    for (let wx = hx0 + 3; wx < hx0 + hw - 3; wx += 6) {
-      cv.rect(wx, y0 + 10, 3, 4, 0xFFEE99, 200);
-      cv.rect(wx, y0 + h - 9, 3, 4, 0xFFEE99, 200);
+    const { y0, h, rectW, hull, accent } = c;
+    const hx0 = 3, hw = rectW - 8;
+    // Layout from top to bottom within the 42px hull:
+    // y0     to y0+4:  roof (4px, darker)
+    // y0+4   to y0+32: main cabin walls + windows (28px)
+    // y0+32  to y0+42: pontoon/hull base (10px, much darker)
+
+    const roofH = 4;
+    const pontoonH = 8;
+    const cabinTop = y0 + roofH;
+    const cabinBot = y0 + h - pontoonH;
+    const cabinH   = cabinBot - cabinTop; // = 30px
+
+    // Roof band — darker accent
+    cv.rect(hx0 - 1, y0,     hw + 2, roofH, darken(accent, 0.3), 250);
+    cv.rect(hx0 - 1, y0,     hw + 2, 1,     darken(accent, 0.55), 250);
+    // Small chimney on the roof (rightish, fits within hull bounds)
+    const chX = hx0 + Math.floor(hw * 0.7);
+    cv.rect(chX, y0, 5, roofH + 2, darken(hull, 0.45), 255);
+    cv.rect(chX + 1, y0, 3, 1, 0x222222, 255); // chimney cap
+
+    // Cabin wall (main body)
+    cv.rect(hx0 + 1, cabinTop, hw - 2, cabinH, accent, 240);
+    // Cabin-roof shadow line (where roof overhang meets the wall)
+    cv.rect(hx0 + 1, cabinTop, hw - 2, 1, darken(accent, 0.35), 240);
+
+    // Windows — larger, evenly spaced, with warm glow interior
+    const winW = 8, winH2 = Math.max(6, cabinH - 10);
+    const winTop = cabinTop + Math.floor((cabinH - winH2) / 2);
+    for (let wx = hx0 + 6; wx < hx0 + hw - 14; wx += 13) {
+      if (wx + winW > chX - 2) continue; // skip if overlaps chimney
+      cv.rect(wx, winTop, winW, winH2, darken(accent, 0.12), 235); // frame surround
+      cv.rect(wx + 1, winTop + 1, winW - 2, winH2 - 2, 0xFFEE88, 210); // warm glass
+      // Cross-bar divider: vertical + horizontal
+      cv.line(wx + Math.floor(winW / 2), winTop + 1, wx + Math.floor(winW / 2), winTop + winH2 - 2, darken(accent, 0.25), 180);
+      cv.line(wx + 1, winTop + Math.floor(winH2 / 2), wx + winW - 2, winTop + Math.floor(winH2 / 2), darken(accent, 0.25), 180);
     }
-    // upper-deck windows
-    for (let wx = hx02 + 2; wx < hx02 + hw2 - 2; wx += 5) cv.set(wx, y0 + 3, 0xFFEE99, 200);
+
+    // Pontoon/hull base — very dark, reads as the waterline platform
+    const pontoonColor = darken(hull, 0.4);
+    cv.rect(hx0 - 1, cabinBot, hw + 2, pontoonH, pontoonColor, 250);
+    cv.rect(hx0 - 1, cabinBot, hw + 2, 1, darken(pontoonColor, 0.3), 250);
+    // Mooring cleats on the pontoon
+    cv.rect(hx0 + 3,      cabinBot + 2, 4, 2, 0x888888, 220);
+    cv.rect(hx0 + hw - 7, cabinBot + 2, 4, 2, 0x888888, 220);
+    // Railing posts along the upper deck edge
+    for (let x = hx0 + 1; x < hx0 + hw - 1; x += 5) cv.set(x, y0 + roofH - 1, 0xBBBBBB, 180);
   },
 
   ferry(cv, c) {
-    const { y0, h, rectW, accent } = c;
-    cv.rect(2, y0 + 1, rectW - 4, h - 4, accent, 220);
-    // three window rows
-    for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + 2, 3, 2, 0x88BBDD, 210);
-    for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + Math.floor(h / 2), 3, 2, 0x88BBDD, 210);
-    for (let wx = 4; wx < rectW - 4; wx += 5) cv.rect(wx, y0 + h - 6, 3, 2, 0xFFEECC, 200);
-    // accent stripe along the waterline
-    for (let x = 1; x < rectW - 1; x++) cv.set(x, y0 + h - 3, lighten(accent, 0.5), 210);
-    // bridge structure toward the bow
-    const bw = Math.floor(rectW * 0.2), bx0 = rectW - bw - Math.floor(rectW * 0.08);
-    cv.rect(bx0, y0, bw, 2, 0xDDDDDD, 230);
-    for (let wx = bx0 + 1; wx < bx0 + bw - 1; wx += 2) cv.set(wx, y0, 0x336688, 220);
-    // life rings along the lower hull edge, sized to stay clear of the
-    // canvas edge so they don't get clipped into wedge shapes
-    for (let x = 10; x < rectW - 10; x += 14) cv.circle(x, y0 + h - 3, 1, 0xFF7700, 220);
+    const { y0, h, rectW, hull, accent } = c;
+    // Two clear passenger decks — light grey upper, slightly darker lower
+    const deckBand = Math.floor(h / 2);
+    cv.rect(1, y0 + 1, rectW - 2, deckBand - 1, 0xDDDDDD, 235);
+    cv.rect(1, y0 + deckBand, rectW - 2, h - deckBand - 1, 0xCCCCCC, 235);
+    // Deck divider rail — bold accent stripe separates upper and lower
+    for (let x = 1; x < rectW - 1; x++) {
+      cv.set(x, y0 + deckBand - 1, accent, 240);
+      cv.set(x, y0 + deckBand,     accent, 240);
+    }
+    // Bold accent band at waterline (company livery)
+    for (let x = 1; x < rectW - 1; x++) {
+      cv.set(x, y0 + h - 4, accent, 230);
+      cv.set(x, y0 + h - 3, accent, 230);
+    }
+    // Upper-deck windows — larger, grouped in sets of 3 with gaps
+    for (let gx = 4; gx < rectW - 16; gx += 12) {
+      for (let wx = 0; wx < 3; wx++) {
+        cv.rect(gx + wx * 4, y0 + 3, 3, deckBand - 6, 0x99CCEE, 220);
+      }
+    }
+    // Lower-deck windows — same grouping but smaller
+    for (let gx = 4; gx < rectW - 16; gx += 12) {
+      for (let wx = 0; wx < 3; wx++) {
+        cv.rect(gx + wx * 4, y0 + deckBand + 3, 3, h - deckBand - 9, 0xAACCDD, 200);
+      }
+    }
+    // Bridge/wheelhouse at the bow — sits inside the hull, taller than
+    // the passenger decks it overwrites, so it reads as a raised structure
+    const bx0 = rectW - Math.floor(rectW * 0.22), bw = Math.floor(rectW * 0.18);
+    const bridgeH = Math.floor(h * 0.7); // tall enough to read as superstructure
+    cv.rect(bx0, y0, bw, bridgeH, 0xEEEEEE, 255);
+    cv.rect(bx0, y0, bw, 2, accent, 245);  // accent roof trim
+    // Bridge windows
+    for (let wx = bx0 + 2; wx < bx0 + bw - 2; wx += 4) cv.rect(wx, y0 + 3, 3, 3, 0x5588AA, 230);
+    // Funnel stack on the bridge — stays within hull (at y0 + a few px)
+    const fxB = bx0 + Math.floor(bw / 2) - 2;
+    cv.rect(fxB, y0 + bridgeH - 1, 5, h - bridgeH, 0x444444, 255); // extends down only
+    cv.rect(fxB, y0 + bridgeH - 1, 5, 2, accent, 255);
+    // Life rings at lower hull edge — stop before the bridge
+    for (let x = 12; x < bx0 - 10; x += 16) cv.circle(x, y0 + h - 2, 2, 0xFF7700, 230);
   },
 
   container_ship(cv, c) {
