@@ -4,6 +4,11 @@ import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { VergePalette, ThemeParams } from '../theme/ThemeTypes';
 import { CYCLIST_KEYS, CYCLIST_ORIGIN_Y, CYCLIST_FRAME_COUNT, cyclistAnimKey } from './CyclistAssets';
+import {
+  BENCH_ORIGIN_X, BENCH_ORIGIN_Y,
+  LAMP_ORIGIN_X, LAMP_ORIGIN_Y,
+  BOLLARD_ORIGIN_X, BOLLARD_ORIGIN_Y,
+} from './VergeFurnitureAssets';
 
 const CYCLE_H = 14;
 const NIGHT_TINT = 0x5a6680;
@@ -33,6 +38,10 @@ export class VergeRiver {
   private treeXs:    number[]      = [];
   private lampXs:    number[]      = [];
   private cyclists:  Cyclist[]     = [];
+
+  private benchImages:   Phaser.GameObjects.Image[] = [];
+  private lampImages:    Phaser.GameObjects.Image[] = [];
+  private bollardImages: Phaser.GameObjects.Image[] = [];
 
   private lampSpots:        SoftSpotLight[]                              = [];
   private lampBulbs:        Array<Extract<LightSource, { type?: 'point' }>> = [];
@@ -108,12 +117,24 @@ export class VergeRiver {
     this.drawBase(gfx, level, width, vergeY);
 
     if (level >= 8)  this.drawCyclePath(gfx, width, vergeY);
-    if (level >= 9)  this.drawBollards(gfx, width, vergeY);
     if (level >= 13) this.drawPaving(gfx, width, vergeY);
     // Wildflowers only before flower beds take over (levels 3–4)
     if (level >= 3 && level <= 4) this.drawWildflowers(gfx, level, width, vergeY);
     if (level >= 5)  this.drawFlowerBeds(this.flowerGfx, level, width, vergeY);
-    if (level >= 6)  this.drawBenches(gfx, level, width, vergeY);
+
+    if (level >= 9) {
+      this.drawBollards(width, vergeY);
+    } else if (this.bollardImages.length > 0) {
+      for (const img of this.bollardImages) img.destroy();
+      this.bollardImages = [];
+    }
+
+    if (level >= 6) {
+      this.drawBenches(level, width, vergeY);
+    } else if (this.benchImages.length > 0) {
+      for (const img of this.benchImages) img.destroy();
+      this.benchImages = [];
+    }
 
     this.treeGfx.clear();
     if (level >= 4) {
@@ -131,6 +152,10 @@ export class VergeRiver {
       this.drawLamps(level, vergeY);
     } else {
       this.lampXs = [];
+      if (this.lampImages.length > 0) {
+        for (const img of this.lampImages) img.destroy();
+        this.lampImages = [];
+      }
     }
 
     // Remove stale native lights before recreating
@@ -211,7 +236,6 @@ export class VergeRiver {
       const vergeY = this._groundY + ROAD_H;
       this.treeGfx.clear();
       this.drawTrees(this._level, vergeY);
-      if (this._level >= 10) this.drawLamps(this._level, vergeY);
     }
 
     // Grass seasonal overlay — a semi-transparent tint over the base grass
@@ -318,23 +342,20 @@ export class VergeRiver {
 
   // ── Boulevard bollards (level 9+) ────────────────────────────────
 
-  private drawBollards(gfx: Phaser.GameObjects.Graphics, width: number, vergeY: number): void {
+  private drawBollards(width: number, vergeY: number): void {
+    for (const img of this.bollardImages) img.destroy();
+    this.bollardImages = [];
+
     // Sit on the paved boulevard strip (vergeY+10, height 9)
     const pathBaseY = vergeY + 19;
-    const poleH     = 3;
-    const capH      = 2;
-    const poleTopY  = pathBaseY - poleH - capH;
+    const tint = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
 
     for (let bx = 20; bx < width; bx += 40) {
-      // Pole
-      gfx.fillStyle(this._palette.bollardColor, 1);
-      gfx.fillRect(bx - 1, poleTopY + capH, 2, poleH);
-      // Cap housing
-      gfx.fillStyle(0x1e1e1e, 1);
-      gfx.fillRect(bx - 2, poleTopY, 4, capH);
-      // Tiny warm lens dot
-      gfx.fillStyle(0xfff0b0, 0.7);
-      gfx.fillRect(bx, poleTopY, 1, 1);
+      const img = this.scene.add.image(bx, pathBaseY, 'bollard')
+        .setOrigin(BOLLARD_ORIGIN_X, BOLLARD_ORIGIN_Y)
+        .setDepth(6)
+        .setTint(tint);
+      this.bollardImages.push(img);
     }
   }
 
@@ -404,28 +425,21 @@ export class VergeRiver {
 
   // ── Park benches ──────────────────────────────────────────────────
 
-  private drawBenches(gfx: Phaser.GameObjects.Graphics, level: number, width: number, vergeY: number): void {
+  private drawBenches(level: number, width: number, vergeY: number): void {
+    for (const img of this.benchImages) img.destroy();
+    this.benchImages = [];
+
     const { spacing } = treeGeom(level);
+    const by   = vergeY + 22;
+    const tint = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
+
     for (let tx = spacing * 1.5; tx < width - spacing * 0.4; tx += spacing * 2) {
-      const bx = Math.round(tx);
-      const by = vergeY + 22;
-
-      // Seat (30 px wide, 4 px tall)
-      gfx.fillStyle(this._palette.benchWood, 1);
-      gfx.fillRect(bx - 15, by, 30, 4);
-      // Seat slat lines
-      gfx.fillStyle(0x8a6030, 0.35);
-      gfx.fillRect(bx - 5, by, 1, 4);
-      gfx.fillRect(bx + 4, by, 1, 4);
-
-      // Back rest (same width, 3 px tall, 5 px above seat)
-      gfx.fillStyle(0xb08848, 1);
-      gfx.fillRect(bx - 15, by - 6, 30, 3);
-
-      // Cast-iron legs (2 each side)
-      gfx.fillStyle(this._palette.benchMetal, 1);
-      gfx.fillRect(bx - 13, by + 4, 3, 5);
-      gfx.fillRect(bx + 10, by + 4, 3, 5);
+      const bx  = Math.round(tx);
+      const img = this.scene.add.image(bx, by, 'bench')
+        .setOrigin(BENCH_ORIGIN_X, BENCH_ORIGIN_Y)
+        .setDepth(6)
+        .setTint(tint);
+      this.benchImages.push(img);
     }
   }
 
@@ -506,34 +520,20 @@ export class VergeRiver {
   // ── Lamp posts (depth 8.5) ────────────────────────────────────────
 
   private drawLamps(level: number, vergeY: number): void {
-    const gfx = this.treeGfx;
-    // Short cycle-lane bollard: base at cycle lane edge, head just above it
+    for (const img of this.lampImages) img.destroy();
+    this.lampImages = [];
+
+    // Lamp base sits at the cycle lane edge, head just above it
     const cycleTopY = vergeY + VERGE_H - CYCLE_H;
-    const poleH     = 19;
-    const poleBaseY = cycleTopY;
-    const poleTopY  = poleBaseY - poleH;
-    const armLen    = 8;
-    const poleColor = level >= 15 ? 0x5c4a38 : 0x555555;
-    const headColor = level >= 15 ? 0x6a5a40 : 0x444444;
-    const baseColor = level >= 15 ? 0x7a6a50 : 0x3a3a3a;
+    const key  = level >= 15 ? 'lamp_ornate' : 'lamp_default';
+    const tint = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
 
     for (const lx of this.lampXs) {
-      // Base plate
-      gfx.fillStyle(baseColor, 1);
-      gfx.fillRect(lx - 2, poleBaseY - 2, 4, 2);
-      // Pole
-      gfx.fillStyle(poleColor, 1);
-      gfx.fillRect(lx - 1, poleTopY, 2, poleH - 2);
-      // Arm
-      gfx.fillRect(lx, poleTopY + 1, armLen, 2);
-      // Lamp head housing (mirrors for-sale sign lamp style)
-      const hx = lx + armLen - 3;
-      gfx.fillStyle(headColor, 1);
-      gfx.fillRect(hx, poleTopY, 7, 4);
-      gfx.fillStyle(0x333333, 1);
-      gfx.fillRect(hx - 1, poleTopY + 3, 9, 1);
-      gfx.fillStyle(0x666666, 1);
-      gfx.fillRect(hx + 1, poleTopY + 1, 5, 1);
+      const img = this.scene.add.image(lx, cycleTopY, key)
+        .setOrigin(LAMP_ORIGIN_X, LAMP_ORIGIN_Y)
+        .setDepth(8.5)
+        .setTint(tint);
+      this.lampImages.push(img);
     }
   }
 
@@ -637,16 +637,23 @@ export class VergeRiver {
     // flowerGfx skips the Light2D pipeline so manually darken it to match the verge
     this.flowerGfx.setAlpha(1.0 - nightFactor * 0.78);
 
-    // Cyclist sprites skip the Light2D pipeline too — tint manually like boats
+    // Cyclist sprites and street furniture skip the Light2D pipeline too —
+    // tint manually like boats
     this._nightFactor = nightFactor;
     const tint = lerpColor(0xffffff, NIGHT_TINT, nightFactor);
     for (const c of this.cyclists) c.sprite.setTint(tint);
+    for (const img of this.benchImages)   img.setTint(tint);
+    for (const img of this.lampImages)    img.setTint(tint);
+    for (const img of this.bollardImages) img.setTint(tint);
   }
 
   destroy(): void {
     for (const l of this.lampNativeLights)    this.scene.lights.removeLight(l);
     for (const l of this.bollardNativeLights) this.scene.lights.removeLight(l);
     for (const c of this.cyclists) c.sprite.destroy();
+    for (const img of this.benchImages)   img.destroy();
+    for (const img of this.lampImages)    img.destroy();
+    for (const img of this.bollardImages) img.destroy();
     this.vergeGfx.destroy();
     this.flowerGfx.destroy();
     this.cyclistGfx.destroy();
