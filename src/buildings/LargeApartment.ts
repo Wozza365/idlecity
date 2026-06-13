@@ -1,9 +1,16 @@
 import Phaser from 'phaser';
-import { YARD_H, buildingHeight } from '../constants';
+import { YARD_H, buildingHeight, multiplyColor } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import { type DoorEntrance } from './types';
 import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
+import { CANOPY_ORIGIN, TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y, CANOPY_SMALL_R } from '../objects/TreeAssets';
+
+const NIGHT_TINT = 0x5a6680;
+// Match the verge street trees' "summer" canopy/trunk tints (ClassicTheme
+// palette.verge) for visual consistency — buildings don't carry that palette.
+const TREE_CANOPY_TINT = 0x4a8c32;
+const TREE_TRUNK_TINT  = 0x5c3a1e;
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -69,6 +76,7 @@ export class LargeApartment extends Phaser.GameObjects.Container {
   private _neonX = 0;
   private _neonY = 0;
   private _neonPhase = 0;
+  private yardTreeImages: Array<{ img: Phaser.GameObjects.Image; baseTint: number }> = [];
 
   get extraLights(): LightSource[] {
     return this.signSpot ? [...this.signSpot.beams] : [];
@@ -305,15 +313,10 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
     // ── Lv 67+: street trees / planters ──────────────────────────
     if (level >= 67) {
-      for (const [tX, isLeft] of [[x + 4, true], [x + w - 14, false]] as [number, boolean][]) {
+      for (const [tX] of [[x + 4, true], [x + w - 14, false]] as [number, boolean][]) {
         gfx.fillStyle(0x3a4430, 1);
         gfx.fillRect(tX, buildGY + 2, 10, 8);
-        gfx.fillStyle(0x5a3820, 1);
-        gfx.fillRect(tX + 4, buildGY - 5, 2, 7);
-        gfx.fillStyle(0x2a6818, 1);
-        gfx.fillCircle(tX + 5, buildGY - 9, 7);
-        gfx.fillStyle(0x388a22, 1);
-        gfx.fillCircle(tX + (isLeft ? 3 : 7), buildGY - 13, 4);
+        this.addYardTree(scene, tX + 5, buildGY - 9, buildGY + 2, 7 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
       }
     }
 
@@ -519,7 +522,29 @@ export class LargeApartment extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
+  // Small yard bush/tree: a tinted canopy cluster over a tinted trunk,
+  // scaled down from the small street-tree textures (radius CANOPY_SMALL_R).
+  private addYardTree(scene: Phaser.Scene, x: number, canopyY: number, trunkBaseY: number, scale: number, canopyTint: number, trunkTint: number): void {
+    const trunk = scene.add.image(x, trunkBaseY, 'trunk_small')
+      .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
+      .setScale(scale)
+      .setTint(trunkTint);
+    const canopy = scene.add.image(x, canopyY, 'canopy_small')
+      .setOrigin(CANOPY_ORIGIN, CANOPY_ORIGIN)
+      .setScale(scale)
+      .setTint(canopyTint);
+    this.add(trunk);
+    this.add(canopy);
+    this.yardTreeImages.push({ img: trunk, baseTint: trunkTint }, { img: canopy, baseTint: canopyTint });
+  }
+
   updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
+    if (this.yardTreeImages.length) {
+      const nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
+      const nightTint   = lerpColor(0xffffff, NIGHT_TINT, nightFactor);
+      for (const { img, baseTint } of this.yardTreeImages) img.setTint(multiplyColor(baseTint, nightTint));
+    }
+
     const t = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01 && this.windowLights.every(l => l.intensity < 0.01)) {
       if (this.lobbyLight)     this.lobbyLight.intensity = 0;

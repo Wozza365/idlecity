@@ -1,7 +1,14 @@
 import Phaser from 'phaser';
-import { YARD_H } from '../constants';
+import { YARD_H, multiplyColor } from '../constants';
 import { type DoorEntrance } from './types';
 import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
+import { CANOPY_ORIGIN, TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y, CANOPY_SMALL_R } from '../objects/TreeAssets';
+
+const NIGHT_TINT = 0x5a6680;
+// Match the verge street trees' "summer" canopy/trunk tints (ClassicTheme
+// palette.verge) for visual consistency — buildings don't carry that palette.
+const TREE_CANOPY_TINT = 0x4a8c32;
+const TREE_TRUNK_TINT  = 0x5c3a1e;
 
 function lerpColor(a: number, b: number, t: number): number {
   const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
@@ -41,6 +48,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private lastSleepHour  = -1;
   private pendingSleepAt = Infinity;
   private shadowGfx!: Phaser.GameObjects.Graphics;
+  private yardTreeImages: Array<{ img: Phaser.GameObjects.Image; baseTint: number }> = [];
 
   getSmokeParticles(): SmokeParticle[] { return this.smokeParticles; }
 
@@ -261,32 +269,32 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     if (level >= 19) {
       const bshX = bx + 7;
       const bshY = buildGY - foundH;
-      gfx.fillStyle(0x4a2808, 1);
-      gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
-      gfx.fillStyle(0x257018, 1);
-      gfx.fillCircle(bshX, bshY - 9, 6);
-      gfx.fillStyle(0x308a20, 1);
-      gfx.fillCircle(bshX - 2, bshY - 11, 3);
+      this.addYardTree(scene, bshX, bshY - 9, bshY + 6, 6 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
     }
 
     // ── Lv 20+: right bush ────────────────────────────────────
     if (level >= 20) {
       const bshX = bx + bw - 7;
       const bshY = buildGY - foundH;
-      gfx.fillStyle(0x4a2808, 1);
-      gfx.fillRect(bshX - 1, bshY - 7, 2, 13);
-      gfx.fillStyle(0x257018, 1);
-      gfx.fillCircle(bshX, bshY - 9, 6);
-      gfx.fillStyle(0x308a20, 1);
-      gfx.fillCircle(bshX + 2, bshY - 11, 3);
+      this.addYardTree(scene, bshX, bshY - 9, bshY + 6, 6 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
     }
 
-    // ── Lv 21+: hedge ─────────────────────────────────────────
+    // ── Lv 21+: hedge — trimmed base with a leafy, lumpy fringe ─
     if (level >= 21) {
       gfx.fillStyle(0x2d6a1e, 1);
       gfx.fillRect(bx, buildGY, bw, 8);
-      gfx.fillStyle(0x3a8428, 1);
-      gfx.fillRect(bx, buildGY, bw, 2);
+
+      const bumpScale = 3.5 / CANOPY_SMALL_R;
+      const bumpCount = Math.max(2, Math.round(bw / 7));
+      for (let i = 0; i < bumpCount; i++) {
+        const bumpX = bx + Math.round((bw * (i + 0.5)) / bumpCount);
+        const canopy = scene.add.image(bumpX, buildGY, 'canopy_small')
+          .setOrigin(CANOPY_ORIGIN, CANOPY_ORIGIN)
+          .setScale(bumpScale)
+          .setTint(TREE_CANOPY_TINT);
+        this.add(canopy);
+        this.yardTreeImages.push({ img: canopy, baseTint: TREE_CANOPY_TINT });
+      }
     }
 
     // ── Lv 22+: porch lantern ─────────────────────────────────
@@ -422,7 +430,29 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
+  // Small yard bush/tree: a tinted canopy cluster over a tinted trunk,
+  // scaled down from the small street-tree textures (radius CANOPY_SMALL_R).
+  private addYardTree(scene: Phaser.Scene, x: number, canopyY: number, trunkBaseY: number, scale: number, canopyTint: number, trunkTint: number): void {
+    const trunk = scene.add.image(x, trunkBaseY, 'trunk_small')
+      .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
+      .setScale(scale)
+      .setTint(trunkTint);
+    const canopy = scene.add.image(x, canopyY, 'canopy_small')
+      .setOrigin(CANOPY_ORIGIN, CANOPY_ORIGIN)
+      .setScale(scale)
+      .setTint(canopyTint);
+    this.add(trunk);
+    this.add(canopy);
+    this.yardTreeImages.push({ img: trunk, baseTint: trunkTint }, { img: canopy, baseTint: canopyTint });
+  }
+
   updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
+    if (this.yardTreeImages.length) {
+      const nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
+      const nightTint   = lerpColor(0xffffff, NIGHT_TINT, nightFactor);
+      for (const { img, baseTint } of this.yardTreeImages) img.setTint(multiplyColor(baseTint, nightTint));
+    }
+
     const t    = Math.max(0, Math.min(1, (0.4 - elevation) / 0.3));
     if (t < 0.01) return;
     const ambientIntensity = elevation >= 0.3 ? 1.0
