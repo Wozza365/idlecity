@@ -1402,6 +1402,36 @@ export class WaterArea {
           gfx.fillRect(mx, my, moonW - row * 10, 1);
         }
       }
+
+      // Sun glitter — scattered twinkling highlights across the open water,
+      // brightest in full daylight and fading out as night approaches.
+      // Each candidate point flickers on/off with its own phase/frequency so
+      // only a handful sparkle at any instant, like sunlight on tiny ripples.
+      if (dayA > 0.05) {
+        const gx0 = tx + 8;
+        const gy0 = wy + ROCK_SHORE_H + 6;
+        const gy1 = wy + WATER_H - 10;
+        const spanX = w - gx0;
+        const spanY = gy1 - gy0;
+        if (spanX > 0 && spanY > 0) {
+          const GLITTER_COUNT = Math.floor(spanX / 9);
+          for (let i = 0; i < GLITTER_COUNT; i++) {
+            const gx = gx0 + ((i * 53 + 17) % spanX);
+            const gy = gy0 + ((i * 31 + 11) % spanY);
+            if (islandClearAt(gx, gy) > 0.3) continue;
+
+            const freq  = 3 + (i % 7);
+            const phase = i * 2.399;
+            const tw = Math.sin(t * freq + phase);
+            if (tw < 0.55) continue;
+
+            const a = dayA * (tw - 0.55) / 0.45 * 0.65;
+            if (a < 0.03) continue;
+            gfx.fillStyle(i % 3 === 0 ? 0xFFFFD0 : 0xFFFFFF, a);
+            gfx.fillRect(gx, gy, 1, 1);
+          }
+        }
+      }
     }
 
     // Buoys — pre-rendered conical channel-marker sprites, dimmed by elevation
