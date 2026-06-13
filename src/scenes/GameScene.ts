@@ -35,6 +35,7 @@ import { ALL_BOAT_KEYS, getBoatUrl } from '../objects/BoatAssets';
 import { CYCLIST_KEYS, getCyclistUrl, CYCLIST_FRAME_WIDTH, CYCLIST_FRAME_HEIGHT } from '../objects/CyclistAssets';
 import { FURNITURE_KEYS, getFurnitureUrl } from '../objects/VergeFurnitureAssets';
 import { FLOWER_KEYS, getFlowerUrl } from '../objects/FlowerAssets';
+import { TREE_KEYS, getTreeUrl } from '../objects/TreeAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
 import { Rain } from '../objects/Rain';
@@ -175,6 +176,10 @@ export class GameScene extends Phaser.Scene {
     }
     for (const key of FLOWER_KEYS) {
       const url = getFlowerUrl(key);
+      if (url) this.load.image(key, url);
+    }
+    for (const key of TREE_KEYS) {
+      const url = getTreeUrl(key);
       if (url) this.load.image(key, url);
     }
     loadHtAssets(this);

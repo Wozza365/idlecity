@@ -10,14 +10,17 @@ import {
   BOLLARD_ORIGIN_X, BOLLARD_ORIGIN_Y,
 } from './VergeFurnitureAssets';
 import { FLOWER_KEYS } from './FlowerAssets';
+import { TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y, CANOPY_SMALL_R } from './TreeAssets';
 
 const CYCLE_H = 14;
 const NIGHT_TINT = 0x5a6680;
 
-function treeGeom(level: number) {
-  if (level >= 14) return { trunkH: 30, canopyR: 21, spacing: 80 };
-  if (level >= 7)  return { trunkH: 24, canopyR: 16, spacing: 80 };
-  return               { trunkH: 18, canopyR: 11, spacing: 80 };
+type TreeTier = 'small' | 'medium' | 'large';
+
+function treeGeom(level: number): { trunkH: number; canopyR: number; spacing: number; tier: TreeTier } {
+  if (level >= 14) return { trunkH: 30, canopyR: 21, spacing: 80, tier: 'large' };
+  if (level >= 7)  return { trunkH: 24, canopyR: 16, spacing: 80, tier: 'medium' };
+  return               { trunkH: 18, canopyR: 11, spacing: 80, tier: 'small' };
 }
 
 function getPositions(width: number, start: number, spacing: number): number[] {
@@ -34,7 +37,6 @@ export class VergeRiver {
   private flowerGfx:  Phaser.GameObjects.Graphics;
   private cyclistGfx: Phaser.GameObjects.Graphics;
   private shadowGfx:  Phaser.GameObjects.Graphics;
-  private treeGfx:    Phaser.GameObjects.Graphics;
 
   private treeXs:    number[]      = [];
   private lampXs:    number[]      = [];
@@ -46,6 +48,14 @@ export class VergeRiver {
 
   private wildflowers:      Array<{ img: Phaser.GameObjects.Image; color: number }> = [];
   private flowerBedFlowers: Array<{ img: Phaser.GameObjects.Image; color: number }> = [];
+
+  private treeImages: Array<{
+    trunk: Phaser.GameObjects.Image;
+    canopy: Phaser.GameObjects.Image;
+    extras: Phaser.GameObjects.Image[];
+  }> = [];
+  private _canopyTint = 0xffffff;
+  private _trunkTint  = 0xffffff;
 
   private lampSpots:        SoftSpotLight[]                              = [];
   private lampBulbs:        Array<Extract<LightSource, { type?: 'point' }>> = [];
@@ -87,7 +97,6 @@ export class VergeRiver {
     this.flowerGfx     = scene.add.graphics().setDepth(6.1); // no lighting — preserves true flower colours
     this.cyclistGfx    = scene.add.graphics().setDepth(6.4); // cyclist shadows, behind their sprites
     this.shadowGfx     = scene.add.graphics().setDepth(7.1);
-    this.treeGfx       = scene.add.graphics().setDepth(8.5).setLighting(true);
     this.grassSeasonGfx = scene.add.graphics().setDepth(6.02).setLighting(true);
     this.setupCyclistAnimations();
   }
@@ -150,13 +159,13 @@ export class VergeRiver {
       this.benchImages = [];
     }
 
-    this.treeGfx.clear();
     if (level >= 4) {
       const { spacing } = treeGeom(level);
       this.treeXs = getPositions(width, spacing / 2, spacing);
       this.drawTrees(level, vergeY);
     } else {
       this.treeXs = [];
+      this.destroyTreeImages();
     }
 
     // Lamps sit between trees: start at one full spacing instead of half
@@ -248,7 +257,6 @@ export class VergeRiver {
 
     if (this._level >= 4) {
       const vergeY = this._groundY + ROAD_H;
-      this.treeGfx.clear();
       this.drawTrees(this._level, vergeY);
     }
 
@@ -483,63 +491,80 @@ export class VergeRiver {
     gfx.fillRect(0, pathY + pathH - 1, width, 1);
   }
 
-  // ── Street trees (depth 8.5) ──────────────────────────────────────
+  // ── Street trees (depth ~8.5) ──────────────────────────────────────
+
+  private destroyTreeImages(): void {
+    for (const t of this.treeImages) {
+      t.trunk.destroy();
+      t.canopy.destroy();
+      for (const e of t.extras) e.destroy();
+    }
+    this.treeImages = [];
+  }
 
   private drawTrees(level: number, vergeY: number): void {
-    const gfx = this.treeGfx;
-    const aw  = this._autumnWeight;
-    const ww  = this._winterWeight;
-    const sw  = this._springWeight;
+    this.destroyTreeImages();
 
-    const { trunkH, canopyR: baseR } = treeGeom(level);
+    const aw = this._autumnWeight;
+    const ww = this._winterWeight;
+    const sw = this._springWeight;
+
+    const { trunkH, canopyR: baseR, tier } = treeGeom(level);
     const trunkBaseY = vergeY + 8;
-    const trunkTopY  = trunkBaseY - trunkH;
-    const canopyY    = trunkTopY;
+    const canopyY    = trunkBaseY - trunkH;
     // Trees thin slightly in winter (reduced canopy radius)
     const canopyR    = Math.round(baseR * (1 - 0.22 * ww));
+    const canopyScale = canopyR / baseR;
 
-    // Base green colours — lerped through autumn (orange) and winter (dark/muted) and spring (bright)
-    const canopy     = this._palette.treeCanopy;
-    const matureIdx  = level >= 14 ? 4 : 0;
-    const baseShadow  = canopy[matureIdx + 0];
-    const baseDark    = canopy[matureIdx + 1];
-    const baseMid     = canopy[matureIdx + 2];
-    const baseLight   = canopy[matureIdx + 3];
+    // Base canopy colour — lerped through autumn (orange), winter (dark/muted)
+    // and spring (bright fresh green). The canopy texture bakes in its own
+    // light/shadow shading, so a single seasonal tint reproduces the gradient.
+    const canopy    = this._palette.treeCanopy;
+    const matureIdx = level >= 14 ? 4 : 0;
+    const baseMid   = canopy[matureIdx + 2];
+    this._canopyTint = lerpColor(lerpColor(lerpColor(baseMid, 0xbb5500, aw), 0x3a2800, ww * 0.5), 0x88ee44, sw * 0.4);
+    this._trunkTint  = this._palette.treeTrunk;
 
-    // Autumn: green → orange/rust; Winter: darken toward near-black twigs
-    const shadowRing  = lerpColor(lerpColor(baseShadow, 0x6a2800, aw), 0x1a1000, ww * 0.5);
-    const canopyDark  = lerpColor(lerpColor(baseDark,   0x7a3a10, aw), 0x2a1800, ww * 0.5);
-    const canopyMid   = lerpColor(lerpColor(baseMid,    0xbb5500, aw), 0x3a2800, ww * 0.5);
-    const canopyLight = lerpColor(lerpColor(lerpColor(baseLight, 0xff8800, aw), 0x4a3818, ww * 0.5), 0x88ee44, sw * 0.55);
+    const nightTint  = lerpColor(0xffffff, NIGHT_TINT, this._nightFactor);
+    const canopyTint = multiplyColor(this._canopyTint, nightTint);
+    const trunkTint  = multiplyColor(this._trunkTint, nightTint);
 
-    const trunkColor = this._palette.treeTrunk;
+    const trunkKey  = `trunk_${tier}`;
+    const canopyKey = `canopy_${tier}`;
 
     for (const tx of this.treeXs) {
-      gfx.fillStyle(trunkColor, 1);
-      gfx.fillRect(tx - 2, trunkTopY, 4, trunkH);
-      gfx.fillStyle(0x3a2410, 1);
-      gfx.fillRect(tx - 3, trunkBaseY - 4, 6, 4);
+      const trunk = this.scene.add.image(tx, trunkBaseY, trunkKey)
+        .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
+        .setDepth(8.49)
+        .setTint(trunkTint);
 
-      gfx.fillStyle(0x000000, 0.18);
-      gfx.fillCircle(tx + 3, canopyY + 3, canopyR);
+      const cnp = this.scene.add.image(tx, canopyY, canopyKey)
+        .setOrigin(0.5, 0.5)
+        .setDepth(8.5)
+        .setScale(canopyScale)
+        .setTint(canopyTint);
 
-      gfx.fillStyle(shadowRing, 1);
-      gfx.fillCircle(tx, canopyY, canopyR);
-      gfx.fillStyle(canopyDark, 1);
-      gfx.fillCircle(tx - 1, canopyY - 1, Math.round(canopyR * 0.88));
-      gfx.fillStyle(canopyMid, 1);
-      gfx.fillCircle(tx - 3, canopyY - 3, Math.round(canopyR * 0.72));
-      gfx.fillStyle(canopyLight, 0.65);
-      gfx.fillCircle(tx - 5, canopyY - 5, Math.round(canopyR * 0.44));
-
+      const extras: Phaser.GameObjects.Image[] = [];
       // Mature trees: extra secondary clusters for a fuller, irregular crown
       if (level >= 14) {
-        gfx.fillStyle(canopyDark, 0.85);
-        gfx.fillCircle(tx - Math.round(canopyR * 0.65), canopyY + Math.round(canopyR * 0.35), Math.round(canopyR * 0.42));
-        gfx.fillCircle(tx + Math.round(canopyR * 0.58), canopyY + Math.round(canopyR * 0.28), Math.round(canopyR * 0.38));
-        gfx.fillStyle(canopyMid, 0.7);
-        gfx.fillCircle(tx + Math.round(canopyR * 0.45), canopyY - Math.round(canopyR * 0.4), Math.round(canopyR * 0.32));
+        const offsets = [
+          { dx: -Math.round(canopyR * 0.65), dy:  Math.round(canopyR * 0.35), a: 0.85 },
+          { dx:  Math.round(canopyR * 0.58), dy:  Math.round(canopyR * 0.28), a: 0.85 },
+          { dx:  Math.round(canopyR * 0.45), dy: -Math.round(canopyR * 0.4),  a: 0.7  },
+        ];
+        const clusterScale = (canopyR * 0.4) / CANOPY_SMALL_R;
+        for (const o of offsets) {
+          const extra = this.scene.add.image(tx + o.dx, canopyY + o.dy, 'canopy_small')
+            .setOrigin(0.5, 0.5)
+            .setDepth(8.51)
+            .setScale(clusterScale)
+            .setTint(canopyTint)
+            .setAlpha(o.a);
+          extras.push(extra);
+        }
       }
+
+      this.treeImages.push({ trunk, canopy: cnp, extras });
     }
   }
 
@@ -675,6 +700,15 @@ export class VergeRiver {
     // Flower blooms combine their palette tint with the night tint
     for (const f of this.wildflowers)      f.img.setTint(multiplyColor(f.color, tint));
     for (const f of this.flowerBedFlowers) f.img.setTint(multiplyColor(f.color, tint));
+
+    // Trees combine their seasonal canopy/trunk tints with the night tint
+    const canopyTint = multiplyColor(this._canopyTint, tint);
+    const trunkTint  = multiplyColor(this._trunkTint, tint);
+    for (const t of this.treeImages) {
+      t.trunk.setTint(trunkTint);
+      t.canopy.setTint(canopyTint);
+      for (const e of t.extras) e.setTint(canopyTint);
+    }
   }
 
   destroy(): void {
@@ -686,10 +720,10 @@ export class VergeRiver {
     for (const img of this.bollardImages) img.destroy();
     for (const f of this.wildflowers)      f.img.destroy();
     for (const f of this.flowerBedFlowers) f.img.destroy();
+    this.destroyTreeImages();
     this.vergeGfx.destroy();
     this.flowerGfx.destroy();
     this.cyclistGfx.destroy();
     this.shadowGfx.destroy();
-    this.treeGfx.destroy();
   }
 }
