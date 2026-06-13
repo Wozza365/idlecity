@@ -8,7 +8,7 @@ export class LoadingScreen {
   private bg: Phaser.GameObjects.Rectangle;
   private label: Phaser.GameObjects.Text;
 
-  constructor(private scene: Phaser.Scene, width: number, height: number) {
+  constructor(scene: Phaser.Scene, width: number, height: number) {
     this.bg = scene.add.rectangle(width / 2, height / 2, width, height, 0x05080c, 0.85)
       .setDepth(DEPTH)
       .setVisible(false);

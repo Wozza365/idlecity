@@ -128,7 +128,7 @@ export class OfficeBlock extends Phaser.GameObjects.Container {
         const wxx = Math.round(x + hPad * (c + 1) - ww / 2);
         const isBright = (f % 4 === 0);
 
-        gfx.fillStyle(isBright ? 0x3a5a72 : 0x1e3448, 1);
+        gfx.fillStyle(isBright ? palette.glass : palette.glassShade, 1);
         gfx.fillRect(wxx, wy, ww, wh);
 
         this.windowRects.push({ wx: wxx, wy, ww, wh, bright: isBright });

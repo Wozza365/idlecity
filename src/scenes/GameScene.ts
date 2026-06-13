@@ -1096,8 +1096,8 @@ export class GameScene extends Phaser.Scene {
     const plot = this.state.plots[index];
 
     const building = plot.unlocked
-      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level, savedParticles)
-      : new EmptyPlot(this, x, this.plotWidth, this.groundY);
+      ? createBuilding(this, x, this.plotWidth, this.groundY, plot.level, this.activeTheme.palette.building, this.activeTheme.params, savedParticles)
+      : new EmptyPlot(this, x, this.plotWidth, this.groundY, this.activeTheme.palette.building.emptyPlot);
 
     building.setDepth(9);
     this.add.existing(building);
