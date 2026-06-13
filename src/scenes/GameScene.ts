@@ -36,6 +36,7 @@ import { CYCLIST_KEYS, getCyclistUrl, CYCLIST_FRAME_WIDTH, CYCLIST_FRAME_HEIGHT 
 import { FURNITURE_KEYS, getFurnitureUrl } from '../objects/VergeFurnitureAssets';
 import { FLOWER_KEYS, getFlowerUrl } from '../objects/FlowerAssets';
 import { TREE_KEYS, getTreeUrl } from '../objects/TreeAssets';
+import { PIGEON_KEY, getPigeonUrl, PIGEON_FRAME_WIDTH, PIGEON_FRAME_HEIGHT } from '../objects/PigeonAssets';
 import { loadHtAssets } from '../objects/HighTidesAssets';
 import { Clouds } from '../objects/Clouds';
 import { Rain } from '../objects/Rain';
@@ -181,6 +182,10 @@ export class GameScene extends Phaser.Scene {
     for (const key of TREE_KEYS) {
       const url = getTreeUrl(key);
       if (url) this.load.image(key, url);
+    }
+    {
+      const url = getPigeonUrl(PIGEON_KEY);
+      if (url) this.load.spritesheet(PIGEON_KEY, url, { frameWidth: PIGEON_FRAME_WIDTH, frameHeight: PIGEON_FRAME_HEIGHT });
     }
     loadHtAssets(this);
   }

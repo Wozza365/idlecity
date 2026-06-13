@@ -45,6 +45,14 @@ class Canvas {
       if (x * x + y * y <= r * r + 0.2) this.set(cx + x, cy + y, hex, a);
     }
   }
+  ellipse(cx, cy, rx, ry, hex, a = 255) {
+    if (rx <= 0 || ry <= 0) return;
+    for (let y = -Math.ceil(ry); y <= Math.ceil(ry); y++) {
+      for (let x = -Math.ceil(rx); x <= Math.ceil(rx); x++) {
+        if ((x * x) / (rx * rx) + (y * y) / (ry * ry) <= 1.04) this.set(cx + x, cy + y, hex, a);
+      }
+    }
+  }
   line(x0, y0, x1, y1, hex, a = 255) {
     const dx = x1 - x0, dy = y1 - y0;
     const steps = Math.max(Math.abs(dx), Math.abs(dy));
