@@ -35,7 +35,7 @@ export const BOAT_DEFS: readonly BoatDef[] = [
   // common
   { key: 'rowboat',        w: 60,  h: 20, texH:  20, rarity: 'common',    speed: 20,  canDock: false },
   { key: 'motorboat',      w: 100, h: 28, texH:  28, rarity: 'common',    speed: 62,  canDock: true  },
-  { key: 'fishing_boat',   w: 84,  h: 30, texH:  42, rarity: 'common',    speed: 26,  canDock: true  },
+  { key: 'fishing_boat',   w: 84,  h: 30, texH:  44, rarity: 'common',    speed: 26,  canDock: true  },
   // uncommon
   { key: 'sailboat',       w: 80,  h: 26, texH:  68, rarity: 'uncommon',  speed: 32,  canDock: true  },
   { key: 'kayak',          w: 70,  h: 16, texH:  16, rarity: 'uncommon',  speed: 44,  canDock: false },
