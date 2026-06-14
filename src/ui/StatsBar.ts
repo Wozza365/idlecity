@@ -83,15 +83,16 @@ export class StatsBar {
     // Population label + value — centered pill
     const popValueFontSize = popPillW < 100 ? '14px' : '16px';
     this.populationLabel = scene.add
-      .text(popPillX + popPillW / 2, labelY, 'POP', { fontSize: '11px', color: '#5a9ac0', fontFamily: UI_FONT })
+      .text(popPillX + popPillW / 2, labelY, 'POPULATION', { fontSize: '11px', color: '#5a9ac0', fontFamily: UI_FONT })
       .setOrigin(0.5, 0.5).setDepth(11);
     this.populationValue = scene.add
       .text(popPillX + popPillW / 2, valueY, '', { fontSize: popValueFontSize, color: '#7ec8f0', fontFamily: MONO_FONT, fontStyle: 'bold' })
       .setOrigin(0.5, 0.5).setDepth(11);
 
-    // ⌂ icon — faint, behind the population value
+    // ▲ icon — faint, behind the population value (⌂ renders as a missing-glyph
+    // box in this font stack, which made the value look squashed inside it)
     this.populationIcon = scene.add
-      .text(popPillX + popPillW / 2, pillCY, '⌂', { fontSize: '34px', color: '#4aa8d8', fontFamily: UI_FONT })
+      .text(popPillX + popPillW / 2, pillCY, '▲', { fontSize: '34px', color: '#4aa8d8', fontFamily: UI_FONT })
       .setOrigin(0.5, 0.5).setAlpha(0.25).setDepth(11);
 
     // Chevron — hints that the bar can be tapped to expand/collapse the panel
