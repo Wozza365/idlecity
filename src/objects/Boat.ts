@@ -8,14 +8,14 @@ const NIGHT_TINT = 0x5a6680;
 // Mirrors the TEX_PAD value in BoatAssets — transparent border around every texture.
 const TEX_PAD = 1;
 
-// Base fraction of hull height rendered as submerged — varies ±0.07 per boat.
-const SUBMERGE_RATIO      = 0.28;
-const SUBMERGE_RATIO_VARY = 0.07;
+// Base fraction of hull height rendered as submerged — varies ±0.04 per boat.
+const SUBMERGE_RATIO      = 0.16;
+const SUBMERGE_RATIO_VARY = 0.04;
 
 // Tint applied to the underwater hull strip to simulate water column colour.
 const WATER_TINT       = 0x2a5588;
-const WATER_ALPHA_BASE = 0.72;
-const WATER_ALPHA_VARY = 0.10; // each boat varies ±VARY around base
+const WATER_ALPHA_BASE = 0.28;
+const WATER_ALPHA_VARY = 0.07; // each boat varies ±VARY around base
 
 export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 
