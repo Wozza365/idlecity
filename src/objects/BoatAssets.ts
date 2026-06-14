@@ -26,6 +26,8 @@ export interface BoatDef {
   canDock: boolean;
   /** World-space offsets from (boatX, bobY) for each smoke emitter. */
   smokeOffsets?: ReadonlyArray<{ dx: number; dy: number }>;
+  /** World-space offset from (boatX, bobY) to the flag pole tip. */
+  flagOffset?: { dx: number; dy: number };
 }
 
 const RARITY_WEIGHTS: Record<BoatRarity, number> = {
@@ -38,7 +40,7 @@ const RARITY_WEIGHTS: Record<BoatRarity, number> = {
 
 export const BOAT_DEFS: readonly BoatDef[] = [
   { key: 'fishing_boat', w:  84,           h: 30, texH:  44, rarity: 'common',    speed: 26, canDock: true  },
-  { key: 'cruise_ship',  w: 340, wlW: 300, h: 64, texH: 164, rarity: 'legendary', speed: 18, canDock: false, smokeOffsets: [{ dx: -48, dy: -66 }] },
+  { key: 'cruise_ship',  w: 340, wlW: 300, h: 64, texH: 164, rarity: 'legendary', speed: 18, canDock: false, smokeOffsets: [{ dx: -48, dy: -66 }], flagOffset: { dx: 88, dy: -67 } },
 ];
 
 export const ALL_BOAT_KEYS: readonly string[] = BOAT_DEFS.map(d => d.key);

@@ -5,6 +5,18 @@ import { type BoatDef, boatOriginY } from './BoatAssets';
 
 type SmokeParticle = { x: number; y: number; alpha: number; dx: number; dy: number; wobble: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
 
+const FLAG_PALETTES: ReadonlyArray<[number, number]> = [
+  [0xcc2222, 0xee4444],
+  [0x2222cc, 0x4455ee],
+  [0x22aa33, 0x44cc55],
+  [0xcc7722, 0xeeaa44],
+  [0x7722aa, 0xaa44cc],
+  [0x22aacc, 0x44ccee],
+  [0xcccc22, 0xeeee55],
+  [0xcc2277, 0xee4499],
+  [0xffffff, 0xcccc22],
+];
+
 const NIGHT_TINT = 0x5a6680;
 const TEX_PAD    = 1;
 
@@ -70,6 +82,10 @@ export class Boat {
   private readonly smokeParticles: SmokeParticle[] = [];
   private smokeTimer = 0;
   private nextSmoke = 0;
+
+  private readonly flagGfx: Phaser.GameObjects.Graphics | null = null;
+  private readonly flagColor1: number = 0;
+  private readonly flagColor2: number = 0;
 
   private readonly portLight: Extract<LightSource, { type?: 'point' }>;
   private readonly starboardLight: Extract<LightSource, { type?: 'point' }>;
@@ -148,6 +164,13 @@ export class Boat {
       this.smokeGfx = scene.add.graphics().setDepth(10);
     }
 
+    if (def.flagOffset) {
+      this.flagGfx = scene.add.graphics().setDepth(7);
+      const palette = FLAG_PALETTES[Math.floor(Math.random() * FLAG_PALETTES.length)];
+      this.flagColor1 = palette[0];
+      this.flagColor2 = palette[1];
+    }
+
     this.portLight = {
       x, y: y - def.h / 2 + 2,
       radius: 6, color: 0xff2222, intensity: 0, noOcclusion: true,
@@ -204,6 +227,7 @@ export class Boat {
     }
 
     this.drawWaterline(bobY);
+    if (this.flagGfx) this.drawFlag(bobY);
 
     this.portLight.x = this.x;
     this.portLight.y = bobY - this.def.h / 2 + 2;
@@ -242,6 +266,33 @@ export class Boat {
   private waveAt(worldX: number, t: number): number {
     return Math.sin(worldX * 0.12 + t * 1.9) * 2.2
          + Math.sin(worldX * 0.22 + t * 1.2 + 1.5) * 0.9;
+  }
+
+  // Draws a two-tone waving flag flying LEFT (toward stern) from the mast tip.
+  private drawFlag(bobY: number): void {
+    const gfx = this.flagGfx!;
+    const off = this.def.flagOffset!;
+    const t   = this.bobPhase / 1.2;
+
+    const fx = this.x + off.dx;
+    const fy = bobY  + off.dy;
+
+    const fw = 16, fh = 10;
+    // fly end is to the LEFT (stern direction)
+    const flyX = fx - fw;
+    const mcx  = fx - Math.round(fw / 2);
+    const wave = Math.sin(t * 4) * 2;
+    const mid  = Math.sin(t * 4 + 1) * 1.2;
+
+    gfx.clear();
+    // Hoist half
+    gfx.fillStyle(this.flagColor1, 1);
+    gfx.fillTriangle(fx, fy,        fx,   fy + fh,       mcx, fy + fh + mid);
+    gfx.fillTriangle(fx, fy,        mcx,  fy + fh + mid, mcx, fy + mid);
+    // Fly half
+    gfx.fillStyle(this.flagColor2, 1);
+    gfx.fillTriangle(mcx, fy + mid, mcx,  fy + fh + mid, flyX, fy + fh + wave);
+    gfx.fillTriangle(mcx, fy + mid, flyX, fy + fh + wave, flyX, fy + wave);
   }
 
   private tickSmoke(bobY: number): void {
@@ -309,5 +360,6 @@ export class Boat {
     this.subBot.destroy();
     this.waveGfx.destroy();
     this.smokeGfx?.destroy();
+    this.flagGfx?.destroy();
   }
 }
