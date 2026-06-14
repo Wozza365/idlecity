@@ -102,10 +102,6 @@ export class Boat {
     const waterlinePx  = hullBottomPx - submergeH;
     const midPx        = waterlinePx + Math.floor(submergeH / 2);
 
-    // Horizontal crop bounds for the submerged strips — centred, limited to wlW.
-    const wlW      = def.wlW ?? def.w;
-    const wlCropX  = Math.floor((texW_padded - wlW) / 2);
-
     this.shadows = SHADOW_LAYERS.map(l =>
       scene.add.image(x, y + l.dy, def.key)
         .setOrigin(0.5, originY)
@@ -126,14 +122,14 @@ export class Boat {
     this.subTop = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setCrop(wlCropX, waterlinePx, wlW, Math.ceil(submergeH / 2))
+      .setCrop(0, waterlinePx, texW_padded, Math.ceil(submergeH / 2))
       .setTint(WATER_TINT)
       .setAlpha(ALPHA_STRIP_TOP);
 
     this.subBot = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setCrop(wlCropX, midPx, wlW, texH_padded - midPx)
+      .setCrop(0, midPx, texW_padded, texH_padded - midPx)
       .setTint(WATER_TINT)
       .setAlpha(ALPHA_STRIP_BOT);
 
