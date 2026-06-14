@@ -49,7 +49,7 @@ export const BOAT_DEFS: readonly BoatDef[] = [
   { key: 'ferry',          w: 162, h: 36, texH:  36, rarity: 'very_rare', speed: 44,  canDock: true  },
   // legendary
   { key: 'container_ship', w: 210, h: 46, texH:  46, rarity: 'legendary', speed: 28,  canDock: false },
-  { key: 'cruise_ship',    w: 340, h: 64, texH: 118, rarity: 'legendary', speed: 18,  canDock: false },
+  { key: 'cruise_ship',    w: 340, h: 64, texH: 164, rarity: 'legendary', speed: 18,  canDock: false },
 ];
 
 export const ALL_BOAT_KEYS: readonly string[] = BOAT_DEFS.map(d => d.key);
