@@ -55,7 +55,6 @@ export class TownNameSign {
       fontFamily: UI_FONT, fontStyle: 'bold',
       shadow: { offsetX: 0, offsetY: 1, color: '#1e0a00', blur: 3, fill: true },
       padding: { x: 6, y: 6 },
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
     }).setOrigin(0.5, 0.5).setDepth(S_DEPTH + 1);
 
     this.btnLabel = scene.add.text(0, 0, 'RENAME', {
@@ -211,7 +210,6 @@ export class TownNameSign {
     this.inputText = add(
       s.add.text(ix + 10, iy, '', {
         fontSize: '16px', color: '#d0c090', fontFamily: UI_FONT,
-        resolution: Math.min(window.devicePixelRatio || 1, 2),
       }).setOrigin(0, 0.5).setDepth(D + 3),
     ) as Phaser.GameObjects.Text;
     this.updateInputDisplay();
