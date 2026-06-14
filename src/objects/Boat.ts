@@ -5,13 +5,21 @@ import { type BoatDef, boatOriginY } from './BoatAssets';
 
 const NIGHT_TINT = 0x5a6680;
 
+// Mirrors the TEX_PAD value in BoatAssets — transparent border around every texture.
+const TEX_PAD = 1;
+
+// Fraction of hull height rendered as submerged (below the waterline).
+const SUBMERGE_RATIO = 0.28;
+
+// Tint applied to the underwater hull strip to simulate water column colour.
+const WATER_TINT  = 0x2a5588;
+const WATER_ALPHA = 0.60;
+
 export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 
 const DOCK_SLOW_DIST   = 90;
 const OFFSCREEN_MARGIN = 30;
 
-// Shadow: smaller copy rendered below and slightly behind, fading out at edges
-// via two offset layers — one wide & faint, one tight & darker.
 const SHADOW_LAYERS = [
   { dx:  0, dy: 3, scale: 0.90, alpha: 0.10 },
   { dx:  0, dy: 2, scale: 0.72, alpha: 0.18 },
@@ -29,6 +37,7 @@ export interface BoatConfig {
 export class Boat {
   private readonly shadows: Phaser.GameObjects.Image[];
   private readonly image: Phaser.GameObjects.Image;
+  private readonly submergedImage: Phaser.GameObjects.Image;
   private readonly def: BoatDef;
   private x: number;
   readonly y: number;
@@ -66,7 +75,15 @@ export class Boat {
     this.baseSpeed    = def.speed * (0.975 + Math.random() * 0.05);
     this.bobPhase     = Math.random() * Math.PI * 2;
 
-    const originY = boatOriginY(def);
+    const originY     = boatOriginY(def);
+    const texH_padded = def.texH + 2 * TEX_PAD;
+    const texW_padded = def.w   + 2 * TEX_PAD;
+    const extraTop    = def.texH - def.h;
+
+    // Pixel row (in texture space) where the hull ends, counting from top.
+    const hullBottomPx = TEX_PAD + extraTop + def.h;
+    const submergeH    = Math.round(def.h * SUBMERGE_RATIO);
+    const waterlinePx  = hullBottomPx - submergeH;
 
     this.shadows = SHADOW_LAYERS.map(l =>
       scene.add.image(x, y + l.dy, def.key)
@@ -77,10 +94,22 @@ export class Boat {
         .setAlpha(l.alpha),
     );
 
-    // Above wave fx (5.85), below lighthouse island (5.86)
+    // Above wave fx (5.85), below lighthouse island (5.86).
+    // Cropped to show only the above-waterline portion of the hull.
     this.image = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
-      .setDepth(5.855);
+      .setDepth(5.855)
+      .setCrop(0, 0, texW_padded, waterlinePx);
+
+    // Below-waterline hull strip rendered inside the water body (depth 5.52).
+    // Water-tinted and semi-transparent so the boat colour reads through the
+    // "water column" while making it clear the hull is submerged.
+    this.submergedImage = scene.add.image(x, y, def.key)
+      .setOrigin(0.5, originY)
+      .setDepth(5.52)
+      .setCrop(0, waterlinePx, texW_padded, texH_padded - waterlinePx)
+      .setTint(WATER_TINT)
+      .setAlpha(WATER_ALPHA);
 
     this.portLight = {
       x, y: y - def.h / 2 + 2,
@@ -127,6 +156,12 @@ export class Boat {
     const bobY = this.y + Math.sin(this.bobPhase) * 1.2;
 
     this.image.setPosition(this.x, bobY);
+
+    // Refraction shimmer: oscillate the submerged strip horizontally at a
+    // slightly different frequency from the bob so they don't move in lockstep.
+    const refractionX = Math.sin(this.bobPhase * 1.35) * 1.4;
+    this.submergedImage.setPosition(this.x + refractionX, bobY);
+
     for (let i = 0; i < this.shadows.length; i++) {
       this.shadows[i].setPosition(this.x + SHADOW_LAYERS[i].dx, bobY + SHADOW_LAYERS[i].dy);
     }
@@ -157,5 +192,6 @@ export class Boat {
   destroy(): void {
     for (const s of this.shadows) s.destroy();
     this.image.destroy();
+    this.submergedImage.destroy();
   }
 }
