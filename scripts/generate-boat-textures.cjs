@@ -493,8 +493,8 @@ const DETAILS = {
     // lifeboats slung below the boat deck
     for (let x = 8; x < rectW - 8; x += 16) cv.rect(x, y0 + 24, 8, 3, 0xFF7700, 220);
 
-    // twin funnel stubs — short so dynamic smoke can trail from the top
-    const funnelH = 16, funnelTop = y0 - funnelH;
+    // twin funnels, standing on the main deck
+    const funnelH = Math.floor(extraTop * 0.65), funnelTop = y0 - funnelH;
     for (const fx of [Math.floor(rectW * 0.6), Math.floor(rectW * 0.72)]) {
       cv.rect(fx, funnelTop, 10, funnelH, darken(accent, 0.2), 255);
       cv.rect(fx, funnelTop, 10, 3, accent, 255);
