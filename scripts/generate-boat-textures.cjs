@@ -511,8 +511,16 @@ const DETAILS = {
   },
 };
 
+// Keys with hand-crafted sprites — never overwrite with generated output.
+const SKIP_KEYS = new Set(['cruise_ship']);
+
 // ── Generate ────────────────────────────────────────────────────────────
+let written = 0;
 for (const def of BOATS) {
+  if (SKIP_KEYS.has(def.key)) {
+    console.log(`  skipped ${def.key}.png  (hand-crafted sprite)`);
+    continue;
+  }
   const extraTop = def.extraTop ?? 0;
   const texH = def.h + extraTop;
   const cv = new Canvas(def.w + TEX_PAD * 2, texH + TEX_PAD * 2);
@@ -529,5 +537,6 @@ for (const def of BOATS) {
   const outPath = path.join(OUT_DIR, `${def.key}.png`);
   fs.writeFileSync(outPath, cv.toBuffer());
   console.log(`  wrote ${def.key}.png  ${cv.w}x${cv.h}`);
+  written++;
 }
-console.log(`Done. ${BOATS.length} boat textures written to ${OUT_DIR}`);
+console.log(`Done. ${written} generated, ${SKIP_KEYS.size} skipped (hand-crafted).`);
