@@ -145,7 +145,7 @@ export class Boat {
     this.waveGfx = scene.add.graphics().setDepth(5.855);
 
     if (def.smokeOffsets?.length) {
-      this.smokeGfx = scene.add.graphics().setDepth(5.858);
+      this.smokeGfx = scene.add.graphics().setDepth(50);
     }
 
     this.portLight = {
@@ -247,29 +247,29 @@ export class Boat {
   private tickSmoke(bobY: number): void {
     if (this.smokeTimer >= this.nextSmoke) {
       for (const off of this.def.smokeOffsets!) {
-        const c = 0x7a + Math.floor(Math.random() * 40);
+        const c = 0x88 + Math.floor(Math.random() * 40);
         this.smokeParticles.push({
-          x: this.x + off.dx + (Math.random() - 0.5) * 3,
+          x: this.x + off.dx + (Math.random() - 0.5) * 4,
           y: bobY + off.dy,
           alpha: 0,
-          dx: -(0.015 + Math.random() * 0.02),
-          fadeRate: 0.001 + Math.random() * 0.0008,
-          radius: 2 + Math.floor(Math.random() * 4),
+          dx: -(0.02 + Math.random() * 0.025),
+          fadeRate: 0.0008 + Math.random() * 0.0006,
+          radius: 4 + Math.floor(Math.random() * 5),
           maxAlpha: 0,
           color: (c << 16) | (c << 8) | c,
           growing: true,
         });
       }
-      this.nextSmoke = 200 + Math.random() * 150;
+      this.nextSmoke = 120 + Math.random() * 100;
       this.smokeTimer = 0;
     }
 
     for (const p of this.smokeParticles) {
-      p.y -= 0.05;
+      p.y -= 0.08;
       p.x += p.dx;
       if (p.growing) {
-        if (p.maxAlpha === 0) p.maxAlpha = 0.45 - (p.radius - 2) * 0.07;
-        p.alpha += 0.04;
+        if (p.maxAlpha === 0) p.maxAlpha = 0.55 - (p.radius - 4) * 0.05;
+        p.alpha += 0.035;
         if (p.alpha >= p.maxAlpha) { p.alpha = p.maxAlpha; p.growing = false; }
       } else {
         p.alpha -= p.fadeRate;
