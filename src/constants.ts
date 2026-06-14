@@ -189,12 +189,13 @@ export function populationGrowthRate(roadLevel: number, vergeLevel: number, wate
 }
 
 // Compact formatter for population counts (no "$" prefix, unlike fmtBalance).
-// Thresholds (950 / 999_950 / 999_950_000) avoid "1000.0K"-style rounding
-// artifacts right at unit boundaries.
+// Sub-million values are shown in full with thousands separators so growth
+// stays visible in real time; only millions/billions are abbreviated. The
+// 999_950_000 threshold avoids a "1000.0M"-style rounding artifact right at
+// the B boundary.
 export function fmtPopulation(n: number): string {
   const v = Math.floor(n);
   if (v >= 999_950_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
-  if (v >= 999_950)     return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 950)         return `${(v / 1_000).toFixed(1)}K`;
+  if (v >= 1_000_000)   return `${(v / 1_000_000).toFixed(1)}M`;
   return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }

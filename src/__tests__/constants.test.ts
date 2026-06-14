@@ -56,11 +56,13 @@ describe('fmtPopulation', () => {
     expect(fmtPopulation(847)).toBe('847');
   });
 
-  it('formats thousands with a K suffix', () => {
-    expect(fmtPopulation(12_345)).toBe('12.3K');
+  it('shows sub-million values in full, with comma separators', () => {
+    expect(fmtPopulation(12_345)).toBe('12,345');
+    expect(fmtPopulation(999_999)).toBe('999,999');
   });
 
   it('formats millions with an M suffix', () => {
+    expect(fmtPopulation(1_000_000)).toBe('1.0M');
     expect(fmtPopulation(1_284_392)).toBe('1.3M');
   });
 
@@ -68,8 +70,8 @@ describe('fmtPopulation', () => {
     expect(fmtPopulation(2_300_000_000)).toBe('2.3B');
   });
 
-  it('rolls over to the next unit at rounding boundaries', () => {
-    expect(fmtPopulation(999_999)).toBe('1.0M');
-    expect(fmtPopulation(999_000)).toBe('999.0K');
+  it('rolls over to the B unit just before 1,000,000,000', () => {
+    expect(fmtPopulation(999_950_000)).toBe('1.0B');
+    expect(fmtPopulation(999_949_999)).toBe('999.9M');
   });
 });
