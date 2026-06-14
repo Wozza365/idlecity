@@ -47,9 +47,10 @@ export class DevPanel {
     this.panel = scene.add.container(-(PANEL_W - BTN_W), 8 + burgerH);
     container.add(this.panel);
 
+    const RES_ROW_H = 22;
     const BOATS_PER_ROW_PRE = 4;
     const boatRowsPre = Math.ceil(BOAT_DEFS.length / BOATS_PER_ROW_PRE);
-    const panelH = 154 + boatRowsPre * 24;
+    const panelH = 154 + boatRowsPre * 24 + RES_ROW_H;
     this.panel.add(
       scene.add.rectangle(PANEL_W / 2, panelH / 2, PANEL_W, panelH, 0x050810, 0.92),
     );
@@ -61,6 +62,7 @@ export class DevPanel {
     const r1 = 14, r2 = 38, r3 = 62, r4 = 86;
     const r5 = r4 + boatExtraH;      // season row
     const r6 = r5 + 30;              // info row
+    const r7 = r6 + RES_ROW_H;       // resolution diagnostics row
 
     // Row 1: +$1B | +1 hr | +1 day  (3 × 82px, 7px gap, 10px margin each side)
     this.mkBtn(scene, 51,  r1, 82, 0x1a4400, '+$1B',   '#88ff88', onAddGold);
@@ -123,6 +125,27 @@ export class DevPanel {
       .text(PANEL_W - 4, r6, '', { fontSize: '12px', color: '#ffdd88', fontFamily: UI_FONT })
       .setOrigin(1, 0.5);
     this.panel.add(this.fpsText);
+
+    // Row 7: resolution diagnostics - shows raw devicePixelRatio, the rounded
+    // density multiplier applied to the canvas backing store (see
+    // PIXEL_DENSITY/applyPixelDensity in main.ts), and the resulting CSS vs.
+    // backing-store canvas sizes, so DPR-aware supersampling can be checked
+    // on-device.
+    const canvas = scene.game.canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const density = Math.round(canvas.width / scene.game.scale.width) || 1;
+    const cssW = Math.round(scene.game.scale.width);
+    const cssH = Math.round(scene.game.scale.height);
+    this.panel.add(
+      scene.add
+        .text(
+          PANEL_W / 2,
+          r7,
+          `dpr ${dpr.toFixed(2)} · density ×${density} · ${cssW}x${cssH} → ${canvas.width}x${canvas.height}`,
+          { fontSize: '10px', color: '#778899', fontFamily: UI_FONT },
+        )
+        .setOrigin(0.5),
+    );
 
     // Start collapsed
     this.panel.setVisible(false);
