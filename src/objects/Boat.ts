@@ -3,6 +3,8 @@ import { lerpColor } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { type BoatDef, boatOriginY } from './BoatAssets';
 
+type SmokeParticle = { x: number; y: number; alpha: number; dx: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
+
 const NIGHT_TINT = 0x5a6680;
 const TEX_PAD    = 1;
 
@@ -63,6 +65,11 @@ export class Boat {
   private readonly hullHalfH: number;
   // Waterline half-width in world space (may be narrower than full hull width).
   private readonly wlHalfW: number;
+
+  private readonly smokeGfx: Phaser.GameObjects.Graphics | null = null;
+  private readonly smokeParticles: SmokeParticle[] = [];
+  private smokeTimer = 0;
+  private nextSmoke = 0;
 
   private readonly portLight: Extract<LightSource, { type?: 'point' }>;
   private readonly starboardLight: Extract<LightSource, { type?: 'point' }>;
@@ -137,6 +144,10 @@ export class Boat {
     // Depth 5.855 puts it level with the hull so the wave reads as foam at the join.
     this.waveGfx = scene.add.graphics().setDepth(5.855);
 
+    if (def.smokeOffsets?.length) {
+      this.smokeGfx = scene.add.graphics().setDepth(5.858);
+    }
+
     this.portLight = {
       x, y: y - def.h / 2 + 2,
       radius: 6, color: 0xff2222, intensity: 0, noOcclusion: true,
@@ -203,6 +214,9 @@ export class Boat {
       this.sternLight.y = bobY;
     }
 
+    this.smokeTimer += delta;
+    if (this.smokeGfx) this.tickSmoke(bobY);
+
     return this.x - this.def.w / 2 > this.sceneWidth + OFFSCREEN_MARGIN;
   }
 
@@ -230,6 +244,50 @@ export class Boat {
          + Math.sin(worldX * 0.22 + t * 1.2 + 1.5) * 0.9;
   }
 
+  private tickSmoke(bobY: number): void {
+    if (this.smokeTimer >= this.nextSmoke) {
+      for (const off of this.def.smokeOffsets!) {
+        const c = 0x7a + Math.floor(Math.random() * 40);
+        this.smokeParticles.push({
+          x: this.x + off.dx + (Math.random() - 0.5) * 3,
+          y: bobY + off.dy,
+          alpha: 0,
+          dx: -(0.015 + Math.random() * 0.02),
+          fadeRate: 0.001 + Math.random() * 0.0008,
+          radius: 2 + Math.floor(Math.random() * 4),
+          maxAlpha: 0,
+          color: (c << 16) | (c << 8) | c,
+          growing: true,
+        });
+      }
+      this.nextSmoke = 200 + Math.random() * 150;
+      this.smokeTimer = 0;
+    }
+
+    for (const p of this.smokeParticles) {
+      p.y -= 0.05;
+      p.x += p.dx;
+      if (p.growing) {
+        if (p.maxAlpha === 0) p.maxAlpha = 0.45 - (p.radius - 2) * 0.07;
+        p.alpha += 0.04;
+        if (p.alpha >= p.maxAlpha) { p.alpha = p.maxAlpha; p.growing = false; }
+      } else {
+        p.alpha -= p.fadeRate;
+      }
+    }
+
+    for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
+      if (this.smokeParticles[i].alpha <= 0) this.smokeParticles.splice(i, 1);
+    }
+
+    const gfx = this.smokeGfx!;
+    gfx.clear();
+    for (const p of this.smokeParticles) {
+      gfx.fillStyle(lerpColor(p.color, 0x1a1a2e, this.nightFactor * 0.75), p.alpha);
+      gfx.fillCircle(Math.round(p.x), Math.round(p.y), p.radius);
+    }
+  }
+
   updateLighting(elevation: number): void {
     if (Math.abs(elevation - this._lastLightingElevation) < 0.002) return;
     this._lastLightingElevation = elevation;
@@ -247,5 +305,6 @@ export class Boat {
     this.subTop.destroy();
     this.subBot.destroy();
     this.waveGfx.destroy();
+    this.smokeGfx?.destroy();
   }
 }
