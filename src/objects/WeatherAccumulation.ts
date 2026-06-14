@@ -12,13 +12,21 @@ const PUDDLE_SHRINK_RATE = 0.35;
 const SNOW_GROW_RATE     = 1.0;
 const SNOW_SHRINK_RATE   = 0.4;
 
-// Puddle radius (px) above which raindrop ripples start appearing
-const RIPPLE_MIN_RX = 6;
+// Raindrop splashes — small expanding rings scattered across the whole road
+// and verge while it rains, independent of puddles.
+const SPLASH_RATE_BASE  = 4;   // splashes / s once it's raining at all
+const SPLASH_RATE_SCALE = 9;   // additional splashes / s at rainIntensity=1
+const SPLASH_LIFE_MIN   = 0.30;
+const SPLASH_LIFE_MAX   = 0.55;
+const SPLASH_R_MIN      = 1.5;
+const SPLASH_R_MAX      = 4;
 
-interface Ripple {
-  ox: number; oy: number; // spawn offset from the puddle centre, in px
+interface Splash {
+  x: number; y: number;
   age:  number;
   life: number;
+  onVerge: boolean;
+  maxR: number;
 }
 
 interface Puddle {
@@ -30,8 +38,6 @@ interface Puddle {
   // perfect-ellipse silhouette so the puddle reads as an irregular pool.
   lobeDx: number; lobeDy: number; lobeScale: number;
   shimmerPhase: number;
-  rippleTimer: number;
-  ripples: Ripple[];
 }
 
 interface SnowPile {
@@ -47,9 +53,11 @@ export class WeatherAccumulation {
 
   private puddles:   Puddle[]   = [];
   private snowPiles: SnowPile[] = [];
+  private splashes:  Splash[]   = [];
 
   private puddleTimer = 0;
   private snowTimer   = 0;
+  private splashAccum = 0;
   private elapsed     = 0;
 
   private groundY = 0;
@@ -65,8 +73,10 @@ export class WeatherAccumulation {
     this.groundY = groundY;
     this.puddles   = [];
     this.snowPiles = [];
+    this.splashes  = [];
     this.puddleTimer = 0;
     this.snowTimer   = 0;
+    this.splashAccum = 0;
   }
 
   /**
@@ -89,17 +99,29 @@ export class WeatherAccumulation {
       for (const p of this.puddles) {
         p.rx = Math.min(p.maxRx, p.rx + PUDDLE_GROW_RATE * dt * rainIntensity);
         p.ry = Math.min(p.maxRy, p.ry + PUDDLE_GROW_RATE * 0.27 * dt * rainIntensity);
-        this.updateRipples(p, dt, rainIntensity);
+      }
+
+      // Spawn raindrop splashes across the whole floor area, at a rate
+      // proportional to both rain intensity and the road's width.
+      const rate = (SPLASH_RATE_BASE + SPLASH_RATE_SCALE * rainIntensity) * (this.width / 480);
+      this.splashAccum += rate * dt;
+      while (this.splashAccum >= 1) {
+        this.spawnSplash();
+        this.splashAccum -= 1;
       }
     } else {
       this.puddleTimer = 0;
+      this.splashAccum = 0;
       this.puddles = this.puddles.filter(p => {
         p.rx -= PUDDLE_SHRINK_RATE * dt;
         p.ry -= PUDDLE_SHRINK_RATE * 0.27 * dt;
-        p.ripples = p.ripples.filter(r => (r.age += dt) < r.life);
         return p.rx > 0.5;
       });
     }
+
+    // Age out splashes regardless of rain state, so existing ones finish
+    // their animation even as the rain tapers off.
+    this.splashes = this.splashes.filter(s => (s.age += dt) < s.life);
 
     // ── Snow piles ────────────────────────────────────────────────────────────
     if (snowActive) {
@@ -124,17 +146,18 @@ export class WeatherAccumulation {
     this.draw(rainIntensity, elevation, horizonColor);
   }
 
-  /** Age existing ripples and occasionally spawn a new one near the puddle's centre. */
-  private updateRipples(p: Puddle, dt: number, rainIntensity: number): void {
-    p.ripples = p.ripples.filter(r => (r.age += dt) < r.life);
-    if (p.rx < RIPPLE_MIN_RX) return;
-    p.rippleTimer -= dt;
-    if (p.rippleTimer <= 0) {
-      const a = Math.random() * Math.PI * 2;
-      const d = Math.random() * 0.5; // fraction of the radius from centre
-      p.ripples.push({ ox: Math.cos(a) * p.rx * d, oy: Math.sin(a) * p.ry * d, age: 0, life: 0.8 + Math.random() * 0.6 });
-      p.rippleTimer = (1.0 + Math.random() * 2.0) / Math.max(0.25, rainIntensity);
-    }
+  private spawnSplash(): void {
+    const onVerge = Math.random() < VERGE_H / (ROAD_H + VERGE_H);
+    const y = onVerge
+      ? this.groundY + ROAD_H + Math.random() * VERGE_H
+      : this.groundY + Math.random() * ROAD_H;
+    const x = Math.random() * this.width;
+    this.splashes.push({
+      x, y, onVerge,
+      age: 0,
+      life: SPLASH_LIFE_MIN + Math.random() * (SPLASH_LIFE_MAX - SPLASH_LIFE_MIN),
+      maxR: SPLASH_R_MIN + Math.random() * (SPLASH_R_MAX - SPLASH_R_MIN),
+    });
   }
 
   private spawnPuddle(): void {
@@ -154,8 +177,6 @@ export class WeatherAccumulation {
       lobeDy: Math.sin(lobeAngle) * lobeDist,
       lobeScale: 0.55 + Math.random() * 0.3,
       shimmerPhase: Math.random() * Math.PI * 2,
-      rippleTimer: 1 + Math.random() * 2,
-      ripples: [],
     });
   }
 
@@ -193,11 +214,11 @@ export class WeatherAccumulation {
     for (const p of this.puddles) {
       if (p.rx <= 0.5) continue;
       const sizeRatio = p.rx / p.maxRx;
-      const alpha = sizeRatio * (0.20 + 0.14 * rainIntensity);
+      const alpha = sizeRatio * (0.13 + 0.09 * rainIntensity);
       const gfx = p.onVerge ? this.vergeGfx : this.roadGfx;
 
       // Damp halo — softly darkens the surface around the standing water
-      gfx.fillStyle(0x000000, alpha * 0.12);
+      gfx.fillStyle(0x000000, alpha * 0.08);
       gfx.fillEllipse(p.x, p.y, p.rx * 1.6, p.ry * 1.6);
 
       // Secondary lobe breaks up the perfect-ellipse outline
@@ -213,19 +234,19 @@ export class WeatherAccumulation {
 
       // Slow shimmer on the reflection highlight
       const shimmer = 0.5 + 0.5 * Math.sin(this.elapsed * 1.4 + p.shimmerPhase);
-      gfx.fillStyle(highlightColor, alpha * (0.28 + 0.2 * shimmer));
+      gfx.fillStyle(highlightColor, alpha * (0.22 + 0.16 * shimmer));
       gfx.fillEllipse(p.x - p.rx * 0.15, p.y - p.ry * 0.18, p.rx * (0.95 + 0.15 * shimmer), p.ry * 0.7);
+    }
 
-      // Raindrop ripples spreading across the surface
-      for (const r of p.ripples) {
-        const t = r.age / r.life;
-        const ringAlpha = alpha * (1 - t) * 0.6;
-        if (ringAlpha <= 0.01) continue;
-        const rw = p.rx * (0.15 + 0.8 * t);
-        const rh = p.ry * (0.15 + 0.8 * t);
-        gfx.lineStyle(1, highlightColor, ringAlpha);
-        gfx.strokeEllipse(p.x + r.ox, p.y + r.oy, rw * 2, rh * 2);
-      }
+    // Raindrop splashes — small fading rings scattered across road & verge
+    for (const s of this.splashes) {
+      const t = s.age / s.life;
+      const ringAlpha = (1 - t) * 0.35;
+      if (ringAlpha <= 0.01) continue;
+      const r = s.maxR * (0.2 + 0.8 * t);
+      const gfx = s.onVerge ? this.vergeGfx : this.roadGfx;
+      gfx.lineStyle(1, highlightColor, ringAlpha);
+      gfx.strokeEllipse(s.x, s.y, r * 2, r * 0.9);
     }
 
     for (const sp of this.snowPiles) {

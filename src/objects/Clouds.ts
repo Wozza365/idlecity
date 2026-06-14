@@ -8,6 +8,9 @@ type Cloud = {
   speed: number;
   sprite: Phaser.GameObjects.Image;
   textureKey: string;
+  // 0 = an ambient cloud present in normal weather; higher values only
+  // join the sky once heavy storm cover has built up past this threshold.
+  coverThreshold: number;
 };
 
 const PAD = 50;
@@ -93,6 +96,9 @@ export class Clouds {
   private readonly scene: Phaser.Scene;
   private clouds: Cloud[] = [];
   private sceneWidth = 800;
+  // Heavy cloud cover during rain — rises quickly once rain starts, then
+  // lingers and clears gradually after it ends.
+  private stormCover = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -111,6 +117,7 @@ export class Clouds {
 
   private initClouds(width: number, groundY: number): void {
     const skyH = groundY;
+    const TOTAL_CLOUDS = 9;
 
     const addCloud = (x: number, y: number, w: number, h: number, speed: number, variant: number) => {
       const textureKey = `__cloud_${this.clouds.length}`;
@@ -118,7 +125,10 @@ export class Clouds {
       if (this.scene.textures.exists(textureKey)) this.scene.textures.remove(textureKey);
       this.scene.textures.addCanvas(textureKey, canvas);
       const sprite = this.scene.add.image(x, y, textureKey).setDepth(1).setAlpha(0);
-      this.clouds.push({ x, y, w, h, speed, sprite, textureKey });
+      // Spread thresholds across the pool so storm clouds join the sky
+      // progressively as cover builds, and leave one-by-one as it clears.
+      const coverThreshold = (this.clouds.length / TOTAL_CLOUDS) * 0.85;
+      this.clouds.push({ x, y, w, h, speed, sprite, textureKey, coverThreshold });
     };
 
     for (let i = 0; i < 5; i++) {
@@ -144,19 +154,32 @@ export class Clouds {
   }
 
   update(delta: number, elevation: number, summerWeight = 1, weatherIntensity = 0): void {
-    const seasonBase = 0.07 + 0.13 * (1 - summerWeight);
-    const maxAlpha   = seasonBase + 0.10 * weatherIntensity;
-    const alpha      = Math.max(0, Math.min(maxAlpha, elevation * maxAlpha / 0.07));
+    const dt = delta / 1000;
+    // Storm cover rises quickly once it starts raining, then lingers and
+    // clears gradually afterwards rather than snapping back to normal.
+    if (weatherIntensity > this.stormCover) {
+      this.stormCover = Math.min(1, this.stormCover + dt / 6);
+    } else {
+      this.stormCover = Math.max(weatherIntensity, this.stormCover - dt / 40);
+    }
 
-    const grey = Math.round(255 - weatherIntensity * 40);
+    const seasonBase = 0.07 + 0.13 * (1 - summerWeight);
+    const dayAlpha   = Math.max(0, Math.min(seasonBase, elevation * seasonBase / 0.07));
+
+    const grey = Math.round(255 - this.stormCover * 95);
     const tint  = (grey << 16) | (grey << 8) | grey;
 
     for (const cloud of this.clouds) {
       cloud.x -= cloud.speed * delta;
       if (cloud.x < -(cloud.w + PAD) * 1.5) cloud.x += this.sceneWidth + (cloud.w + PAD) * 3;
       cloud.sprite.x = cloud.x;
-      cloud.sprite.setAlpha(alpha);
-      if (weatherIntensity > 0) {
+
+      // Storm clouds fade in once cover builds past their threshold, and
+      // stay visible day or night for a heavy, overcast look.
+      const stormVisibility = Math.max(0, (this.stormCover - cloud.coverThreshold) / Math.max(0.05, 1 - cloud.coverThreshold));
+      cloud.sprite.setAlpha(Math.max(dayAlpha, stormVisibility * 0.8));
+
+      if (this.stormCover > 0.02) {
         cloud.sprite.setTint(tint);
       } else {
         cloud.sprite.clearTint();
