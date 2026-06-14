@@ -61,6 +61,8 @@ export class Boat {
   // World-space offset from hull centre (bobY) to the waterline.
   private readonly waterlineOffset: number;
   private readonly hullHalfH: number;
+  // Waterline half-width in world space (may be narrower than full hull width).
+  private readonly wlHalfW: number;
 
   private readonly portLight: Extract<LightSource, { type?: 'point' }>;
   private readonly starboardLight: Extract<LightSource, { type?: 'point' }>;
@@ -89,6 +91,7 @@ export class Boat {
 
     const submergeRatio  = SUBMERGE_RATIO + (Math.random() * 2 - 1) * SUBMERGE_RATIO_VARY;
     this.waterlineOffset = def.h * (0.5 - submergeRatio); // bobY + this = waterline world Y
+    this.wlHalfW         = (def.wlW ?? def.w) / 2;
 
     const originY      = boatOriginY(def);
     const texH_padded  = def.texH + 2 * TEX_PAD;
@@ -98,6 +101,10 @@ export class Boat {
     const submergeH    = Math.round(def.h * submergeRatio);
     const waterlinePx  = hullBottomPx - submergeH;
     const midPx        = waterlinePx + Math.floor(submergeH / 2);
+
+    // Horizontal crop bounds for the submerged strips — centred, limited to wlW.
+    const wlW      = def.wlW ?? def.w;
+    const wlCropX  = Math.floor((texW_padded - wlW) / 2);
 
     this.shadows = SHADOW_LAYERS.map(l =>
       scene.add.image(x, y + l.dy, def.key)
@@ -115,17 +122,18 @@ export class Boat {
       .setCrop(0, 0, texW_padded, waterlinePx);
 
     // Submerged hull — two strips for gradient alpha, rendered inside the water body.
+    // Horizontal crop limited to wlW so they don't overextend past the waterline footprint.
     this.subTop = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setCrop(0, waterlinePx, texW_padded, Math.ceil(submergeH / 2))
+      .setCrop(wlCropX, waterlinePx, wlW, Math.ceil(submergeH / 2))
       .setTint(WATER_TINT)
       .setAlpha(ALPHA_STRIP_TOP);
 
     this.subBot = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setCrop(0, midPx, texW_padded, texH_padded - midPx)
+      .setCrop(wlCropX, midPx, wlW, texH_padded - midPx)
       .setTint(WATER_TINT)
       .setAlpha(ALPHA_STRIP_BOT);
 
@@ -205,8 +213,8 @@ export class Boat {
   // Draws a thin wavy stroke at the waterline to suggest foam / surface contact.
   private drawWaterline(bobY: number): void {
     const gfx        = this.waveGfx;
-    const left       = this.x - this.def.w / 2 + 2;
-    const right      = this.x + this.def.w / 2 - 2;
+    const left       = this.x - this.wlHalfW + 2;
+    const right      = this.x + this.wlHalfW - 2;
     const wlY        = bobY + this.waterlineOffset;
     const t          = this.bobPhase / 1.2;
     const step       = Math.max(2, Math.ceil(this.def.w / 30));

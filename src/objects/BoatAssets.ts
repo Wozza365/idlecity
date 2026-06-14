@@ -14,6 +14,9 @@ export type BoatRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legenda
 export interface BoatDef {
   key: string;
   w: number;
+  /** Hull width at the waterline (defaults to w). Narrower than w when the
+   *  deck/superstructure overhangs the hull sides. */
+  wlW?: number;
   /** Hull height — used for spacing/lighting placement. */
   h: number;
   /** Full texture height, including any mast/funnel above the hull. */
@@ -32,8 +35,8 @@ const RARITY_WEIGHTS: Record<BoatRarity, number> = {
 };
 
 export const BOAT_DEFS: readonly BoatDef[] = [
-  { key: 'fishing_boat',   w: 84,  h: 30, texH:  44, rarity: 'common',    speed: 26,  canDock: true  },
-  { key: 'cruise_ship',    w: 340, h: 64, texH: 164, rarity: 'legendary', speed: 18,  canDock: false },
+  { key: 'fishing_boat', w:  84,           h: 30, texH:  44, rarity: 'common',    speed: 26, canDock: true  },
+  { key: 'cruise_ship',  w: 340, wlW: 300, h: 64, texH: 164, rarity: 'legendary', speed: 18, canDock: false },
 ];
 
 export const ALL_BOAT_KEYS: readonly string[] = BOAT_DEFS.map(d => d.key);
