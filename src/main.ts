@@ -40,6 +40,18 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const game = new Phaser.Game(config);
 
+// `antialias: false` also sets the canvas's CSS `image-rendering` to
+// `pixelated` (Phaser's CanvasInterpolation.setCrisp). On devicePixelRatio>1
+// screens the canvas backing store is smaller than its physical display
+// size, so the browser has to scale it up — and `pixelated` does that scale
+// with nearest-neighbor, turning even the smooth text from the patch above
+// into chunky blocks. Restore the browser's default smooth upscaling; sprite
+// textures stay crisp (NEAREST-filtered) within the backing store, so this
+// only softens their edges by a sub-pixel amount when the canvas is scaled.
+game.events.once(Phaser.Core.Events.READY, () => {
+  Phaser.Display.Canvas.CanvasInterpolation.setBicubic(game.canvas);
+});
+
 // Prevent HMR from stacking multiple Phaser instances on top of each other
 if (import.meta.hot) {
   import.meta.hot.dispose(() => game.destroy(true));
