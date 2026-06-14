@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculateProgress, defaultState, type GameState } from '../game/GameState';
-import { MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, PLOT_COUNT, TOTAL_SKINS } from '../constants';
+import { calculateProgress, defaultState, totalPopulationCapacity, type GameState } from '../game/GameState';
+import { MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, PLOT_COUNT, TOTAL_SKINS, plotPopulationCapacity } from '../constants';
 
 describe('calculateProgress', () => {
   it('returns 0 for a brand-new game', () => {
@@ -44,5 +44,32 @@ describe('calculateProgress', () => {
     state.road.level = MAX_ROAD_LEVEL * 100;
 
     expect(calculateProgress(state)).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('totalPopulationCapacity', () => {
+  it('is 0 for a brand-new game (no plots unlocked)', () => {
+    const state = defaultState(PLOT_COUNT);
+    expect(totalPopulationCapacity(state)).toBe(0);
+  });
+
+  it('sums plotPopulationCapacity over unlocked plots only', () => {
+    const state = defaultState(PLOT_COUNT);
+    state.plots[0].unlocked = true;
+    state.plots[0].level = 50;
+    state.plots[1].unlocked = true;
+    state.plots[1].level = 10;
+    // plots[2..4] remain locked at level 0.
+
+    const expected = plotPopulationCapacity(50) + plotPopulationCapacity(10);
+    expect(totalPopulationCapacity(state)).toBeCloseTo(expected, 5);
+  });
+
+  it('ignores level on locked plots', () => {
+    const state = defaultState(PLOT_COUNT);
+    state.plots[0].unlocked = false;
+    state.plots[0].level = MAX_LEVEL;
+
+    expect(totalPopulationCapacity(state)).toBe(0);
   });
 });

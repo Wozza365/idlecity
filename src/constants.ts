@@ -161,3 +161,40 @@ export function fmtBalance(n: number): string {
   if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
   return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
+
+// ── Population ────────────────────────────────────────────────────────────────
+// Single knob for population scale — mirrors BASE_INCOME_MULTIPLIER's pattern.
+export const POPULATION_CAPACITY_MULTIPLIER = 1;
+
+// Exp-poly capacity curve per plot: 0 if locked/unbuilt, else 10 × exp(0.125 × (L-1)^1.06).
+// Smoothly continuous across building tiers, same shape family as perBuildingIncome.
+// At level 100 this is ~120M per plot — 5 maxed plots reach ~600M total (megacity scale).
+export function plotPopulationCapacity(level: number): number {
+  if (level <= 0) return 0;
+  return 10 * Math.exp(0.125 * Math.pow(level - 1, 1.06)) * POPULATION_CAPACITY_MULTIPLIER;
+}
+
+// Base rate: at road/verge/water = 0, closes ~63% of the population gap every 3 hours.
+export const POPULATION_BASE_RATE = 1 / (3 * 3600); // ≈ 9.26e-5 / sec
+
+// Road/verge/water act as pure growth-rate multipliers — they never add to
+// capacity directly. Each track's max level contributes +0.40 to the multiplier,
+// so maxing all three roughly doubles the base rate (multiplier ≈ 2.2).
+export function populationGrowthRate(roadLevel: number, vergeLevel: number, waterLevel: number): number {
+  const multiplier = 1
+    + roadLevel  * 0.04     // max road  (10) -> +0.40
+    + vergeLevel * 0.02667  // max verge (15) -> +0.40
+    + waterLevel * 0.0333;  // max water (12) -> +0.40
+  return POPULATION_BASE_RATE * multiplier;
+}
+
+// Compact formatter for population counts (no "$" prefix, unlike fmtBalance).
+// Thresholds (950 / 999_950 / 999_950_000) avoid "1000.0K"-style rounding
+// artifacts right at unit boundaries.
+export function fmtPopulation(n: number): string {
+  const v = Math.floor(n);
+  if (v >= 999_950_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 999_950)     return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 950)         return `${(v / 1_000).toFixed(1)}K`;
+  return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}

@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
+import { type GameState, clearSave, defaultState, loadGame, saveGame, totalPopulationCapacity } from '../game/GameState';
 import {
   PLOT_COUNT, MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H,
   ROAD_H, VERGE_H, WATER_H, YARD_H,
   UNLOCK_COSTS,
   upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
-  roadUpgradeCost, roadIncome, vergeIncome, waterIncome,
+  roadUpgradeCost, roadIncome, vergeIncome, waterIncome, populationGrowthRate,
   buildingHeight, fmt, MONO_FONT,
 } from '../constants';
 import { spawnFloatingText } from '../ui/FloatingText';
@@ -433,7 +433,7 @@ export class GameScene extends Phaser.Scene {
           if (this.state.gold < TOWN_RENAME_COST) return false;
           this.state.gold -= TOWN_RENAME_COST;
           this.state.townName = newName;
-          this.statsBar.update(this.state.gold, this.taxRate);
+          this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
           return true;
         },
       );
@@ -494,7 +494,7 @@ export class GameScene extends Phaser.Scene {
     this.applyPanelOffset(this.panelOffset);
 
     this.refreshButtons();
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.sky.updateGradient(Math.sin(this.sunAngle), width, this.groundY, this.seasons?.winterWeight ?? 0, this.seasons?.springWeight ?? 0, this.seasons?.weatherIntensity ?? 0, this.activeTheme.palette.sky);
     this.sunMoon.update(this.sunAngle, width, this.groundY, this.collapsedPanelTop, this.state.plots, this.plotWidth);
   }
@@ -616,7 +616,7 @@ export class GameScene extends Phaser.Scene {
     this.add.existing(this.plotUIs[index].container);
     this.plotUIs[index].container.y = this.panelOffset;
     this.touchPanel();
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
@@ -769,7 +769,7 @@ export class GameScene extends Phaser.Scene {
       this.plotUIs[i].container.y = this.panelOffset;
     }
     this.touchPanel();
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
@@ -823,7 +823,7 @@ export class GameScene extends Phaser.Scene {
     this.add.existing(this.roadUI.container);
     this.roadUI.container.y = this.panelOffset;
     this.touchPanel();
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
@@ -855,7 +855,7 @@ export class GameScene extends Phaser.Scene {
     this.add.existing(this.roadUI.container);
     this.roadUI.container.y = this.panelOffset;
     this.touchPanel();
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
@@ -890,14 +890,14 @@ export class GameScene extends Phaser.Scene {
     this.add.existing(this.roadUI.container);
     this.roadUI.container.y = this.panelOffset;
     this.touchPanel();
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
   private onAddGold(): void {
     this.state.gold += 1_000_000_000;
     this.state.stats.totalMoneyEarned += 1_000_000_000;
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
@@ -1065,6 +1065,12 @@ export class GameScene extends Phaser.Scene {
     return total;
   }
 
+  private updatePopulation(dtSeconds: number): void {
+    const capacity = totalPopulationCapacity(this.state);
+    const rate = populationGrowthRate(this.state.road.level, this.state.verge.level, this.state.water.level);
+    this.state.population += (capacity - this.state.population) * (1 - Math.exp(-rate * dtSeconds));
+  }
+
   private onTaxTick(): void {
     const now = Date.now();
     const elapsed = now - this._lastTaxTimestamp;
@@ -1072,7 +1078,8 @@ export class GameScene extends Phaser.Scene {
     const earned = this.taxRate * (elapsed / 1000);
     this.state.gold += earned;
     this.state.stats.totalMoneyEarned += earned;
-    this.statsBar.update(this.state.gold, this.taxRate);
+    this.updatePopulation(elapsed / 1000);
+    this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
 
     if (document.visibilityState === 'visible') {

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { type GameState, calculateProgress } from '../game/GameState';
-import { TOTAL_SKINS, UI_FONT, MONO_FONT, fmtBalance } from '../constants';
+import { TOTAL_SKINS, UI_FONT, MONO_FONT, fmtBalance, fmtPopulation } from '../constants';
 import { getTheme } from '../theme/themes';
 
 const BTN_DEPTH = 100; // corner button
@@ -55,6 +55,7 @@ interface StatsRefs {
   playtimeText: Phaser.GameObjects.Text;
   skinsText: Phaser.GameObjects.Text;
   moneyText: Phaser.GameObjects.Text;
+  populationText: Phaser.GameObjects.Text;
   progressText: Phaser.GameObjects.Text;
   barGfx: Phaser.GameObjects.Graphics;
   barX: number;
@@ -428,6 +429,8 @@ export class MenuUI {
     y += rowH;
     const moneyText = addRow(y, 'Total Money Earned', fmtBalance(state.stats.totalMoneyEarned));
     y += rowH;
+    const populationText = addRow(y, 'Population', fmtPopulation(state.population));
+    y += rowH;
 
     // Progress row + bar
     const progress = calculateProgress(state);
@@ -446,7 +449,7 @@ export class MenuUI {
     const barGfx = add(s.add.graphics().setDepth(D + 2).setLighting(false)) as Phaser.GameObjects.Graphics;
     drawProgressBar(barGfx, barX, barY, barW, barH, progress);
 
-    this.statsRefs = { playtimeText, skinsText, moneyText, progressText, barGfx, barX, barY, barW, barH };
+    this.statsRefs = { playtimeText, skinsText, moneyText, populationText, progressText, barGfx, barX, barY, barW, barH };
     this.startStatsTimer();
 
     y += barH + 28;
@@ -498,12 +501,13 @@ export class MenuUI {
 
   private refreshStats(): void {
     if (!this.statsRefs) return;
-    const { playtimeText, skinsText, moneyText, progressText, barGfx, barX, barY, barW, barH } = this.statsRefs;
+    const { playtimeText, skinsText, moneyText, populationText, progressText, barGfx, barX, barY, barW, barH } = this.statsRefs;
     const state = this.getState();
 
     playtimeText.setText(formatPlaytime(state.stats.totalPlayTimeMs));
     skinsText.setText(`${state.stats.skinsUnlocked} / ${TOTAL_SKINS}`);
     moneyText.setText(fmtBalance(state.stats.totalMoneyEarned));
+    populationText.setText(fmtPopulation(state.population));
 
     const progress = calculateProgress(state);
     progressText.setText(`${progress}%`);

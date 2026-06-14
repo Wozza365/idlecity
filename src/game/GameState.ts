@@ -1,5 +1,5 @@
 import type { SeasonSaveState } from './SeasonSystem';
-import { MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, TOTAL_SKINS } from '../constants';
+import { MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, TOTAL_SKINS, plotPopulationCapacity } from '../constants';
 
 const SAVE_KEY = 'idlecity-save';
 
@@ -32,6 +32,7 @@ export interface StatsState {
 /** All persistent game data lives here. */
 export interface GameState {
   gold: number;
+  population: number;
   plots: PlotState[];
   road: RoadState;
   verge: VergeState;
@@ -47,6 +48,7 @@ export interface GameState {
 export function defaultState(plotCount: number): GameState {
   return {
     gold: 500,
+    population: 0,
     townName: 'Idleville',
     plots: Array.from({ length: plotCount }, (_, i) => ({
       id: i,
@@ -86,6 +88,15 @@ export function calculateProgress(state: GameState): number {
   return Math.round(avg * 100);
 }
 
+/** Sum of each unlocked plot's population capacity — the target that `population` grows toward. */
+export function totalPopulationCapacity(state: GameState): number {
+  let total = 0;
+  for (const plot of state.plots) {
+    if (plot.unlocked) total += plotPopulationCapacity(plot.level);
+  }
+  return total;
+}
+
 // ── Persistence ────────────────────────────────────────────────────────────────
 
 export function saveGame(state: GameState): void {
@@ -118,6 +129,7 @@ export function loadGame(plotCount: number): GameState {
       if (!parsed.townName) parsed.townName = 'Idleville';
       if (!parsed.stats)    parsed.stats    = { totalPlayTimeMs: 0, totalMoneyEarned: 0, skinsUnlocked: 1 };
       if (typeof parsed.selectedSkin !== 'number') parsed.selectedSkin = 0;
+      if (typeof parsed.population !== 'number') parsed.population = totalPopulationCapacity(parsed as GameState);
       return parsed as GameState;
     }
   } catch {
