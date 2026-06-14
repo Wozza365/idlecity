@@ -180,9 +180,10 @@ export class BoatManager {
       }
     }
 
+    const spawnX = force ? this.sceneWidth / 2 : -def.w / 2 - 10;
     const dockDuration = DOCK_DURATION_MS + Math.random() * DOCK_VARY_MS;
     const boat = new Boat(this.scene, {
-      def, x: -def.w / 2 - 10, y,
+      def, x: spawnX, y,
       sceneWidth: this.sceneWidth,
       dockX, dockDuration,
     });
