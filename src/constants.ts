@@ -188,14 +188,18 @@ export function populationGrowthRate(roadLevel: number, vergeLevel: number, wate
   return POPULATION_BASE_RATE * multiplier;
 }
 
-// Compact formatter for population counts (no "$" prefix, unlike fmtBalance).
-// Sub-million values are shown in full with thousands separators so growth
-// stays visible in real time; only millions/billions are abbreviated. The
-// 999_950_000 threshold avoids a "1000.0M"-style rounding artifact right at
-// the B boundary.
+// Formatter for population counts (no "$" prefix, unlike fmtBalance). Shows as
+// much precision as fits: full digits with thousands separators below 1M, then
+// recursively shifts to the next unit (K/M/B) whenever the leading digit group
+// would otherwise reach 7 digits — e.g. 1,500,000 reads as "1,500K" rather than
+// the coarser "1.5M", and 999,999,999 reads as "999,999K" rather than "1.0M".
 export function fmtPopulation(n: number): string {
-  const v = Math.floor(n);
-  if (v >= 999_950_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
-  if (v >= 1_000_000)   return `${(v / 1_000_000).toFixed(1)}M`;
-  return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const UNITS = ['', 'K', 'M', 'B'];
+  let v = Math.floor(n);
+  let unit = 0;
+  while (v >= 1_000_000 && unit < UNITS.length - 1) {
+    v = Math.floor(v / 1000);
+    unit++;
+  }
+  return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + UNITS[unit];
 }

@@ -61,17 +61,18 @@ describe('fmtPopulation', () => {
     expect(fmtPopulation(999_999)).toBe('999,999');
   });
 
-  it('formats millions with an M suffix', () => {
-    expect(fmtPopulation(1_000_000)).toBe('1.0M');
-    expect(fmtPopulation(1_284_392)).toBe('1.3M');
+  it('shifts to K once the integer part would reach 7 digits, preserving precision', () => {
+    expect(fmtPopulation(1_000_000)).toBe('1,000K');
+    expect(fmtPopulation(1_284_392)).toBe('1,284K');
+    expect(fmtPopulation(999_999_999)).toBe('999,999K');
   });
 
-  it('formats billions with a B suffix', () => {
-    expect(fmtPopulation(2_300_000_000)).toBe('2.3B');
+  it('shifts to M once the K-scaled value would reach 7 digits', () => {
+    expect(fmtPopulation(1_000_000_000)).toBe('1,000M');
+    expect(fmtPopulation(2_300_000_000)).toBe('2,300M');
   });
 
-  it('rolls over to the B unit just before 1,000,000,000', () => {
-    expect(fmtPopulation(999_950_000)).toBe('1.0B');
-    expect(fmtPopulation(999_949_999)).toBe('999.9M');
+  it('shifts to B once the M-scaled value would reach 7 digits', () => {
+    expect(fmtPopulation(1_000_000_000_000)).toBe('1,000B');
   });
 });
