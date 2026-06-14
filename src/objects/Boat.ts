@@ -4,26 +4,19 @@ import { type LightSource } from '../lighting/LightingSystem';
 import { type BoatDef, boatOriginY } from './BoatAssets';
 
 const NIGHT_TINT = 0x5a6680;
+const TEX_PAD    = 1;
 
-// Mirrors the TEX_PAD value in BoatAssets.
-const TEX_PAD = 1;
-
-// Fraction of hull height that sits below the waterline, ±VARY per boat.
+// Fraction of hull height submerged, ±VARY per boat.
 const SUBMERGE_RATIO      = 0.16;
 const SUBMERGE_RATIO_VARY = 0.04;
 
-// Water tint on the submerged strip.
+// Water tint on the submerged hull image.
 const WATER_TINT = 0x2a5588;
 
-// Target visible alpha: 0.30 just below the waterline, 0.10 at the hull bottom.
-// The submerged image is set to ALPHA_TOP; the FilterMask scales it down to
-// ALPHA_BOT by drawing the bottom bands with alpha = ALPHA_BOT / ALPHA_TOP.
-const ALPHA_TOP      = 0.30;
-const ALPHA_BOT      = 0.10;
-const MASK_ALPHA_BOT = ALPHA_BOT / ALPHA_TOP; // ≈ 0.333
-
-// Number of horizontal gradient bands in the wave mask.
-const MASK_BANDS = 8;
+// Visible alpha of the submerged hull:
+// top strip (just below waterline) and bottom strip (at hull bottom).
+const ALPHA_STRIP_TOP = 0.28;
+const ALPHA_STRIP_BOT = 0.10;
 
 export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 
@@ -47,9 +40,11 @@ export interface BoatConfig {
 export class Boat {
   private readonly shadows: Phaser.GameObjects.Image[];
   private readonly image: Phaser.GameObjects.Image;
-  private readonly submergedImage: Phaser.GameObjects.Image;
-  // Off-display-list graphics used solely as a FilterMask source.
-  private readonly waveMaskGfx: Phaser.GameObjects.Graphics;
+  // Two strips for gradient alpha: top = more visible, bottom = more transparent.
+  private readonly subTop: Phaser.GameObjects.Image;
+  private readonly subBot: Phaser.GameObjects.Image;
+  // Graphics drawn in world space to render the animated wave at the waterline.
+  private readonly waveGfx: Phaser.GameObjects.Graphics;
   private readonly def: BoatDef;
   private x: number;
   readonly y: number;
@@ -63,8 +58,7 @@ export class Boat {
   private nightFactor = 0;
   private _lastLightingElevation = NaN;
 
-  // World-space offsets from hull centre (bobY): waterline is below centre,
-  // hull bottom is at +hullHalfH.
+  // World-space offset from hull centre (bobY) to the waterline.
   private readonly waterlineOffset: number;
   private readonly hullHalfH: number;
 
@@ -94,8 +88,7 @@ export class Boat {
     this.hullHalfH    = def.h / 2;
 
     const submergeRatio  = SUBMERGE_RATIO + (Math.random() * 2 - 1) * SUBMERGE_RATIO_VARY;
-    // world Y of waterline = bobY + waterlineOffset
-    this.waterlineOffset = def.h * (0.5 - submergeRatio);
+    this.waterlineOffset = def.h * (0.5 - submergeRatio); // bobY + this = waterline world Y
 
     const originY      = boatOriginY(def);
     const texH_padded  = def.texH + 2 * TEX_PAD;
@@ -104,6 +97,7 @@ export class Boat {
     const hullBottomPx = TEX_PAD + extraTop + def.h;
     const submergeH    = Math.round(def.h * submergeRatio);
     const waterlinePx  = hullBottomPx - submergeH;
+    const midPx        = waterlinePx + Math.floor(submergeH / 2);
 
     this.shadows = SHADOW_LAYERS.map(l =>
       scene.add.image(x, y + l.dy, def.key)
@@ -114,29 +108,30 @@ export class Boat {
         .setAlpha(l.alpha),
     );
 
-    // Above-waterline hull. Depth encodes hull-bottom Y for painter's-algorithm
-    // ordering among boats (higher Y = further into the scene = higher depth).
+    // Above-waterline hull, depth-sorted by hull-bottom Y for painter's order.
     this.image = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.855 + (y + this.hullHalfH) * 0.000001)
       .setCrop(0, 0, texW_padded, waterlinePx);
 
-    // Wave mask Graphics — never in the display list, used only by FilterMask.
-    this.waveMaskGfx = scene.make.graphics({}, false);
-
-    // Submerged hull rendered inside the water body.
-    // setCrop limits it to the below-waterline strip.
-    // FilterMask applies the wavy top edge + gradient alpha (ALPHA_TOP → ALPHA_BOT).
-    this.submergedImage = scene.add.image(x, y, def.key)
+    // Submerged hull — two strips for gradient alpha, rendered inside the water body.
+    this.subTop = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setCrop(0, waterlinePx, texW_padded, texH_padded - waterlinePx)
+      .setCrop(0, waterlinePx, texW_padded, Math.ceil(submergeH / 2))
       .setTint(WATER_TINT)
-      .setAlpha(ALPHA_TOP)
-      .enableFilters();
+      .setAlpha(ALPHA_STRIP_TOP);
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.submergedImage.filters!.internal.addMask(this.waveMaskGfx).autoUpdate = true;
+    this.subBot = scene.add.image(x, y, def.key)
+      .setOrigin(0.5, originY)
+      .setDepth(5.52)
+      .setCrop(0, midPx, texW_padded, texH_padded - midPx)
+      .setTint(WATER_TINT)
+      .setAlpha(ALPHA_STRIP_BOT);
+
+    // Wave Graphics drawn directly in world space at the waterline boundary.
+    // Depth 5.855 puts it level with the hull so the wave reads as foam at the join.
+    this.waveGfx = scene.add.graphics().setDepth(5.855);
 
     this.portLight = {
       x, y: y - def.h / 2 + 2,
@@ -183,7 +178,8 @@ export class Boat {
     const bobY = this.y + Math.sin(this.bobPhase) * 1.2;
 
     this.image.setPosition(this.x, bobY);
-    this.submergedImage.setPosition(this.x, bobY);
+    this.subTop.setPosition(this.x, bobY);
+    this.subBot.setPosition(this.x, bobY);
 
     // Keep painter depth current through the bob.
     this.image.setDepth(5.855 + (bobY + this.hullHalfH) * 0.000001);
@@ -192,8 +188,7 @@ export class Boat {
       this.shadows[i].setPosition(this.x + SHADOW_LAYERS[i].dx, bobY + SHADOW_LAYERS[i].dy);
     }
 
-    // Redraw the wave mask for this frame.
-    this.updateWaveMask(bobY);
+    this.drawWaterline(bobY);
 
     this.portLight.x = this.x;
     this.portLight.y = bobY - this.def.h / 2 + 2;
@@ -207,46 +202,25 @@ export class Boat {
     return this.x - this.def.w / 2 > this.sceneWidth + OFFSCREEN_MARGIN;
   }
 
-  private updateWaveMask(bobY: number): void {
-    const gfx         = this.waveMaskGfx;
-    const left        = this.x - this.def.w / 2 - 1;
-    const right       = this.x + this.def.w / 2 + 1;
-    const waterlineY  = bobY + this.waterlineOffset;
-    const hullBottomY = bobY + this.hullHalfH;
-    const totalH      = hullBottomY - waterlineY;
-    if (totalH <= 0) { gfx.clear(); return; }
+  // Draws a thin wavy stroke at the waterline to suggest foam / surface contact.
+  private drawWaterline(bobY: number): void {
+    const gfx        = this.waveGfx;
+    const left       = this.x - this.def.w / 2 + 2;
+    const right      = this.x + this.def.w / 2 - 2;
+    const wlY        = bobY + this.waterlineOffset;
+    const t          = this.bobPhase / 1.2;
+    const step       = Math.max(2, Math.ceil(this.def.w / 30));
 
     gfx.clear();
-    const t    = this.bobPhase / 1.2; // ≈ elapsed seconds
-    const step = Math.max(3, Math.ceil(this.def.w / 20));
-
-    for (let b = 0; b < MASK_BANDS; b++) {
-      const f0        = b / MASK_BANDS;
-      const f1        = (b + 1) / MASK_BANDS;
-      // Mask alpha: 1.0 at waterline band → MASK_ALPHA_BOT at bottom band.
-      const bandAlpha = 1.0 - f0 * (1.0 - MASK_ALPHA_BOT);
-      const bandTopY  = waterlineY + f0 * totalH;
-      const bandBotY  = waterlineY + f1 * totalH;
-
-      gfx.fillStyle(0xffffff, bandAlpha);
-
-      if (b === 0) {
-        // Top band: polygon with a wavy upper edge.
-        gfx.beginPath();
-        gfx.moveTo(left,  bandBotY);
-        gfx.lineTo(right, bandBotY);
-        for (let px = right; px >= left; px -= step) {
-          gfx.lineTo(px, bandTopY + this.waveAt(px, t));
-        }
-        gfx.closePath();
-        gfx.fillPath();
-      } else {
-        gfx.fillRect(left, bandTopY, right - left, bandBotY - bandTopY + 1);
-      }
+    gfx.lineStyle(1, 0xb8d8f0, 0.45);
+    gfx.beginPath();
+    gfx.moveTo(left, wlY + this.waveAt(left, t));
+    for (let px = left + step; px <= right; px += step) {
+      gfx.lineTo(px, wlY + this.waveAt(px, t));
     }
+    gfx.strokePath();
   }
 
-  // Two-frequency sine wave that animates the waterline edge in real time.
   private waveAt(worldX: number, t: number): number {
     return Math.sin(worldX * 0.12 + t * 1.9) * 2.2
          + Math.sin(worldX * 0.22 + t * 1.2 + 1.5) * 0.9;
@@ -266,7 +240,8 @@ export class Boat {
   destroy(): void {
     for (const s of this.shadows) s.destroy();
     this.image.destroy();
-    this.submergedImage.destroy();
-    this.waveMaskGfx.destroy();
+    this.subTop.destroy();
+    this.subBot.destroy();
+    this.waveGfx.destroy();
   }
 }
