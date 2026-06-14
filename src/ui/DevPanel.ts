@@ -126,14 +126,16 @@ export class DevPanel {
       .setOrigin(1, 0.5);
     this.panel.add(this.fpsText);
 
-    // Row 7: resolution diagnostics - shows raw devicePixelRatio, the rounded
-    // density multiplier applied to the canvas backing store (see
-    // PIXEL_DENSITY/applyPixelDensity in main.ts), and the resulting CSS vs.
-    // backing-store canvas sizes, so DPR-aware supersampling can be checked
-    // on-device.
+    // Row 7: resolution diagnostics - shows raw devicePixelRatio, the actual
+    // (fractional) density multiplier applied to the canvas backing store
+    // (see PIXEL_DENSITY/applyPixelDensity in main.ts), and the resulting
+    // CSS vs. backing-store canvas sizes, so DPR-aware supersampling can be
+    // checked on-device. `density` should closely match `dpr` - if it's
+    // noticeably lower (e.g. capped at 3.00), the canvas is being downscaled
+    // by the browser.
     const canvas = scene.game.canvas;
     const dpr = window.devicePixelRatio || 1;
-    const density = Math.round(canvas.width / scene.game.scale.width) || 1;
+    const density = canvas.width / scene.game.scale.width || 1;
     const cssW = Math.round(scene.game.scale.width);
     const cssH = Math.round(scene.game.scale.height);
     this.panel.add(
@@ -141,7 +143,7 @@ export class DevPanel {
         .text(
           PANEL_W / 2,
           r7,
-          `dpr ${dpr.toFixed(2)} · density ×${density} · ${cssW}x${cssH} → ${canvas.width}x${canvas.height}`,
+          `dpr ${dpr.toFixed(2)} · density ×${density.toFixed(2)} · ${cssW}x${cssH} → ${canvas.width}x${canvas.height}`,
           { fontSize: '10px', color: '#778899', fontFamily: UI_FONT },
         )
         .setOrigin(0.5),
