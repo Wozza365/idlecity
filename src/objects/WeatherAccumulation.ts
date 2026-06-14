@@ -144,7 +144,7 @@ export class WeatherAccumulation {
       ? this.groundY + ROAD_H + margin + Math.random() * (VERGE_H - margin * 2)
       : this.groundY + margin + Math.random() * (ROAD_H - margin * 2);
     const x    = this.width * (0.04 + Math.random() * 0.92);
-    const maxRx = 10 + Math.random() * 24;
+    const maxRx = 7 + Math.random() * 13;
     const maxRy = maxRx * (0.19 + Math.random() * 0.13);
     const lobeAngle = Math.random() * Math.PI * 2;
     const lobeDist  = 0.12 + Math.random() * 0.22;
@@ -182,22 +182,23 @@ export class WeatherAccumulation {
 
     // Night factor: 0 in daylight, ramping to 1 after dusk — dims puddle reflections
     const nightFactor = Math.max(0, Math.min(1, (0.15 - elevation) / 0.35));
-    // Puddles act as little mirrors of the sky overhead — blend a neutral wet
-    // asphalt tone with the current horizon colour, darkening after dark.
-    const skyTint        = lerpColor(0x3a5570, horizonColor, 0.65);
+    // Puddles act as little mirrors of the sky overhead — blend a dark, neutral
+    // wet-asphalt tone with a touch of the current horizon colour, darkening
+    // further after dark. Kept fairly dark so the reflection reads as subtle.
+    const skyTint        = lerpColor(0x2a3d52, horizonColor, 0.35);
     const bodyColor      = lerpColor(skyTint, 0x10141e, nightFactor * 0.75);
-    const highlightColor = lerpColor(lerpColor(0xf0f8ff, horizonColor, 0.35), 0x222c40, nightFactor * 0.8);
+    const highlightColor = lerpColor(lerpColor(0xe8f0fa, horizonColor, 0.3), 0x222c40, nightFactor * 0.8);
     const rimColor       = lerpColor(0x05070c, bodyColor, 0.3);
 
     for (const p of this.puddles) {
       if (p.rx <= 0.5) continue;
       const sizeRatio = p.rx / p.maxRx;
-      const alpha = sizeRatio * (0.34 + 0.22 * rainIntensity);
+      const alpha = sizeRatio * (0.20 + 0.14 * rainIntensity);
       const gfx = p.onVerge ? this.vergeGfx : this.roadGfx;
 
       // Damp halo — softly darkens the surface around the standing water
-      gfx.fillStyle(0x000000, alpha * 0.16);
-      gfx.fillEllipse(p.x, p.y, p.rx * 2.6, p.ry * 2.6);
+      gfx.fillStyle(0x000000, alpha * 0.12);
+      gfx.fillEllipse(p.x, p.y, p.rx * 1.6, p.ry * 1.6);
 
       // Secondary lobe breaks up the perfect-ellipse outline
       gfx.fillStyle(bodyColor, alpha);
@@ -212,7 +213,7 @@ export class WeatherAccumulation {
 
       // Slow shimmer on the reflection highlight
       const shimmer = 0.5 + 0.5 * Math.sin(this.elapsed * 1.4 + p.shimmerPhase);
-      gfx.fillStyle(highlightColor, alpha * (0.4 + 0.35 * shimmer));
+      gfx.fillStyle(highlightColor, alpha * (0.28 + 0.2 * shimmer));
       gfx.fillEllipse(p.x - p.rx * 0.15, p.y - p.ry * 0.18, p.rx * (0.95 + 0.15 * shimmer), p.ry * 0.7);
 
       // Raindrop ripples spreading across the surface
