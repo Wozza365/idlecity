@@ -10,15 +10,12 @@ export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 const DOCK_SLOW_DIST   = 90;
 const OFFSCREEN_MARGIN = 30;
 
-// Two-layer upward shadow: outer halo + tighter core
+// Shadow: smaller copy rendered below and slightly behind, fading out at edges
+// via two offset layers — one wide & faint, one tight & darker.
 const SHADOW_LAYERS = [
-  { offsetY: -6, scale: 0.95, alpha: 0.07 },
-  { offsetY: -3, scale: 0.80, alpha: 0.17 },
+  { dx:  0, dy: 3, scale: 0.90, alpha: 0.10 },
+  { dx:  0, dy: 2, scale: 0.72, alpha: 0.18 },
 ] as const;
-
-// Waterline strip drawn over the hull at depth 5.857
-const WATERLINE_COLOR = 0x2A89CB;
-const WATERLINE_FOAM  = 0x88CCEE;
 
 export interface BoatConfig {
   def: BoatDef;
@@ -32,7 +29,6 @@ export interface BoatConfig {
 export class Boat {
   private readonly shadows: Phaser.GameObjects.Image[];
   private readonly image: Phaser.GameObjects.Image;
-  private readonly waterlineGfx: Phaser.GameObjects.Graphics;
   private readonly def: BoatDef;
   private x: number;
   readonly y: number;
@@ -43,7 +39,6 @@ export class Boat {
   private state: BoatState = 'moving';
   private dockTimer = 0;
   private bobPhase: number;
-  private waterPhase: number;
   private nightFactor = 0;
   private _lastLightingElevation = NaN;
 
@@ -70,18 +65,16 @@ export class Boat {
     this.dockDuration = dockDuration;
     this.baseSpeed    = def.speed * (0.975 + Math.random() * 0.05);
     this.bobPhase     = Math.random() * Math.PI * 2;
-    this.waterPhase   = Math.random() * Math.PI * 2;
 
     const originY = boatOriginY(def);
 
-    // Soft upward shadow — two layers so edges fade gradually
-    this.shadows = SHADOW_LAYERS.map(layer =>
-      scene.add.image(x, y + layer.offsetY, def.key)
+    this.shadows = SHADOW_LAYERS.map(l =>
+      scene.add.image(x, y + l.dy, def.key)
         .setOrigin(0.5, originY)
         .setDepth(5.854)
         .setTint(0x000000)
-        .setScale(layer.scale)
-        .setAlpha(layer.alpha),
+        .setScale(l.scale)
+        .setAlpha(l.alpha),
     );
 
     // Above wave fx (5.85), below lighthouse island (5.86)
@@ -89,20 +82,14 @@ export class Boat {
       .setOrigin(0.5, originY)
       .setDepth(5.855);
 
-    // Waterline strip renders over the boat to simulate hull meeting water surface
-    this.waterlineGfx = scene.add.graphics().setDepth(5.857);
-
-    // Port (top/city-side) = red
     this.portLight = {
       x, y: y - def.h / 2 + 2,
       radius: 6, color: 0xff2222, intensity: 0, noOcclusion: true,
     };
-    // Starboard (bottom/sea-side) = green
     this.starboardLight = {
       x, y: y + def.h / 2 - 2,
       radius: 6, color: 0x22ff55, intensity: 0, noOcclusion: true,
     };
-    // Stern white light for larger vessels
     this.sternLight = def.w >= 36 ? {
       x: x - def.w / 2, y,
       radius: 9, color: 0xffffff, intensity: 0, noOcclusion: true,
@@ -120,9 +107,9 @@ export class Boat {
           speed = this.baseSpeed * Math.max(0.08, dist / DOCK_SLOW_DIST);
         }
         if (dist <= 1 && dist > -10) {
-          this.state    = 'docked';
+          this.state     = 'docked';
           this.dockTimer = this.dockDuration;
-          this.x        = this.dockX;
+          this.x         = this.dockX;
         } else {
           this.x += speed * dt;
         }
@@ -136,30 +123,13 @@ export class Boat {
       this.x += this.baseSpeed * 1.15 * dt;
     }
 
-    this.bobPhase   += dt * 1.2;
-    this.waterPhase += dt * 1.5;
+    this.bobPhase += dt * 1.2;
     const bobY = this.y + Math.sin(this.bobPhase) * 1.2;
 
     this.image.setPosition(this.x, bobY);
-
     for (let i = 0; i < this.shadows.length; i++) {
-      this.shadows[i].setPosition(this.x, bobY + SHADOW_LAYERS[i].offsetY);
+      this.shadows[i].setPosition(this.x + SHADOW_LAYERS[i].dx, bobY + SHADOW_LAYERS[i].dy);
     }
-
-    // Waterline: slight independent wave offset so it washes back and forth
-    const waveOff = Math.sin(this.waterPhase) * 1.4 + Math.sin(this.waterPhase * 1.73) * 0.6;
-    const lineW   = Math.round(this.def.w * 0.84);
-    const lineX   = Math.round(this.x - lineW / 2);
-    // Waterline sits at 15% below hull centre — approximately where hull meets water
-    const lineY   = Math.round(bobY + this.def.h * 0.15 + waveOff);
-
-    this.waterlineGfx.clear();
-    // Foam highlight just above the waterline
-    this.waterlineGfx.fillStyle(WATERLINE_FOAM, 0.40);
-    this.waterlineGfx.fillRect(lineX, lineY - 2, lineW, 1);
-    // Main water surface band
-    this.waterlineGfx.fillStyle(WATERLINE_COLOR, 0.58);
-    this.waterlineGfx.fillRect(lineX, lineY - 1, lineW, 3);
 
     this.portLight.x = this.x;
     this.portLight.y = bobY - this.def.h / 2 + 2;
@@ -186,7 +156,6 @@ export class Boat {
 
   destroy(): void {
     for (const s of this.shadows) s.destroy();
-    this.waterlineGfx.destroy();
     this.image.destroy();
   }
 }
