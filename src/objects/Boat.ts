@@ -274,7 +274,8 @@ export class Boat {
         p.alpha += 0.035;
         if (p.alpha >= p.maxAlpha) { p.alpha = p.maxAlpha; p.growing = false; }
       } else {
-        p.alpha -= p.fadeRate;
+        const rate = p.alpha < p.maxAlpha * 0.5 ? p.fadeRate * 2 : p.fadeRate;
+        p.alpha -= rate;
       }
     }
 
