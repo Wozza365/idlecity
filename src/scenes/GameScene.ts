@@ -1067,7 +1067,11 @@ export class GameScene extends Phaser.Scene {
 
   private updatePopulation(dtSeconds: number): void {
     const capacity = totalPopulationCapacity(this.state);
-    const rate = populationGrowthRate(this.state.road.level, this.state.verge.level, this.state.water.level);
+    const baseRate = populationGrowthRate(this.state.road.level, this.state.verge.level, this.state.water.level);
+    // Jitter the rate per tick (avg 1x) so growth feels organic — bursts of
+    // several new residents arriving together, then quieter ticks with just
+    // one or two — without changing the overall pacing.
+    const rate = baseRate * (0.5 + Math.random());
     this.state.population += (capacity - this.state.population) * (1 - Math.exp(-rate * dtSeconds));
   }
 
