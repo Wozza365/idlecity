@@ -2,11 +2,21 @@ import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
 
 // How many physical pixels to render per CSS pixel, for both the game canvas
-// (see applyPixelDensity below) and Text glyph textures. Rounded to an
-// integer so it lines up with `render.roundPixels` (a fractional zoom level
-// would defeat pixel-perfect snapping) and capped at 3 to bound the GPU cost
-// of the Light2D/shadow pipeline, which redraws every light per output pixel.
-const PIXEL_DENSITY = Math.min(Math.round(window.devicePixelRatio || 1), 3);
+// (see applyPixelDensity below) and Text glyph textures. Capped at 3 to
+// bound the GPU cost of the Light2D/shadow pipeline, which redraws every
+// light per output pixel.
+//
+// Deliberately left fractional (not rounded): many phones report a
+// non-integer devicePixelRatio (e.g. 2.23). Rounding it would leave the
+// canvas backing store at a different resolution than the physical display,
+// so the browser would apply its own smoothing rescale on top of everything
+// we draw — including text — softening it again. Matching the raw ratio
+// makes the backing store align 1:1 with physical pixels, so that rescale
+// never happens. The cost is that `roundPixels` (which snaps positions to
+// whole CSS pixels) no longer guarantees whole-*framebuffer*-pixel
+// positions for sprites, which can cause faint 1px seams on NEAREST-filtered
+// pixel art — a much smaller artifact than full-canvas softening.
+const PIXEL_DENSITY = Math.min(window.devicePixelRatio || 1, 3);
 
 // `render.antialias: false` below keeps the game's small pixel-art sprites
 // crisp by defaulting every texture to nearest-neighbor sampling. That same
