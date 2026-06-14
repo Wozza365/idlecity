@@ -38,6 +38,23 @@ Phaser.GameObjects.GameObjectFactory.prototype.text = function (
   return textObj;
 };
 
+// Every `setText`/`setStyle`/etc. call re-renders the glyph canvas and
+// re-uploads it to the GPU via `WebGLRenderer.canvasToTexture`, which always
+// resets the texture's min/mag filters to NEAREST when `antialias: false` —
+// silently undoing the `setFilter(LINEAR)` above. Re-apply it after every
+// such update so frequently-changing text (stats bar values, clock, floating
+// "+$" popups) stays smooth too, not just text that's set once and never
+// updated.
+const originalUpdateText = Phaser.GameObjects.Text.prototype.updateText;
+Phaser.GameObjects.Text.prototype.updateText = function (
+  this: Phaser.GameObjects.Text,
+): Phaser.GameObjects.Text {
+  const result = originalUpdateText.call(this);
+  this.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  return result;
+};
+
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   backgroundColor: '#0d0d1a',
