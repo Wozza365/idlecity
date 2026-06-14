@@ -481,6 +481,7 @@ export class GameScene extends Phaser.Scene {
       () => this.advanceDay(),
       (season) => this.jumpToSeason(season),
       () => this.balloon?.forceSpawn(),
+      (key) => this.boatManager?.forceSpawn(key),
     );
     this.add.existing(this.devPanel.container);
 

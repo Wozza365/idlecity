@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ROAD_H, VERGE_H } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { Boat } from './Boat';
-import { pickRandomBoat } from './BoatAssets';
+import { BOAT_DEFS, pickRandomBoat, type BoatDef } from './BoatAssets';
 
 // Spawn interval bounds (ms) — decreases with level
 const BASE_INTERVAL_MS = 69_000;
@@ -146,8 +146,16 @@ export class BoatManager {
     for (const boat of this.boats) boat.updateLighting(elevation);
   }
 
+  forceSpawn(key: string): void {
+    const def = BOAT_DEFS.find(d => d.key === key);
+    if (def) this.spawnBoatDef(def);
+  }
+
   private spawnBoat(): void {
-    const def = pickRandomBoat();
+    this.spawnBoatDef(pickRandomBoat());
+  }
+
+  private spawnBoatDef(def: BoatDef): void {
     // Single lane across the deep water, a fixed distance below the shoreline
     // (independent of WATER_H) so boats stay near the dock/pier even as the
     // water area extends further out to sea.
