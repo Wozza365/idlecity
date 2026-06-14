@@ -3,7 +3,7 @@ import { lerpColor } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { type BoatDef, boatOriginY } from './BoatAssets';
 
-type SmokeParticle = { x: number; y: number; alpha: number; dx: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
+type SmokeParticle = { x: number; y: number; alpha: number; dx: number; dy: number; wobble: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
 
 const NIGHT_TINT = 0x5a6680;
 const TEX_PAD    = 1;
@@ -145,7 +145,7 @@ export class Boat {
     this.waveGfx = scene.add.graphics().setDepth(5.855);
 
     if (def.smokeOffsets?.length) {
-      this.smokeGfx = scene.add.graphics().setDepth(50);
+      this.smokeGfx = scene.add.graphics().setDepth(10);
     }
 
     this.portLight = {
@@ -247,28 +247,30 @@ export class Boat {
   private tickSmoke(bobY: number): void {
     if (this.smokeTimer >= this.nextSmoke) {
       for (const off of this.def.smokeOffsets!) {
-        const c = 0x88 + Math.floor(Math.random() * 40);
+        const c = 0xbb + Math.floor(Math.random() * 50);
         this.smokeParticles.push({
-          x: this.x + off.dx + (Math.random() - 0.5) * 4,
+          x: this.x + off.dx + (Math.random() - 0.5) * 5,
           y: bobY + off.dy,
           alpha: 0,
-          dx: -(0.02 + Math.random() * 0.025),
-          fadeRate: 0.0008 + Math.random() * 0.0006,
-          radius: 4 + Math.floor(Math.random() * 5),
+          dx: -(0.01 + Math.random() * 0.015),
+          dy: -(0.12 + Math.random() * 0.10),
+          wobble: Math.random() * Math.PI * 2,
+          fadeRate: 0.0008 + Math.random() * 0.0007,
+          radius: 3 + Math.floor(Math.random() * 5),
           maxAlpha: 0,
           color: (c << 16) | (c << 8) | c,
           growing: true,
         });
       }
-      this.nextSmoke = 120 + Math.random() * 100;
+      this.nextSmoke = 100 + Math.random() * 100;
       this.smokeTimer = 0;
     }
 
     for (const p of this.smokeParticles) {
-      p.y -= 0.08;
-      p.x += p.dx;
+      p.y += p.dy;
+      p.x += p.dx + Math.sin(this.bobPhase * 1.8 + p.wobble) * 0.05;
       if (p.growing) {
-        if (p.maxAlpha === 0) p.maxAlpha = 0.55 - (p.radius - 4) * 0.05;
+        if (p.maxAlpha === 0) p.maxAlpha = 0.50 - (p.radius - 3) * 0.05;
         p.alpha += 0.035;
         if (p.alpha >= p.maxAlpha) { p.alpha = p.maxAlpha; p.growing = false; }
       } else {
