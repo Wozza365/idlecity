@@ -174,8 +174,11 @@ export function plotPopulationCapacity(level: number): number {
   return 10 * Math.exp(0.125 * Math.pow(level - 1, 1.06)) * POPULATION_CAPACITY_MULTIPLIER;
 }
 
-// Base rate: at road/verge/water = 0, closes ~63% of the population gap every 3 hours.
-export const POPULATION_BASE_RATE = 1 / (3 * 3600); // ≈ 9.26e-5 / sec
+// Base rate: at road/verge/water = 0, closes ~63% of the population gap every
+// 20 seconds — fast enough that growth toward a freshly-raised capacity (e.g.
+// a brand-new level-1 house, capacity 10) is visible within a couple of
+// seconds, then tapers off over the following tens of seconds.
+export const POPULATION_BASE_RATE = 1 / 20; // 0.05 / sec
 
 // Road/verge/water act as pure growth-rate multipliers — they never add to
 // capacity directly. Each track's max level contributes +0.40 to the multiplier,
