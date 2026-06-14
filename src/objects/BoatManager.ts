@@ -148,24 +148,27 @@ export class BoatManager {
 
   forceSpawn(key: string): void {
     const def = BOAT_DEFS.find(d => d.key === key);
-    if (def) this.spawnBoatDef(def);
+    if (def) this.spawnBoatDef(def, true);
   }
 
   private spawnBoat(): void {
     this.spawnBoatDef(pickRandomBoat());
   }
 
-  private spawnBoatDef(def: BoatDef): void {
+  private spawnBoatDef(def: BoatDef, force = false): void {
     // Single lane across the deep water, a fixed distance below the shoreline
     // (independent of WATER_H) so boats stay near the dock/pier even as the
     // water area extends further out to sea.
     const y = this.waterY + 75 + Math.random() * 12;
 
-    // Don't spawn if another boat is too close to the left edge
-    const MIN_SEPARATION = 100 + def.w;
-    if (this.boats.some(b => b.posX < MIN_SEPARATION)) {
-      this.spawnTimer = 3000 + Math.random() * 2000;
-      return;
+    // Don't spawn if another boat is too close to the left edge.
+    // Force-spawns (from the dev panel) skip this check.
+    if (!force) {
+      const MIN_SEPARATION = 100 + def.w;
+      if (this.boats.some(b => b.posX < MIN_SEPARATION)) {
+        this.spawnTimer = 3000 + Math.random() * 2000;
+        return;
+      }
     }
 
     let dockX: number | null = null;

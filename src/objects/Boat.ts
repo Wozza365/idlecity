@@ -8,12 +8,14 @@ const NIGHT_TINT = 0x5a6680;
 // Mirrors the TEX_PAD value in BoatAssets — transparent border around every texture.
 const TEX_PAD = 1;
 
-// Fraction of hull height rendered as submerged (below the waterline).
-const SUBMERGE_RATIO = 0.28;
+// Base fraction of hull height rendered as submerged — varies ±0.07 per boat.
+const SUBMERGE_RATIO      = 0.28;
+const SUBMERGE_RATIO_VARY = 0.07;
 
 // Tint applied to the underwater hull strip to simulate water column colour.
-const WATER_TINT  = 0x2a5588;
-const WATER_ALPHA = 0.60;
+const WATER_TINT       = 0x2a5588;
+const WATER_ALPHA_BASE = 0.72;
+const WATER_ALPHA_VARY = 0.10; // each boat varies ±VARY around base
 
 export type BoatState = 'moving' | 'docking' | 'docked' | 'departing';
 
@@ -80,9 +82,13 @@ export class Boat {
     const texW_padded = def.w   + 2 * TEX_PAD;
     const extraTop    = def.texH - def.h;
 
+    // Per-boat variation so vessels don't look identical.
+    const submergeRatio = SUBMERGE_RATIO + (Math.random() * 2 - 1) * SUBMERGE_RATIO_VARY;
+    const submergeAlpha = WATER_ALPHA_BASE + (Math.random() * 2 - 1) * WATER_ALPHA_VARY;
+
     // Pixel row (in texture space) where the hull ends, counting from top.
     const hullBottomPx = TEX_PAD + extraTop + def.h;
-    const submergeH    = Math.round(def.h * SUBMERGE_RATIO);
+    const submergeH    = Math.round(def.h * submergeRatio);
     const waterlinePx  = hullBottomPx - submergeH;
 
     this.shadows = SHADOW_LAYERS.map(l =>
@@ -109,7 +115,7 @@ export class Boat {
       .setDepth(5.52)
       .setCrop(0, waterlinePx, texW_padded, texH_padded - waterlinePx)
       .setTint(WATER_TINT)
-      .setAlpha(WATER_ALPHA);
+      .setAlpha(submergeAlpha);
 
     this.portLight = {
       x, y: y - def.h / 2 + 2,
