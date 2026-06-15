@@ -8,7 +8,6 @@ import {
   PIER_KEY, PIER_ORIGIN_X, PIER_ORIGIN_Y,
   CAFE_KEY, CAFE_ORIGIN_X, CAFE_ORIGIN_Y,
   HUT_KEY, HUT_ORIGIN_X, HUT_ORIGIN_Y,
-  LIGHTHOUSE_KEY, LIGHTHOUSE_ORIGIN_X, LIGHTHOUSE_ORIGIN_Y,
   DOCK_PLANK_KEY,
   DOCK_POST_KEY, DOCK_POST_ORIGIN_X, DOCK_POST_ORIGIN_Y,
   DOCK_BOLLARD_KEY, DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y,
@@ -16,6 +15,7 @@ import {
 } from './WaterStructureAssets';
 import { WaterCritterSim, SPLASH_DURATION } from './water/WaterCritterSim';
 import { advanceBeachPersonPosition, advanceBeachPersonPhase } from './water/BeachPeopleSim';
+import { LighthouseFeature, islandClearAt } from './water/LighthouseFeature';
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
@@ -31,24 +31,6 @@ const BEACH_PERSON_SHADOW_DEPTH = 5.663;
 const FISH_LEN = 6;
 const DUCK_W = 8;
 const DUCK_H = 5;
-
-// ── Lighthouse tower (pre-rendered sprite — see assets/water-structures/lighthouse.png) ──
-const LH_TOWER_H  = 44;  // tower-body height below topY (matches lighthouse.png tex-y 25-69)
-const LH_BASE_W   = 16;  // tower-body width at the base (bottom)
-const LH_TOP_W    = 12;  // tower-body width at the top — slight taper
-const LH_LAMP_DY  = -9;  // lantern-room centre, relative to topY (light/beam origin)
-
-// Per-column (1px) shadow profile for the tapered tower silhouette — for each
-// column across the base width, the y (relative to the tower top) at which the
-// cone's outline begins to cover that column. Mirrors Balloon.ts's shadowY1s/
-// shadowY2s, but the cone's bottom edge is flat so only one array is needed.
-const lhShadowTopYs = new Int32Array(LH_BASE_W);
-for (let col = 0; col < LH_BASE_W; col++) {
-  const dx = Math.abs(col + 0.5 - LH_BASE_W / 2) * 2;
-  lhShadowTopYs[col] = dx <= LH_TOP_W
-    ? 0
-    : Math.round(LH_TOWER_H * (dx - LH_TOP_W) / (LH_BASE_W - LH_TOP_W));
-}
 
 // ── Beach person AI ───────────────────────────────────────────────────────────
 
@@ -83,7 +65,6 @@ export class WaterArea {
   private beachShadowGfx:  Phaser.GameObjects.Graphics; // 5.76 – beach people shadows
   private beachPeopleGfx:  Phaser.GameObjects.Graphics; // 5.78 – moving beach people
   private fxGfx:           Phaser.GameObjects.Graphics; // 5.85 – bonfire, sparkles, buoys (no lighting)
-  private islandGfx:       Phaser.GameObjects.Graphics; // 5.86 – lighthouse island (above wave fx)
   private crittersGfx:     Phaser.GameObjects.Graphics; // 5.84 – jumping fish + paddling ducks
 
   // Layout
@@ -101,7 +82,7 @@ export class WaterArea {
   private _bonfireY   = 0;
   private _lighthouseX    = 0;
   private _lighthouseTopY = 0;
-  private _lhTowerImg: Phaser.GameObjects.Image | null = null;
+  private _lighthouse!: LighthouseFeature;
   private _pierImg: Phaser.GameObjects.Image | null = null;
   private _cafeImg: Phaser.GameObjects.Image | null = null;
   private _hutImg: Phaser.GameObjects.Image | null = null;
@@ -130,7 +111,6 @@ export class WaterArea {
   private _waveTime        = 0;
   private _waveRise        = 0;
   private _bonfireTime     = 0;
-  private _lighthouseAngle = 0;
   private _nightFactor     = 0;
   private _lastLightElevation = NaN;
 
@@ -142,9 +122,6 @@ export class WaterArea {
   private _pierSpot:   SoftSpotLight | null = null;
   private _pierBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
   private _bonFireLights: Array<Extract<LightSource, { type?: 'point' }>> = [];
-  private _lighthouseSpot: SoftSpotLight | null = null;
-  private _lighthouseBulb: Extract<LightSource, { type?: 'point' }> | null = null;
-  private _beamSprite: Phaser.GameObjects.Image | null = null;
   private _buoyBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
   private _nativeLights: Phaser.GameObjects.Light[] = [];
 
@@ -157,8 +134,7 @@ export class WaterArea {
     if (this._pierSpot)   out.push(...this._pierSpot.beams);
     if (this._pierBulb)   out.push(this._pierBulb);
     for (const b of this._bonFireLights) out.push(b);
-    if (this._lighthouseSpot) out.push(...this._lighthouseSpot.beams);
-    if (this._lighthouseBulb) out.push(this._lighthouseBulb);
+    out.push(...this._lighthouse.extraLights);
     for (const b of this._buoyBulbs) out.push(b);
     return out;
   }
@@ -174,8 +150,8 @@ export class WaterArea {
     this.beachShadowGfx = scene.add.graphics().setDepth(5.62);
     this.beachPeopleGfx = scene.add.graphics().setDepth(5.66).setLighting(true);
     this.fxGfx          = scene.add.graphics().setDepth(5.85);
-    this.islandGfx      = scene.add.graphics().setDepth(5.86).setLighting(true);
     this.crittersGfx    = scene.add.graphics().setDepth(5.84).setLighting(true);
+    this._lighthouse    = new LighthouseFeature(scene);
   }
 
   render(level: number, width: number, groundY: number, palette: WaterPalette): void {
@@ -198,7 +174,6 @@ export class WaterArea {
     this._lighthouseTopY = this._waterY + WATER_H * 0.5;
 
     this.structGfx.clear();
-    this.islandGfx.clear();
 
     this.drawWaterAndCoast();
 
@@ -220,8 +195,7 @@ export class WaterArea {
       for (const img of this._buoyImgs) img.destroy();
       this._buoyImgs = [];
     }
-    if (level >= 8) { this.drawLighthouseIsland(); this.drawLighthouse(); }
-    else { this._lhTowerImg?.setVisible(false); }
+    this._lighthouse.render(level, this._lighthouseX, this._lighthouseTopY, palette);
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
     else { this.destroyFoamSprites(); }
 
@@ -453,82 +427,6 @@ export class WaterArea {
     }
   }
 
-  // ── Lighthouse rocky island (level 8+) ─────────────────────────────────────
-
-  private drawLighthouseIsland(): void {
-    const gfx = this.islandGfx;
-    const { _lighthouseX: cx, _lighthouseTopY: topY } = this;
-    const baseY = topY + 46;
-
-    // Soft halo in the surrounding water — grounds the island visually
-    gfx.fillStyle(0x06223A, 0.25);
-    gfx.fillEllipse(cx, topY + 50, 48, 22);
-
-    // ── Submerged rock base — small, rounded, dark wet stone ──
-    gfx.fillStyle(this._palette.rockWet, 1);
-    gfx.fillEllipse(cx, topY + 48, 40, 18);
-    gfx.fillStyle(dimColor(this._palette.rockWet, 0.7), 1);
-    gfx.fillEllipse(cx, topY + 52, 32, 12);
-
-    // ── Jagged dry peaks rising above the waterline, each lit on the left
-    //    face and shaded on the right for a faceted pixel-art look ──
-    const peaks: ReadonlyArray<{ x0: number; x1: number; ax: number; ay: number }> = [
-      { x0: cx - 18, x1: cx - 2, ax: cx - 11, ay: topY + 30 },
-      { x0: cx + 0,  x1: cx + 16, ax: cx + 8, ay: topY + 34 },
-    ];
-    for (const p of peaks) {
-      gfx.fillStyle(this._palette.rockBase, 1);
-      gfx.fillTriangle(p.x0, baseY, p.x1, baseY, p.ax, p.ay);
-      gfx.fillStyle(this._palette.rockLight, 0.8);
-      gfx.fillTriangle(p.x0, baseY, p.ax, p.ay, (p.x0 + p.ax) / 2, baseY);
-      gfx.fillStyle(0x404040, 0.55);
-      gfx.fillTriangle(p.x1, baseY, p.ax, p.ay, (p.x1 + p.ax) / 2, baseY);
-    }
-
-    // ── Strata cracks ──
-    gfx.fillStyle(0x333333, 0.6);
-    gfx.fillRect(cx - 13, topY + 40, 10, 2);
-    gfx.fillRect(cx + 2,  topY + 42, 9, 2);
-
-    // ── Moss patch on the highest peak ──
-    gfx.fillStyle(this._palette.mossDark, 0.9);
-    gfx.fillEllipse(cx - 11, topY + 29, 9, 4);
-    gfx.fillStyle(this._palette.mossGreen, 0.9);
-    gfx.fillEllipse(cx - 12, topY + 28, 6, 2.5);
-
-    // ── Foam where waves break against the rock ──
-    gfx.fillStyle(0xFFFFFF, 0.3);
-    for (let i = 0; i < 4; i++) {
-      const fx = cx - 18 + i * 12;
-      const fy = topY + 44 + Math.round(Math.sin(i * 1.7) * 3);
-      gfx.fillCircle(fx, fy, 1.5);
-    }
-
-    // ── Tiny companion boulder ──
-    gfx.fillStyle(this._palette.rockWet, 1);
-    gfx.fillEllipse(cx - 26, topY + 54, 14, 8);
-    gfx.fillStyle(this._palette.rockBase, 1);
-    gfx.fillTriangle(cx - 32, topY + 52, cx - 21, topY + 52, cx - 27, topY + 43);
-    gfx.fillStyle(this._palette.rockLight, 0.8);
-    gfx.fillTriangle(cx - 32, topY + 52, cx - 27, topY + 43, cx - 29, topY + 52);
-    gfx.fillStyle(0xFFFFFF, 0.3);
-    gfx.fillCircle(cx - 33, topY + 56, 1.5);
-  }
-
-  // ── Lighthouse (level 8+) ─────────────────────────────────────────────────
-
-  private drawLighthouse(): void {
-    const { _lighthouseX: lx, _lighthouseTopY: topY } = this;
-
-    if (!this._lhTowerImg) {
-      this._lhTowerImg = this.scene.add.image(lx, topY, LIGHTHOUSE_KEY)
-        .setOrigin(LIGHTHOUSE_ORIGIN_X, LIGHTHOUSE_ORIGIN_Y)
-        .setDepth(5.86);
-    } else {
-      this._lhTowerImg.setPosition(lx, topY).setVisible(true);
-    }
-  }
-
   // ── Buoys ─────────────────────────────────────────────────────────────────
 
   private setupBuoys(): void {
@@ -613,27 +511,6 @@ export class WaterArea {
       ];
     } else {
       this._bonFireLights = [];
-    }
-
-    // ── Lighthouse sweeping SoftSpotLight (level 8+) ──
-    if (lv >= 8) {
-      this._lighthouseSpot = new SoftSpotLight({
-        x: this._lighthouseX, y: this._lighthouseTopY + LH_LAMP_DY,
-        radius: 180, color: 0xFFFF88, intensity: 0,
-        angle: 0, coneAngle: Math.PI / 8,
-        noOcclusion: true,
-      });
-      this._lighthouseBulb = {
-        x: this._lighthouseX, y: this._lighthouseTopY + LH_LAMP_DY,
-        radius: 3, color: 0xFFFF88, intensity: 0, noOcclusion: true,
-      };
-      this._nativeLights.push(this.scene.lights.addLight(this._lighthouseX, this._lighthouseTopY + LH_LAMP_DY, 80, 0xFFFF88, 0));
-      this.createBeamSprite();
-    } else {
-      this._lighthouseSpot = null;
-      this._lighthouseBulb = null;
-      this._beamSprite?.destroy();
-      this._beamSprite = null;
     }
 
     // ── Buoy lights — small warm points at the lantern, above the float (level 7+) ──
@@ -984,23 +861,7 @@ export class WaterArea {
       gfx.fillEllipse(cafeCx + leanX * 6, wy + BEACH_SHORE_H - 2, 40, 8);
     }
 
-    // Lighthouse shadow — a soft offset silhouette of the cone tower, drawn in
-    // the same two-pass per-column technique as Balloon.ts's drawShadow().
-    if (this._level >= 8) {
-      const { _lighthouseX: lx, _lighthouseTopY: topY } = this;
-      const shadowX = Math.round(leanX * 4);
-      const shadowY = Math.round(2 + (1 - elevation) * 3);
-      for (const [frac, a] of [[0.5, alpha], [1.0, alpha * 0.5]] as [number, number][]) {
-        const sox = Math.round(shadowX * frac);
-        const soy = Math.max(1, Math.round(shadowY * frac));
-        gfx.fillStyle(0x000000, a);
-        for (let col = 0; col < LH_BASE_W; col++) {
-          const h = LH_TOWER_H - lhShadowTopYs[col];
-          if (h < 1) continue;
-          gfx.fillRect(lx - LH_BASE_W / 2 + col + sox, topY + lhShadowTopYs[col] + soy, 1, h);
-        }
-      }
-    }
+    this._lighthouse.drawShadow(gfx, leanX, alpha, elevation);
   }
 
   // ── Per-frame update ──────────────────────────────────────────────────────
@@ -1012,12 +873,7 @@ export class WaterArea {
     this._waveTime    += dt * 0.3;
     this._waveRise    += dt * 7.5; // 7.5 px/s rise speed
     this._bonfireTime += dt * 0.55; // slowed for more organic feel
-    this._lighthouseAngle  = (this._lighthouseAngle + dt * 0.75) % (Math.PI * 2);
-
-    // Rotate lighthouse beam
-    if (this._lighthouseSpot && this._nightFactor > 0.05) {
-      this._lighthouseSpot.beams[0].angle = this._lighthouseAngle;
-    }
+    this._lighthouse.update(delta, this._nightFactor);
 
     // Buoy gentle bob
     for (let i = 0; i < this._buoys.length; i++) {
@@ -1094,18 +950,6 @@ export class WaterArea {
       // which is pulled left by the companion boulder (drawn at cx-26..cx-33).
       const islandCx = this._lighthouseX - 7;
       const islandCy = this._lighthouseTopY + 48;
-      const ISLAND_RX = 26, ISLAND_RY_FRONT = 18, ISLAND_RY_BACK = 32;
-      const islandClearAt = (px: number, py: number): number => {
-        if (!islandActive) return 0;
-        const dx = px - islandCx;
-        const dy = py - islandCy;
-        const ry = dy < 0 ? ISLAND_RY_BACK : ISLAND_RY_FRONT;
-        const nx = dx / ISLAND_RX, ny = dy / ry;
-        const t  = Math.sqrt(nx * nx + ny * ny);
-        if (t >= 1.5) return 0;
-        if (t <= 1)   return 1;
-        return (1.5 - t) / 0.5;
-      };
 
       if (dayA > 0.01) {
         const SHORE_FADE = 30;
@@ -1159,7 +1003,7 @@ export class WaterArea {
               const ceilY = ceilAt(x);
               if (y0 < ceilY || y0 >= wy + WATER_H) continue;
 
-              const clear = islandClearAt(x, y0);
+              const clear = islandClearAt(x, y0, islandCx, islandCy, islandActive);
               if (clear >= 1) continue;
 
               const shoreFade = Math.min(1, (y0 - ceilY) / SHORE_FADE);
@@ -1253,7 +1097,7 @@ export class WaterArea {
           for (let i = 0; i < GLITTER_COUNT; i++) {
             const gx = gx0 + ((i * 53 + 17) % spanX);
             const gy = gy0 + ((i * 31 + 11) % spanY);
-            if (islandClearAt(gx, gy) > 0.3) continue;
+            if (islandClearAt(gx, gy, islandCx, islandCy, islandActive) > 0.3) continue;
 
             const freq  = 3 + (i % 7);
             const phase = i * 2.399;
@@ -1311,12 +1155,7 @@ export class WaterArea {
       }
     }
 
-    if (this._level >= 9)                             this.drawBonfire();
-    if (this._level >= 8 && this._nightFactor > 0.08) {
-      this.drawLighthouseBeam();
-    } else if (this._beamSprite) {
-      this._beamSprite.setAlpha(0);
-    }
+    if (this._level >= 9) this.drawBonfire();
   }
 
   private drawBonfire(): void {
@@ -1399,83 +1238,6 @@ export class WaterArea {
     }
   }
 
-  // Pre-render a lighthouse beam into a CanvasTexture using a proper radial gradient
-  // (smooth radial falloff) + CSS blur (smooth angular edge falloff). The texture is
-  // created once and reused; only the sprite rotation changes each frame.
-  private createBeamSprite(): void {
-    const texKey = '__lh_beam__';
-    const len    = 160;
-    const spread = Math.PI / 14;   // half-angle of the cone
-    const blurPx = 10;             // blur radius for angular edge softness
-
-    // Canvas dimensions: extra space on all sides so blur doesn't clip.
-    const W    = len + blurPx * 2 + 4;
-    const half = Math.ceil(len * Math.tan(spread)) + blurPx + 4;
-    const H    = half * 2;
-    const sx   = blurPx + 2;      // source x on canvas (lighthouse lens)
-    const sy   = H / 2;           // source y on canvas (vertically centred)
-
-    // Draw the raw cone with a radial gradient on an off-screen DOM canvas
-    // so the sharp edges can be blurred smoothly onto the Phaser texture.
-    const off = document.createElement('canvas');
-    off.width  = W;
-    off.height = H;
-    const oct  = off.getContext('2d')!;
-
-    oct.beginPath();
-    oct.moveTo(sx, sy);
-    oct.lineTo(W, sy - (W - sx) * Math.tan(spread));
-    oct.lineTo(W, sy + (W - sx) * Math.tan(spread));
-    oct.closePath();
-
-    const grad = oct.createRadialGradient(sx, sy, 0, sx, sy, len);
-    grad.addColorStop(0,    'rgba(255,255,200,0.55)');
-    grad.addColorStop(0.25, 'rgba(255,255,170,0.30)');
-    grad.addColorStop(0.60, 'rgba(255,255,140,0.10)');
-    grad.addColorStop(1,    'rgba(255,255,120,0)');
-    oct.fillStyle = grad;
-    oct.fill();
-
-    // Composite the blurred cone onto the Phaser CanvasTexture.
-    // CSS blur is applied as a context filter before drawing — this gives
-    // a true per-pixel Gaussian falloff at the angular edges, not polygon steps.
-    if (this.scene.textures.exists(texKey)) this.scene.textures.remove(texKey);
-    const ct  = this.scene.textures.createCanvas(texKey, W, H) as Phaser.Textures.CanvasTexture;
-    const ctx = ct.context;
-    ctx.filter = `blur(${blurPx}px)`;
-    ctx.drawImage(off, 0, 0);
-    ctx.filter = 'none';
-    ct.refresh();
-
-    // Create (or replace) the sprite. Origin is set so the "source" pixel on the
-    // texture aligns with the lighthouse position; rotation sweeps the beam.
-    this._beamSprite?.destroy();
-    this._beamSprite = this.scene.add.image(
-      this._lighthouseX, this._lighthouseTopY + LH_LAMP_DY, texKey,
-    )
-      .setOrigin(sx / W, 0.5)
-      .setDepth(5.69)                   // below structGfx (5.7) so tower overlaps beam
-      .setAlpha(0)
-      .setBlendMode(Phaser.BlendModes.ADD);
-  }
-
-  private drawLighthouseBeam(): void {
-    const gfx = this.fxGfx;
-    const { _lighthouseX: lx, _lighthouseTopY: ty } = this;
-    const nf    = this._nightFactor;
-    const angle = this._lighthouseAngle;
-    const ox = lx, oy = ty + LH_LAMP_DY;
-
-    if (this._beamSprite) {
-      this._beamSprite.setPosition(ox, oy).setRotation(angle).setAlpha(nf);
-    }
-
-    // Lens glow — drawn larger than the lamp window so its halo is visible
-    // around the (now in-front) tower rather than hidden entirely behind it.
-    gfx.fillStyle(0xFFFF44, nf * 0.55);
-    gfx.fillCircle(ox, oy, 8);
-  }
-
   // ── Sky reflection ────────────────────────────────────────────────────────
 
   private updateSkyReflection(horizonColor: number): void {
@@ -1513,7 +1275,6 @@ export class WaterArea {
     this._pierImg?.setTint(structTint);
     this._cafeImg?.setTint(structTint);
     this._hutImg?.setTint(structTint);
-    this._lhTowerImg?.setTint(structTint);
     this._dockDeckTile?.setTint(structTint);
     for (const img of this._dockPostImgs) img.setTint(structTint);
     for (const img of this._dockBollardImgs) img.setTint(structTint);
@@ -1535,9 +1296,7 @@ export class WaterArea {
       for (const b of this._bonFireLights) (b as { intensity: number }).intensity = 0;
     }
 
-    // Lighthouse
-    if (this._lighthouseSpot)  this._lighthouseSpot.setIntensity(nf * 3.5);
-    if (this._lighthouseBulb) (this._lighthouseBulb as { intensity: number }).intensity = nf * 180;
+    this._lighthouse.updateLighting(nf, structTint);
 
     // Buoys — tiny glow
     for (const b of this._buoyBulbs) (b as { intensity: number }).intensity = nf * 50;
@@ -1560,9 +1319,8 @@ export class WaterArea {
     this.beachShadowGfx.destroy();
     this.beachPeopleGfx.destroy();
     this.fxGfx.destroy();
-    this.islandGfx.destroy();
+    this._lighthouse.destroy();
     this.crittersGfx.destroy();
-    this._lhTowerImg?.destroy();
     this._pierImg?.destroy();
     this._cafeImg?.destroy();
     this._hutImg?.destroy();
