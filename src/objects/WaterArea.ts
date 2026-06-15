@@ -14,6 +14,8 @@ import {
   DOCK_BOLLARD_KEY, DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y,
   BUOY_RED_KEY, BUOY_ORANGE_KEY, BUOY_ORIGIN_X, BUOY_ORIGIN_Y,
 } from './WaterStructureAssets';
+import { WaterCritterSim, SPLASH_DURATION } from './water/WaterCritterSim';
+import { advanceBeachPersonPosition, advanceBeachPersonPhase } from './water/BeachPeopleSim';
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
@@ -26,24 +28,9 @@ const BEACH_PERSON_DEPTH        = 5.665;
 const BEACH_PERSON_SHADOW_DEPTH = 5.663;
 
 // ── Water critters — jumping fish + paddling ducks ─────────────────────────────
-const FISH_MIN_INTERVAL     = 6000;  // ms between jumps (min)
-const FISH_MAX_INTERVAL     = 12000; // ms between jumps (max)
-const FISH_JUMP_DURATION_MIN = 650;  // ms
-const FISH_JUMP_DURATION_MAX = 900;  // ms
-const FISH_JUMP_HEIGHT_MIN   = 10;   // px
-const FISH_JUMP_HEIGHT_MAX   = 18;   // px
-const FISH_JUMP_TRAVEL_MIN   = 18;   // px
-const FISH_JUMP_TRAVEL_MAX   = 34;   // px
 const FISH_LEN = 6;
-const FISH_COLORS: readonly number[] = [0x6699cc, 0x88aabb, 0x5577aa, 0x77bbaa];
-
-const SPLASH_DURATION = 0.45; // seconds
-
 const DUCK_W = 8;
 const DUCK_H = 5;
-const DUCK_SPEED_MIN = 3;  // px/s
-const DUCK_SPEED_MAX = 6;  // px/s
-const DUCK_DIP_DURATION = 500; // ms — head-dunk animation length
 
 // ── Lighthouse tower (pre-rendered sprite — see assets/water-structures/lighthouse.png) ──
 const LH_TOWER_H  = 44;  // tower-body height below topY (matches lighthouse.png tex-y 25-69)
@@ -61,38 +48,6 @@ for (let col = 0; col < LH_BASE_W; col++) {
   lhShadowTopYs[col] = dx <= LH_TOP_W
     ? 0
     : Math.round(LH_TOWER_H * (dx - LH_TOP_W) / (LH_BASE_W - LH_TOP_W));
-}
-
-// ── Water critters ────────────────────────────────────────────────────────────
-
-interface FishJump {
-  startX: number;
-  baseY: number;
-  dir: 1 | -1;
-  t: number;       // progress 0..1
-  duration: number; // ms
-  height: number;   // arc height (px)
-  travel: number;   // horizontal distance covered (px)
-  color: number;
-}
-
-interface Splash {
-  x: number;
-  y: number;
-  t: number; // seconds elapsed
-}
-
-interface Duck {
-  x: number;
-  y: number;
-  xMin: number;
-  xMax: number;
-  dir: 1 | -1;
-  speed: number;
-  hasGreenHead: boolean;
-  dipTimer: number;
-  dipProgress: number; // 0 = not dipping; ramps 0→1 over the dunk
-  bobSeed: number;
 }
 
 // ── Beach person AI ───────────────────────────────────────────────────────────
@@ -160,10 +115,7 @@ export class WaterArea {
   private _people: BeachPerson[] = [];
 
   // Water critters
-  private _fish: FishJump[] = [];
-  private _fishTimer = 0;
-  private _splashes: Splash[] = [];
-  private _ducks: Duck[] = [];
+  private _critters = new WaterCritterSim();
 
   // Buoys
   private _buoys: Array<{ x: number; y: number; color: number; phase: number }> = [];
@@ -273,10 +225,8 @@ export class WaterArea {
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
     else { this.destroyFoamSprites(); }
 
-    this._fish = [];
-    this._splashes = [];
-    this._fishTimer = FISH_MIN_INTERVAL + Math.random() * (FISH_MAX_INTERVAL - FISH_MIN_INTERVAL);
-    this.initDucks();
+    this._critters.reset();
+    this._critters.initDucks(level, this._transEndX, this._width, this._waterY, ROCK_SHORE_H);
 
     this.rebuildLights();
   }
@@ -850,28 +800,17 @@ export class WaterArea {
       p.alpha += (targetAlpha - p.alpha) * Math.min(1, dt * 1.5);
 
       if (p.phase === 'walk') {
-        p.x += p.speed * p.dir * dt;
-        if (p.x <= p.xMin) { p.x = p.xMin; p.dir = 1; }
-        if (p.x >= p.xMax) { p.x = p.xMax; p.dir = -1; }
-        p.phaseTimer -= delta;
-        if (p.phaseTimer <= 0) {
-          p.phase = 'sit';
-          p.phaseTimer = 7000 + Math.random() * 12000;
+        advanceBeachPersonPosition(p, dt);
+      }
+      if (advanceBeachPersonPhase(p, delta)) {
+        if (p.phase === 'sit') {
           // Stop the walk cycle and settle into a neutral/flat pose.
           p.sprite.anims.stop();
           p.sprite.setFrame(0);
           p.shadowSprite.setFrame(0);
-        }
-      } else {
-        p.phaseTimer -= delta;
-        if (p.phaseTimer <= 0) {
-          p.phase = 'walk';
-          p.phaseTimer = 3000 + Math.random() * 7000;
-          p.dir = Math.random() < 0.5 ? 1 : -1;
-          if (this.scene.anims.exists(walkAnimKey(p.def.key))) {
-            p.sprite.play(walkAnimKey(p.def.key));
-            p.sprite.anims.setProgress(Math.random());
-          }
+        } else if (this.scene.anims.exists(walkAnimKey(p.def.key))) {
+          p.sprite.play(walkAnimKey(p.def.key));
+          p.sprite.anims.setProgress(Math.random());
         }
       }
 
@@ -907,105 +846,11 @@ export class WaterArea {
 
   // ── Water critters — jumping fish + paddling ducks ────────────────────────
 
-  /** Places 0-2 ducks in the open-water zone, gated by level like the other water features. */
-  private initDucks(): void {
-    const xMin = this._transEndX + 15;
-    const xMax = this._width - 15;
-    if (xMax <= xMin) { this._ducks = []; return; }
-
-    const wy   = this._waterY;
-    const yMin = wy + ROCK_SHORE_H + 14;
-    const yMax = wy + WATER_H - 24;
-    const count = this._level >= 6 ? 2 : this._level >= 2 ? 1 : 0;
-
-    this._ducks = [];
-    for (let i = 0; i < count; i++) {
-      this._ducks.push({
-        x: xMin + Math.random() * (xMax - xMin),
-        y: yMin + Math.random() * Math.max(1, yMax - yMin),
-        xMin,
-        xMax,
-        dir: Math.random() < 0.5 ? 1 : -1,
-        speed: DUCK_SPEED_MIN + Math.random() * (DUCK_SPEED_MAX - DUCK_SPEED_MIN),
-        hasGreenHead: i === 0,
-        dipTimer: 2000 + Math.random() * 5000,
-        dipProgress: 0,
-        bobSeed: Math.random() * Math.PI * 2,
-      });
-    }
-  }
-
-  /** Spawns the occasional jumping fish in the open-water zone and tracks its arc. */
-  private updateFish(delta: number): void {
-    const xMin = this._transEndX + 15;
-    const xMax = this._width - 15;
-    if (xMax <= xMin) return;
-
-    this._fishTimer -= delta;
-    if (this._fishTimer <= 0 && this._fish.length === 0) {
-      const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-      const travel = FISH_JUMP_TRAVEL_MIN + Math.random() * (FISH_JUMP_TRAVEL_MAX - FISH_JUMP_TRAVEL_MIN);
-      const lo = dir === 1 ? xMin : xMin + travel;
-      const hi = dir === 1 ? xMax - travel : xMax;
-      if (hi > lo) {
-        const startX = lo + Math.random() * (hi - lo);
-        const baseY  = this._waterY + ROCK_SHORE_H + 30
-                     + Math.random() * (WATER_H - ROCK_SHORE_H - 60);
-        const duration = FISH_JUMP_DURATION_MIN + Math.random() * (FISH_JUMP_DURATION_MAX - FISH_JUMP_DURATION_MIN);
-        const height = FISH_JUMP_HEIGHT_MIN + Math.random() * (FISH_JUMP_HEIGHT_MAX - FISH_JUMP_HEIGHT_MIN);
-        const color = FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)];
-        this._fish.push({ startX, baseY, dir, t: 0, duration, height, travel, color });
-        this._splashes.push({ x: startX, y: baseY, t: 0 });
-      }
-      this._fishTimer = FISH_MIN_INTERVAL + Math.random() * (FISH_MAX_INTERVAL - FISH_MIN_INTERVAL);
-    }
-
-    for (let i = this._fish.length - 1; i >= 0; i--) {
-      const f = this._fish[i];
-      f.t += delta / f.duration;
-      if (f.t >= 1) {
-        this._splashes.push({ x: f.startX + f.dir * f.travel, y: f.baseY, t: 0 });
-        this._fish.splice(i, 1);
-      }
-    }
-  }
-
-  /** Paddles ducks back and forth, with an occasional head-dunk to feed. */
-  private updateDucks(delta: number): void {
-    const dt = delta / 1000;
-    for (const d of this._ducks) {
-      if (d.dipProgress > 0) {
-        d.dipProgress = Math.min(1, d.dipProgress + delta / DUCK_DIP_DURATION);
-        if (d.dipProgress >= 1) {
-          d.dipProgress = 0;
-          d.dipTimer = 3000 + Math.random() * 6000;
-        }
-        continue;
-      }
-
-      d.dipTimer -= delta;
-      if (d.dipTimer <= 0) { d.dipProgress = 0.001; continue; }
-
-      d.x += d.dir * d.speed * dt;
-      if (d.x <= d.xMin) { d.x = d.xMin; d.dir = 1; }
-      if (d.x >= d.xMax) { d.x = d.xMax; d.dir = -1; }
-    }
-  }
-
-  /** Advances splash ring lifetimes and removes expired ones. */
-  private updateSplashes(delta: number): void {
-    const dt = delta / 1000;
-    for (let i = this._splashes.length - 1; i >= 0; i--) {
-      this._splashes[i].t += dt;
-      if (this._splashes[i].t >= SPLASH_DURATION) this._splashes.splice(i, 1);
-    }
-  }
-
   /** Draws splash rings on the FX layer — called after drawFx(), without clearing it. */
   private drawSplashes(): void {
-    if (this._splashes.length === 0) return;
+    if (this._critters.splashes.length === 0) return;
     const gfx = this.fxGfx;
-    for (const s of this._splashes) {
+    for (const s of this._critters.splashes) {
       const t = s.t / SPLASH_DURATION;
       const ringR = 2 + t * 10;
       const alpha = (1 - t) * 0.5;
@@ -1028,12 +873,12 @@ export class WaterArea {
   private drawCritters(elevation: number): void {
     const gfx = this.crittersGfx;
     gfx.clear();
-    if (this._fish.length === 0 && this._ducks.length === 0) return;
+    if (this._critters.fish.length === 0 && this._critters.ducks.length === 0) return;
 
     const brightness = Math.max(0.25, Math.min(1, (elevation + 0.2) / 0.4));
 
     // Fish — a small two-tone wedge rotated to follow the jump-arc tangent
-    for (const f of this._fish) {
+    for (const f of this._critters.fish) {
       const progress = f.t;
       const x = f.startX + f.dir * f.travel * progress;
       const y = f.baseY - f.height * Math.sin(progress * Math.PI);
@@ -1053,7 +898,7 @@ export class WaterArea {
     }
 
     // Ducks — paddling with a periodic head-dunk
-    for (const d of this._ducks) {
+    for (const d of this._critters.ducks) {
       const bob = Math.sin(this._waveTime * 3 + d.bobSeed) * 0.8;
       const cx  = Math.round(d.x);
       const cy  = Math.round(d.y + bob);
@@ -1201,9 +1046,9 @@ export class WaterArea {
     this.updateBeachPeople(delta, elevation);
     this.drawFx();
 
-    this.updateFish(delta);
-    this.updateDucks(delta);
-    this.updateSplashes(delta);
+    this._critters.updateFish(delta, this._transEndX, this._width, this._waterY, ROCK_SHORE_H);
+    this._critters.updateDucks(delta);
+    this._critters.updateSplashes(delta);
     this.drawSplashes();
     this.drawCritters(elevation);
   }
