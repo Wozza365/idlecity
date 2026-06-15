@@ -9,7 +9,7 @@ import {
   UNLOCK_COSTS,
   upgradeCost, vergeUpgradeCost, waterUpgradeCost,
   roadUpgradeCost,
-  buildingHeight, fmt, MONO_FONT,
+  buildingHeight, fmt,
 } from '../constants';
 import { spawnFloatingText } from '../ui/FloatingText';
 import { createBuilding, EmptyPlot } from '../buildings';
@@ -49,6 +49,8 @@ import { Rain } from '../objects/Rain';
 import { Snow } from '../objects/Snow';
 import { WeatherAccumulation } from '../objects/WeatherAccumulation';
 import { SeasonSystem } from '../game/SeasonSystem';
+import { Airplane } from '../objects/Airplane';
+import { TierCelebrationFx } from './TierCelebrationFx';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
 import { PigeonManager } from '../objects/PigeonManager';
@@ -133,9 +135,10 @@ export class GameScene extends Phaser.Scene {
   private cursorOverCanvas = false;
 
   // ── Airplane ──────────────────────────────────────────────────────────────
-  private planeGfx!: Phaser.GameObjects.Graphics;
-  private plane: { x: number; y: number; vx: number; blinkTimer: number; blinkOn: boolean } | null = null;
-  private planeIdleTimer = 70_000 + Math.random() * 50_000;
+  private airplane!: Airplane;
+
+  // ── Tier-upgrade celebration FX ──────────────────────────────────────────
+  private tierCelebrationFx!: TierCelebrationFx;
 
   // ── Hot air balloon & birds ───────────────────────────────────────────────
   private balloon!: Balloon;
@@ -215,7 +218,7 @@ export class GameScene extends Phaser.Scene {
     this.rain                = new Rain(this);
     this.snow                = new Snow(this);
     this.weatherAccumulation = new WeatherAccumulation(this);
-    this.planeGfx  = this.add.graphics().setDepth(1.5);
+    this.airplane  = new Airplane(this);
     this.balloon   = new Balloon(this);
     this.birdFlock = new BirdFlock(this);
     this.pigeonManager = new PigeonManager(this);
@@ -285,12 +288,7 @@ export class GameScene extends Phaser.Scene {
     // Autosave — every 10 s
     this.time.addEvent({ delay: 10_000, loop: true, callback: this.onAutosave, callbackScope: this });
 
-    // Particle dot texture for tier celebrations
-    const dotG = this.add.graphics();
-    dotG.fillStyle(0xffffff, 1);
-    dotG.fillCircle(4, 4, 4);
-    dotG.generateTexture('__particle', 8, 8);
-    dotG.destroy();
+    this.tierCelebrationFx = new TierCelebrationFx(this);
 
     // Master clock: 0→240_000 ms, linear, loops forever
     this.masterClock = this.tweens.addCounter({
@@ -331,7 +329,7 @@ export class GameScene extends Phaser.Scene {
     this.waterArea?.updateShadows(this.sunAngle);
     this.boatManager?.update(delta, elevation);
     this.stars.update(delta, elevation, this.sunAngle, this.scale.width);
-    this.updateAirplane(delta);
+    this.airplane.update(delta, this.scale.width, this.groundY);
     this.balloon?.update(delta, elevation, this.sunAngle);
     this.birdFlock?.update(delta, elevation);
     this.skyToy?.update(delta, elevation);
@@ -600,11 +598,11 @@ export class GameScene extends Phaser.Scene {
     plot.level = Math.min(plot.level + 1, MAX_LEVEL);
     this.plotContainers[index] = this.renderPlot(index);
     this.lightingSystem?.markSegmentsDirty();
-    this.flashPlot(index, plot.level);
-    this.showScaffolding(index, plot.level);
+    this.tierCelebrationFx.flashPlot(index, plot.level, this.plotWidth, this.groundY);
+    this.tierCelebrationFx.showScaffolding(index, plot.level, this.plotWidth, this.groundY);
 
     const newTier = this.buildingTier(plot.level);
-    if (newTier !== prevTier) this.celebrateTier(index, newTier, plot.level);
+    if (newTier !== prevTier) this.tierCelebrationFx.celebrateTier(index, newTier, plot.level, this.plotWidth, this.groundY);
     this.plotUIs[index].destroy();
     this.plotUIs[index] = new PlotUI(
       this,
@@ -637,106 +635,6 @@ export class GameScene extends Phaser.Scene {
 
   private buildingTier(level: number): number {
     return buildingTier(level);
-  }
-
-  private celebrateTier(plotIndex: number, tier: number, level: number): void {
-    const TIER_NAMES = ['', 'Starter Home', 'Two-Storey House', 'Townhouse', 'Apartment Block', 'High-Rise', 'Office Block', 'Skyscraper'];
-    const plotW = this.scale.width / PLOT_COUNT;
-    const cx = (plotIndex + 0.5) * plotW;
-    const topY = this.groundY - buildingHeight(level) - YARD_H - 12;
-
-    // Banner
-    const banner = this.add
-      .text(cx, topY, `✦ ${TIER_NAMES[tier].toUpperCase()} ✦`, {
-        fontSize: '13px',
-        color: '#ffe066',
-        fontFamily: MONO_FONT,
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 3,
-        backgroundColor: '#0a1828cc',
-        padding: { x: 8, y: 4 },
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(201)
-      .setAlpha(0)
-      .setScale(0.6);
-
-    this.tweens.add({
-      targets: banner,
-      scale: 1,
-      alpha: 1,
-      duration: 280,
-      ease: 'Back.Out',
-      onComplete: () => {
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: topY - 55,
-          duration: 700,
-          delay: 1200,
-          ease: 'Quad.In',
-          onComplete: () => banner.destroy(),
-        });
-      },
-    });
-
-    // Particle burst
-    const emitter = this.add.particles(cx, topY, '__particle', {
-      speed: { min: 55, max: 140 },
-      angle: { min: 210, max: 330 },
-      scale: { start: 1.1, end: 0 },
-      alpha: { start: 1, end: 0 },
-      lifespan: { min: 550, max: 950 },
-      tint: [0xffe066, 0xff8844, 0x44ddff, 0xff44cc, 0xaaffaa],
-      blendMode: 'ADD',
-    });
-    emitter.setDepth(202);
-    emitter.explode(22, cx, topY);
-    this.time.delayedCall(1100, () => emitter.destroy());
-  }
-
-  private flashPlot(index: number, level: number): void {
-    const plotW = this.scale.width / PLOT_COUNT;
-    const cx = (index + 0.5) * plotW;
-    const bh = buildingHeight(level) + YARD_H;
-    const flash = this.add
-      .rectangle(cx, this.groundY - bh / 2, plotW - 4, bh, 0xffffff, 0.28)
-      .setDepth(20);
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: 350,
-      ease: 'Cubic.Out',
-      onComplete: () => flash.destroy(),
-    });
-  }
-
-  private showScaffolding(index: number, level: number): void {
-    const plotW = this.scale.width / PLOT_COUNT;
-    const x0    = index * plotW + 2;
-    const bh    = buildingHeight(level) + YARD_H;
-    const y0    = this.groundY - bh;
-    const w     = plotW - 4;
-
-    const gfx = this.add.graphics().setDepth(9.05).setAlpha(0.65);
-    gfx.lineStyle(1, 0x888888, 1);
-    // Vertical scaffold poles
-    for (let x = 0; x <= w; x += 12) {
-      gfx.lineBetween(x0 + x, y0, x0 + x, y0 + bh);
-    }
-    // Horizontal scaffold boards
-    for (let y = 0; y <= bh; y += 8) {
-      gfx.lineBetween(x0, y0 + y, x0 + w, y0 + y);
-    }
-
-    this.tweens.add({
-      targets: gfx,
-      alpha:   0,
-      duration: 1500,
-      ease: 'Cubic.Out',
-      onComplete: () => gfx.destroy(),
-    });
   }
 
   private onPlotUnlock(index: number): void {
@@ -903,49 +801,6 @@ export class GameScene extends Phaser.Scene {
     this.state = defaultState(PLOT_COUNT);
     this.seasons = new SeasonSystem();
     this.buildLayout();
-  }
-
-  private updateAirplane(delta: number): void {
-    const w = this.scale.width;
-    const h = this.groundY;
-    this.planeGfx.clear();
-
-    if (this.plane) {
-      const p = this.plane;
-      p.x += p.vx * delta / 1000;
-      p.blinkTimer -= delta;
-      if (p.blinkTimer <= 0) {
-        p.blinkOn     = !p.blinkOn;
-        p.blinkTimer  = p.blinkOn ? 600 : 400;
-      }
-
-      if (p.x < -20 || p.x > w + 20) {
-        this.plane = null;
-        this.planeIdleTimer = 70_000 + Math.random() * 50_000;
-      } else {
-        // White body dot + blinking red offset dot
-        this.planeGfx.fillStyle(0xffffff, 0.9);
-        this.planeGfx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
-        if (p.blinkOn) {
-          this.planeGfx.fillStyle(0xff2222, 0.85);
-          this.planeGfx.fillRect(Math.round(p.x) + (p.vx > 0 ? -3 : 2), Math.round(p.y), 1, 1);
-        }
-      }
-    } else {
-      this.planeIdleTimer -= delta;
-      if (this.planeIdleTimer <= 0) {
-        const fromLeft = Math.random() < 0.5;
-        const altY     = h * (0.08 + Math.random() * 0.17);
-        const speed    = 65 + Math.random() * 25;
-        this.plane = {
-          x:          fromLeft ? -10 : w + 10,
-          y:          altY,
-          vx:         fromLeft ? speed : -speed,
-          blinkTimer: 400,
-          blinkOn:    true,
-        };
-      }
-    }
   }
 
   private onClockTick(): void {
