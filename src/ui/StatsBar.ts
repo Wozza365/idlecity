@@ -16,6 +16,8 @@ export class StatsBar {
   private populationIcon: Phaser.GameObjects.Text;
   private readonly width: number;
   private readonly panelTop: number;
+  private readonly popMaxDigits: number;
+  private readonly balanceMaxFrac: number;
 
   constructor(scene: Phaser.Scene, panelTop: number, width: number, onToggle: () => void) {
     this.width = width;
@@ -32,6 +34,22 @@ export class StatsBar {
     const popPillW  = Math.max(80, Math.min(150, width * 0.22));
     const pillW     = Math.max(110, Math.min(190, (width - 2 * margin - 2 * gap - popPillW) / 2));
     const popPillX  = (width - popPillW) / 2;
+
+    // Roboto Mono's glyph advance is ~0.6 of its font size — used to estimate
+    // how many characters fit in a pill without measuring text at runtime, so
+    // wider pills (desktop) can show more digits before fmtPopulation/
+    // fmtBalance fall back to a coarser K/M/B unit.
+    const popValueFontPx = popPillW < 100 ? 14 : 16;
+    const popChars = Math.floor((popPillW - 16) / (popValueFontPx * 0.6));
+    let popMaxDigits = 6;
+    for (let d = 7; d <= 9; d++) {
+      if (d + Math.floor((d - 1) / 3) <= popChars) popMaxDigits = d;
+      else break;
+    }
+    this.popMaxDigits = popMaxDigits;
+
+    const balChars = Math.floor((pillW - 12) / (16 * 0.6));
+    this.balanceMaxFrac = Math.max(1, Math.min(3, balChars - 6));
 
     this.gfx = scene.add.graphics().setDepth(10).setLighting(false);
     const gfx = this.gfx;
@@ -81,7 +99,7 @@ export class StatsBar {
       .setOrigin(0.5, 0.5).setAlpha(0.5).setDepth(11);
 
     // Population label + value — centered pill
-    const popValueFontSize = popPillW < 100 ? '14px' : '16px';
+    const popValueFontSize = `${popValueFontPx}px`;
     this.populationLabel = scene.add
       .text(popPillX + popPillW / 2, labelY, 'POPULATION', { fontSize: '11px', color: '#5a9ac0', fontFamily: UI_FONT })
       .setOrigin(0.5, 0.5).setDepth(11);
@@ -126,8 +144,8 @@ export class StatsBar {
 
   update(gold: number, taxRate: number, population: number): void {
     this.incomeValue.setText(`${fmtRate(taxRate * GAME_HOUR_FACTOR)} / hr`);
-    this.balanceValue.setText(fmtBalance(gold));
-    this.populationValue.setText(fmtPopulation(population));
+    this.balanceValue.setText(fmtBalance(gold, this.balanceMaxFrac));
+    this.populationValue.setText(fmtPopulation(population, this.popMaxDigits));
   }
 
   destroy(): void {

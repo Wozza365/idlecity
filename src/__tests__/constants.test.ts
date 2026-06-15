@@ -4,6 +4,7 @@ import {
   populationGrowthRate,
   POPULATION_BASE_RATE,
   fmtPopulation,
+  fmtBalance,
 } from '../constants';
 
 describe('plotPopulationCapacity', () => {
@@ -74,5 +75,31 @@ describe('fmtPopulation', () => {
 
   it('shifts to B once the M-scaled value would reach 7 digits', () => {
     expect(fmtPopulation(1_000_000_000_000)).toBe('1,000B');
+  });
+
+  it('with a higher maxDigits, shows full numbers further before shifting units', () => {
+    expect(fmtPopulation(7_123_456, 7)).toBe('7,123,456');
+    expect(fmtPopulation(12_345_678, 7)).toBe('12,345K');
+    expect(fmtPopulation(999_999_999, 9)).toBe('999,999,999');
+  });
+});
+
+describe('fmtBalance', () => {
+  it('shows sub-billion values in full, with comma separators', () => {
+    expect(fmtBalance(0)).toBe('$0');
+    expect(fmtBalance(1_234_567)).toBe('$1,234,567');
+  });
+
+  it('defaults to one decimal place at B scale', () => {
+    expect(fmtBalance(1_823_456_789)).toBe('$1.8B');
+  });
+
+  it('shows more decimal places when maxFracDigits is higher', () => {
+    expect(fmtBalance(1_823_456_789, 2)).toBe('$1.82B');
+    expect(fmtBalance(1_823_456_789, 3)).toBe('$1.823B');
+  });
+
+  it('shifts to T at trillion scale', () => {
+    expect(fmtBalance(1_823_456_789_123, 3)).toBe('$1.823T');
   });
 });

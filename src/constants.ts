@@ -156,9 +156,13 @@ export function fmtRate(n: number): string {
   return '$' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
 }
 
-export function fmtBalance(n: number): string {
+// `maxFracDigits` lets callers with extra horizontal space show more precision
+// on B/T-scale balances (e.g. "$1.823B" instead of "$1.8B") — the magnitude
+// still rounds to a unit, but less aggressively.
+export function fmtBalance(n: number, maxFracDigits: number = 1): string {
   const v = Math.floor(n);
-  if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000_000_000) return `$${(v / 1_000_000_000_000).toFixed(maxFracDigits)}T`;
+  if (v >= 1_000_000_000)     return `$${(v / 1_000_000_000).toFixed(maxFracDigits)}B`;
   return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
@@ -192,15 +196,19 @@ export function populationGrowthRate(roadLevel: number, vergeLevel: number, wate
 }
 
 // Formatter for population counts (no "$" prefix, unlike fmtBalance). Shows as
-// much precision as fits: full digits with thousands separators below 1M, then
-// recursively shifts to the next unit (K/M/B) whenever the leading digit group
-// would otherwise reach 7 digits — e.g. 1,500,000 reads as "1,500K" rather than
-// the coarser "1.5M", and 999,999,999 reads as "999,999K" rather than "1.0M".
-export function fmtPopulation(n: number): string {
+// much precision as fits: full digits with thousands separators below
+// 10^maxDigits, then recursively shifts to the next unit (K/M/B) whenever the
+// leading digit group would otherwise reach maxDigits+1 digits — e.g. with the
+// default maxDigits=6, 1,500,000 reads as "1,500K" rather than the coarser
+// "1.5M", and 999,999,999 reads as "999,999K" rather than "1.0M". Callers with
+// extra horizontal space (e.g. a wider stats pill) can pass a higher
+// maxDigits to show full numbers further before the unit shift kicks in.
+export function fmtPopulation(n: number, maxDigits: number = 6): string {
   const UNITS = ['', 'K', 'M', 'B'];
   let v = Math.floor(n);
   let unit = 0;
-  while (v >= 1_000_000 && unit < UNITS.length - 1) {
+  const threshold = Math.pow(10, maxDigits);
+  while (v >= threshold && unit < UNITS.length - 1) {
     v = Math.floor(v / 1000);
     unit++;
   }
