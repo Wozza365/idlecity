@@ -97,6 +97,7 @@ describe('fmtBalance', () => {
   it('shows more decimal places when maxFracDigits is higher', () => {
     expect(fmtBalance(1_823_456_789, 2)).toBe('$1.82B');
     expect(fmtBalance(1_823_456_789, 3)).toBe('$1.823B');
+    expect(fmtBalance(1_823_456_789, 6)).toBe('$1.823457B');
   });
 
   it('shifts to T at trillion scale', () => {

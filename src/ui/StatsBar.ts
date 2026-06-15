@@ -49,7 +49,7 @@ export class StatsBar {
     this.popMaxDigits = popMaxDigits;
 
     const balChars = Math.floor((pillW - 12) / (16 * 0.6));
-    this.balanceMaxFrac = Math.max(1, Math.min(3, balChars - 6));
+    this.balanceMaxFrac = Math.max(1, Math.min(6, balChars - 6));
 
     this.gfx = scene.add.graphics().setDepth(10).setLighting(false);
     const gfx = this.gfx;
