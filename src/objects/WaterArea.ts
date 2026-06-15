@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H, VERGE_H, WATER_H } from '../constants';
+import { ROAD_H, VERGE_H, WATER_H, NIGHT_TINT, lerpColor, dimColor } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { WaterPalette } from '../theme/ThemeTypes';
@@ -14,8 +14,6 @@ import {
   DOCK_BOLLARD_KEY, DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y,
   BUOY_RED_KEY, BUOY_ORANGE_KEY, BUOY_ORIGIN_X, BUOY_ORIGIN_Y,
 } from './WaterStructureAssets';
-
-const NIGHT_TINT = 0x5a6680;
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
@@ -115,19 +113,6 @@ interface BeachPerson {
   xMax: number;
   sprite: Phaser.GameObjects.Sprite;
   shadowSprite: Phaser.GameObjects.Sprite;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function lerpColor(a: number, b: number, t: number): number {
-  const r  = Math.round(((a >> 16) & 0xff) * (1 - t) + ((b >> 16) & 0xff) * t);
-  const g  = Math.round(((a >> 8)  & 0xff) * (1 - t) + ((b >> 8)  & 0xff) * t);
-  const bl = Math.round( (a        & 0xff) * (1 - t) +  (b        & 0xff) * t);
-  return (r << 16) | (g << 8) | bl;
-}
-
-function dimColor(c: number, brightness: number): number {
-  return lerpColor(0x000000, c, brightness);
 }
 
 // ── Main class ────────────────────────────────────────────────────────────────

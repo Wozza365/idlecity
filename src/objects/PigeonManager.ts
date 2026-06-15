@@ -1,13 +1,11 @@
 import Phaser from 'phaser';
-import { YARD_H, lerpColor } from '../constants';
+import { YARD_H, lerpColor, NIGHT_TINT } from '../constants';
 import { type PlotState } from '../game/GameState';
 import {
   PIGEON_KEY, PIGEON_ORIGIN_X, PIGEON_ORIGIN_Y,
   PIGEON_FRAME_IDLE, PIGEON_FRAME_PECK, PIGEON_FRAME_WALK_A, PIGEON_FRAME_WALK_B,
   PIGEON_FRAME_FLEE_A, PIGEON_FRAME_FLEE_B,
 } from './PigeonAssets';
-
-const NIGHT_TINT = 0x5a6680;
 
 const PIGEON_COUNT     = 2;
 const PIGEON_W         = 7;

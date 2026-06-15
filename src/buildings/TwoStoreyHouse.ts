@@ -1,32 +1,11 @@
 import Phaser from 'phaser';
-import { YARD_H, multiplyColor } from '../constants';
-import { type DoorEntrance } from './types';
+import { YARD_H, multiplyColor, lerpColor, NIGHT_TINT, TREE_CANOPY_TINT, TREE_TRUNK_TINT } from '../constants';
+import { type DoorEntrance, type WindowRect, type SmokeParticle } from './types';
 import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
-import { CANOPY_ORIGIN, TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y, CANOPY_SMALL_R } from '../objects/TreeAssets';
-
-const NIGHT_TINT = 0x5a6680;
-// Match the verge street trees' "summer" canopy/trunk tints (ClassicTheme
-// palette.verge) for visual consistency — buildings don't carry that palette.
-const TREE_CANOPY_TINT = 0x4a8c32;
-const TREE_TRUNK_TINT  = 0x5c3a1e;
-
-function lerpColor(a: number, b: number, t: number): number {
-  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
-  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-  return ((Math.round(ar + (br - ar) * t) << 16) |
-          (Math.round(ag + (bg - ag) * t) << 8)  |
-           Math.round(ab + (bb - ab) * t));
-}
-
-function randTvColor(): number {
-  return ((30 + Math.floor(Math.random() * 40)) << 16) |
-         ((40 + Math.floor(Math.random() * 40)) << 8)  |
-          (110 + Math.floor(Math.random() * 70));
-}
+import { CANOPY_ORIGIN, CANOPY_SMALL_R } from '../objects/TreeAssets';
+import { randTvColor, addYardTree } from './buildingHelpers';
 
 const BODY_H = 88;
-
-type SmokeParticle = { x: number; y: number; alpha: number; dx: number; fadeRate: number; radius: number; maxAlpha: number; color: number; growing: boolean };
 
 export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   readonly doorEntrances: DoorEntrance[] = [];
@@ -34,11 +13,7 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
   private smokeGfx:       Phaser.GameObjects.Graphics | null = null;
-  private windowRects: Array<{
-    wx: number; wy: number; ww: number; wh: number;
-    sashH: number; halfWw: number; upperDay: number; lowerDay: number;
-    isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean;
-  }> = [];
+  private windowRects: Array<WindowRect> = [];
   private smokeParticles: SmokeParticle[] = [];
   private chimneyX    = 0;
   private chimneyTopY = 0;
@@ -269,14 +244,14 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
     if (level >= 19) {
       const bshX = bx + 7;
       const bshY = buildGY - foundH;
-      this.addYardTree(scene, bshX, bshY - 9, bshY + 6, 6 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
+      addYardTree(scene, this, this.yardTreeImages, bshX, bshY - 9, bshY + 6, 6 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
     }
 
     // ── Lv 20+: right bush ────────────────────────────────────
     if (level >= 20) {
       const bshX = bx + bw - 7;
       const bshY = buildGY - foundH;
-      this.addYardTree(scene, bshX, bshY - 9, bshY + 6, 6 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
+      addYardTree(scene, this, this.yardTreeImages, bshX, bshY - 9, bshY + 6, 6 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
     }
 
     // ── Lv 21+: hedge — trimmed base with a leafy, lumpy fringe ─
@@ -430,22 +405,6 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  // Small yard bush/tree: a tinted canopy cluster over a tinted trunk,
-  // scaled down from the small street-tree textures (radius CANOPY_SMALL_R).
-  private addYardTree(scene: Phaser.Scene, x: number, canopyY: number, trunkBaseY: number, scale: number, canopyTint: number, trunkTint: number): void {
-    const trunk = scene.add.image(x, trunkBaseY, 'trunk_small')
-      .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
-      .setScale(scale)
-      .setTint(trunkTint);
-    const canopy = scene.add.image(x, canopyY, 'canopy_small')
-      .setOrigin(CANOPY_ORIGIN, CANOPY_ORIGIN)
-      .setScale(scale)
-      .setTint(canopyTint);
-    this.add(trunk);
-    this.add(canopy);
-    this.yardTreeImages.push({ img: trunk, baseTint: trunkTint }, { img: canopy, baseTint: canopyTint });
-  }
-
   updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
     if (this.yardTreeImages.length) {
       const nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
@@ -521,26 +480,27 @@ export class TwoStoreyHouse extends Phaser.GameObjects.Container {
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
     for (const { wx, wy: winY, ww, wh, sashH, halfWw, upperDay, lowerDay, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
+      const sh = sashH!, hw = halfWw!, upper = upperDay!, lower = lowerDay!;
       if (asleep) {
-        gfx.fillStyle(lerpColor(upperDay, 0x0a0f18, t), 1);
-        gfx.fillRect(wx, winY, ww, sashH);
-        gfx.fillStyle(lerpColor(lowerDay, 0x0a0f18, t), 1);
-        gfx.fillRect(wx, winY + sashH + 2, ww, wh - sashH - 2);
+        gfx.fillStyle(lerpColor(upper, 0x0a0f18, t), 1);
+        gfx.fillRect(wx, winY, ww, sh);
+        gfx.fillStyle(lerpColor(lower, 0x0a0f18, t), 1);
+        gfx.fillRect(wx, winY + sh + 2, ww, wh - sh - 2);
         gfx.fillStyle(0xffffff, 0.4);
-        gfx.fillRect(wx, winY + sashH, ww, 2);
-        gfx.fillRect(wx + halfWw - 1, winY, 2, wh);
+        gfx.fillRect(wx, winY + sh, ww, 2);
+        gfx.fillRect(wx + hw - 1, winY, 2, wh);
         continue;
       }
-      const tvFlick  = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
-      const nightTop = isTv ? lerpColor(upperDay, tvColor, t * tvFlick) : lerpColor(upperDay, 0xffcc66, t);
-      const nightBot = isTv ? lerpColor(lowerDay, tvColor, t * tvFlick) : lerpColor(lowerDay, 0xffcc66, t);
+      const tvFlick  = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq! + wx)) : 1;
+      const nightTop = isTv ? lerpColor(upper, tvColor!, t * tvFlick) : lerpColor(upper, 0xffcc66, t);
+      const nightBot = isTv ? lerpColor(lower, tvColor!, t * tvFlick) : lerpColor(lower, 0xffcc66, t);
       gfx.fillStyle(nightTop, 1);
-      gfx.fillRect(wx, winY, ww, sashH);
+      gfx.fillRect(wx, winY, ww, sh);
       gfx.fillStyle(nightBot, 1);
-      gfx.fillRect(wx, winY + sashH + 2, ww, wh - sashH - 2);
+      gfx.fillRect(wx, winY + sh + 2, ww, wh - sh - 2);
       gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(wx, winY + sashH, ww, 2);
-      gfx.fillRect(wx + halfWw - 1, winY, 2, wh);
+      gfx.fillRect(wx, winY + sh, ww, 2);
+      gfx.fillRect(wx + hw - 1, winY, 2, wh);
     }
   }
 }

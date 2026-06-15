@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
-import { type GameState, clearSave, defaultState, loadGame, saveGame, totalPopulationCapacity } from '../game/GameState';
+import { type GameState, clearSave, defaultState, loadGame, saveGame } from '../game/GameState';
+import { advanceTime as advanceTimeOffset, computeSunAngle, elapsedMs, gameTimeString, setMidnight as computeMidnightOffset } from '../game/TimeOfDaySystem';
+import { buildingTier, plotIncomeWithNeighbourBonus, taxRate, updatePopulation } from '../game/EconomySystem';
+import { addDevGold, jumpToSeasonOffset, skipToHighLevelState } from '../game/DevActions';
 import {
   PLOT_COUNT, MAX_LEVEL, MAX_ROAD_LEVEL, MAX_VERGE_LEVEL, MAX_WATER_LEVEL, UI_HEIGHT, STATS_BAR_H, ROAD_BAR_H,
   ROAD_H, VERGE_H, WATER_H, YARD_H,
   UNLOCK_COSTS,
-  upgradeCost, perBuildingIncome, vergeUpgradeCost, waterUpgradeCost,
-  roadUpgradeCost, roadIncome, vergeIncome, waterIncome, populationGrowthRate,
+  upgradeCost, vergeUpgradeCost, waterUpgradeCost,
+  roadUpgradeCost,
   buildingHeight, fmt, MONO_FONT,
 } from '../constants';
 import { spawnFloatingText } from '../ui/FloatingText';
@@ -310,7 +313,7 @@ export class GameScene extends Phaser.Scene {
     this.snow.update(delta, snowIntensity);
     this.road.updateWeather(rainIntensity + snowIntensity * 0.3);
     this.weatherAccumulation.update(delta, rainIntensity, snowIntensity, Math.sin(this.sunAngle), this.sky.horizonColor);
-    const elapsed   = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
+    const elapsed   = elapsedMs(this.masterClock?.getValue() ?? 0, this.timeOffsetMs);
     const gameHour  = Math.floor((elapsed / 240_000) * 24 + 12) % 24;
     this.gameHour = gameHour;
     if (this.pedestrianManager) {
@@ -633,13 +636,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildingTier(level: number): number {
-    if (level <= 15) return 1;
-    if (level <= 25) return 2;
-    if (level <= 40) return 3;
-    if (level <= 55) return 4;
-    if (level <= 70) return 5;
-    if (level <= 85) return 6;
-    return 7;
+    return buildingTier(level);
   }
 
   private celebrateTier(plotIndex: number, tier: number, level: number): void {
@@ -895,19 +892,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onAddGold(): void {
-    this.state.gold += 1_000_000_000;
-    this.state.stats.totalMoneyEarned += 1_000_000_000;
+    addDevGold(this.state);
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
 
-  private gameTimeString(): string {
-    const elapsed   = ((this.masterClock?.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
-    const totalMins = (elapsed / 240_000) * 24 * 60;
-    const hour = Math.floor(12 + totalMins / 60) % 24;
-    const min  = Math.floor(totalMins) % 60;
-    return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-  }
 
   private resetGame(): void {
     clearSave();
@@ -961,32 +950,9 @@ export class GameScene extends Phaser.Scene {
 
   private onClockTick(): void {
     if (!this.masterClock) return;
-    const elapsed = ((this.masterClock.getValue() ?? 0) + this.timeOffsetMs) % 240_000;
+    const elapsed = elapsedMs(this.masterClock.getValue() ?? 0, this.timeOffsetMs);
 
-    // Sunrise/sunset hours vary smoothly by season via the sinusoidal c1 oscillator.
-    // Summer (c1=+1): sunrise 3am, sunset 9pm (18h daylight).
-    // Winter (c1=−1): sunrise 6am, sunset 6pm (12h daylight).
-    const c1 = this.seasons.c1;
-    const sunriseHour = 4.5 - 1.5 * c1;   // 3.0 → 6.0
-    const sunsetHour  = 19.5 + 1.5 * c1;  // 21.0 → 18.0
-    const afterHours  = sunsetHour - 12;
-    const mornHours   = 12 - sunriseHour;
-    const nightHours  = 24 - (sunsetHour - sunriseHour);
-    const NC          = 0.667; // night compression — keeps night visually fast
-    const msPerDayHr  = 240_000 / (afterHours + mornHours + NC * nightHours);
-    const SUNSET      = afterHours * msPerDayHr;
-    const SUNRISE     = SUNSET + nightHours * msPerDayHr * NC;
-
-    if (elapsed < SUNSET) {
-      // Noon→sunset: sunAngle π/2 → π
-      this.sunAngle = Math.PI / 2 + (elapsed / SUNSET) * (Math.PI / 2);
-    } else if (elapsed < SUNRISE) {
-      // Sunset→sunrise (night): sunAngle π → 2π (fast)
-      this.sunAngle = Math.PI + ((elapsed - SUNSET) / (SUNRISE - SUNSET)) * Math.PI;
-    } else {
-      // Sunrise→noon: sunAngle 2π → 5π/2
-      this.sunAngle = 2 * Math.PI + ((elapsed - SUNRISE) / (240_000 - SUNRISE)) * (Math.PI / 2);
-    }
+    this.sunAngle = computeSunAngle(elapsed, this.seasons.c1);
 
     const elev = Math.sin(this.sunAngle);
     this.sky.updateGradient(elev, this.scale.width, this.groundY, this.seasons.winterWeight, this.seasons.springWeight, this.seasons.weatherIntensity, this.activeTheme.palette.sky);
@@ -1008,13 +974,13 @@ export class GameScene extends Phaser.Scene {
     this.boatManager?.updateLighting(elev);
     this.vergeRiver.updateLighting(elev);
     this.waterArea?.updateLighting(elev);
-    this.devPanel?.updateClock(this.gameTimeString());
+    this.devPanel?.updateClock(gameTimeString(elapsedMs(this.masterClock.getValue() ?? 0, this.timeOffsetMs)));
     this.devPanel?.updateFps(this.game.loop.actualFps);
     this.lightingSystem?.update(this.sunAngle, this.seasons.moonPhase);
   }
 
   private advanceTime(): void {
-    this.timeOffsetMs = (this.timeOffsetMs + 240_000 / 24) % 240_000;
+    this.timeOffsetMs = advanceTimeOffset(this.timeOffsetMs);
   }
 
   private advanceDay(): void {
@@ -1022,57 +988,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private jumpToSeason(season: string): void {
-    const offsets: Record<string, number> = { Summer: 0, Autumn: 10, Winter: 20, Spring: 30 };
-    const yearBase = Math.floor(this.seasons.gameDayCount / 40) * 40;
-    this.seasons.gameDayCount = yearBase + (offsets[season] ?? 0);
+    this.seasons.gameDayCount = jumpToSeasonOffset(this.seasons.gameDayCount, season);
   }
 
   private setMidnight(): void {
-    const MIDNIGHT_ELAPSED = 120_000;
-    const current = this.masterClock?.getValue() ?? 0;
-    this.timeOffsetMs = ((MIDNIGHT_ELAPSED - current) % 240_000 + 240_000) % 240_000;
+    this.timeOffsetMs = computeMidnightOffset(this.masterClock?.getValue() ?? 0);
   }
 
   private skipToHighLevel(): void {
-    const SKIP_LEVELS = [75, 60, 45, 30, 15];
-    this.state.road.level  = MAX_ROAD_LEVEL;
-    this.state.verge.level = MAX_VERGE_LEVEL;
-    this.state.water.level = MAX_WATER_LEVEL;
-    for (let i = 0; i < PLOT_COUNT; i++) {
-      this.state.plots[i].unlocked = true;
-      this.state.plots[i].level = SKIP_LEVELS[i] ?? 1;
-    }
+    skipToHighLevelState(this.state);
     this.buildLayout();
   }
 
   // ── Tax system ─────────────────────────────────────────────────────────────
 
   private get taxRate(): number {
-    const plots = this.state.plots;
-    let total = 0;
-    for (let i = 0; i < plots.length; i++) {
-      const plot = plots[i];
-      if (!plot.unlocked) continue;
-      const base = perBuildingIncome(plot.level);
-      const neighbours =
-        (i > 0 && plots[i - 1].unlocked ? 1 : 0) +
-        (i < plots.length - 1 && plots[i + 1].unlocked ? 1 : 0);
-      total += base * (1 + neighbours * 0.15);
-    }
-    total += roadIncome(this.state.road.level);
-    total += vergeIncome(this.state.verge.level);
-    total += waterIncome(this.state.water.level);
-    return total;
+    return taxRate(this.state);
   }
 
   private updatePopulation(dtSeconds: number): void {
-    const capacity = totalPopulationCapacity(this.state);
-    const baseRate = populationGrowthRate(this.state.road.level, this.state.verge.level, this.state.water.level);
-    // Jitter the rate per tick (avg 1x) so growth feels organic — bursts of
-    // several new residents arriving together, then quieter ticks with just
-    // one or two — without changing the overall pacing.
-    const rate = baseRate * (0.5 + Math.random());
-    this.state.population += (capacity - this.state.population) * (1 - Math.exp(-rate * dtSeconds));
+    updatePopulation(this.state, dtSeconds);
   }
 
   private onTaxTick(): void {
@@ -1104,11 +1039,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < plots.length; i++) {
       const plot = plots[i];
       if (!plot.unlocked) continue;
-      const base = perBuildingIncome(plot.level);
-      const neighbours =
-        (i > 0 && plots[i - 1].unlocked ? 1 : 0) +
-        (i < plots.length - 1 && plots[i + 1].unlocked ? 1 : 0);
-      const incomeFor3s = base * (1 + neighbours * 0.15) * 3;
+      const incomeFor3s = plotIncomeWithNeighbourBonus(plots, i) * 3;
       const cx = (i + 0.5) * plotW;
       const topY = this.groundY - buildingHeight(plot.level) - YARD_H - 8;
       spawnFloatingText(this, cx, topY, `+${fmt(incomeFor3s)}`);

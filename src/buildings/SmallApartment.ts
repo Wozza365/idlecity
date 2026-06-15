@@ -1,30 +1,11 @@
 import Phaser from 'phaser';
-import { YARD_H, buildingHeight, multiplyColor } from '../constants';
+import { YARD_H, buildingHeight, multiplyColor, lerpColor, NIGHT_TINT, TREE_CANOPY_TINT, TREE_TRUNK_TINT } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
-import { type DoorEntrance } from './types';
+import { type DoorEntrance, type WindowRect } from './types';
 import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
-import { CANOPY_ORIGIN, TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y, CANOPY_SMALL_R } from '../objects/TreeAssets';
-
-const NIGHT_TINT = 0x5a6680;
-// Match the verge street trees' "summer" canopy/trunk tints (ClassicTheme
-// palette.verge) for visual consistency — buildings don't carry that palette.
-const TREE_CANOPY_TINT = 0x4a8c32;
-const TREE_TRUNK_TINT  = 0x5c3a1e;
-
-function lerpColor(a: number, b: number, t: number): number {
-  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
-  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-  return ((Math.round(ar + (br - ar) * t) << 16) |
-          (Math.round(ag + (bg - ag) * t) << 8)  |
-           Math.round(ab + (bb - ab) * t));
-}
-
-function randTvColor(): number {
-  return ((30 + Math.floor(Math.random() * 40)) << 16) |
-         ((40 + Math.floor(Math.random() * 40)) << 8)  |
-          (110 + Math.floor(Math.random() * 70));
-}
+import { CANOPY_SMALL_R } from '../objects/TreeAssets';
+import { randTvColor, addYardTree } from './buildingHelpers';
 
 const FOUND_H   = 8;
 const PARAPET_H = 12;
@@ -51,7 +32,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
   private neonPhases:     number[] = [];
   private lastSleepHour  = -1;
   private pendingSleepAt = Infinity;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; dayColor: number; shop?: boolean; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
+  private windowRects: Array<WindowRect> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
   private yardTreeImages: Array<{ img: Phaser.GameObjects.Image; baseTint: number }> = [];
 
@@ -374,7 +355,7 @@ export class SmallApartment extends Phaser.GameObjects.Container {
       for (const [tX] of [[x + 4, true], [x + w - 14, false]] as [number, boolean][]) {
         gfx.fillStyle(0x3a4430, 1);
         gfx.fillRect(tX, buildGY + 2, 10, 8);
-        this.addYardTree(scene, tX + 5, buildGY - 8, buildGY + 2, 7 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
+        addYardTree(scene, this, this.yardTreeImages, tX + 5, buildGY - 8, buildGY + 2, 7 / CANOPY_SMALL_R, TREE_CANOPY_TINT, TREE_TRUNK_TINT);
       }
     }
 
@@ -572,22 +553,6 @@ export class SmallApartment extends Phaser.GameObjects.Container {
 
   setShadowAlpha(alpha: number): void { this.shadowGfx.setAlpha(alpha); }
 
-  // Small yard bush/tree: a tinted canopy cluster over a tinted trunk,
-  // scaled down from the small street-tree textures (radius CANOPY_SMALL_R).
-  private addYardTree(scene: Phaser.Scene, x: number, canopyY: number, trunkBaseY: number, scale: number, canopyTint: number, trunkTint: number): void {
-    const trunk = scene.add.image(x, trunkBaseY, 'trunk_small')
-      .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
-      .setScale(scale)
-      .setTint(trunkTint);
-    const canopy = scene.add.image(x, canopyY, 'canopy_small')
-      .setOrigin(CANOPY_ORIGIN, CANOPY_ORIGIN)
-      .setScale(scale)
-      .setTint(canopyTint);
-    this.add(trunk);
-    this.add(canopy);
-    this.yardTreeImages.push({ img: trunk, baseTint: trunkTint }, { img: canopy, baseTint: canopyTint });
-  }
-
   updateWindowLights(elevation: number, time = 0, gameHour = -1): void {
     if (this.yardTreeImages.length) {
       const nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
@@ -660,18 +625,18 @@ export class SmallApartment extends Phaser.GameObjects.Container {
     gfx.clear();
     for (const { wx, wy, ww, wh, dayColor, shop, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
       if (shop) {
-        gfx.fillStyle(lerpColor(dayColor, 0xffdd88, t), 1);
+        gfx.fillStyle(lerpColor(dayColor!, 0xffdd88, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, Math.max(0, 0.12 - t * 0.1));
         gfx.fillRect(wx, wy, ww, 2);
       } else if (asleep) {
-        gfx.fillStyle(lerpColor(dayColor, 0x0a0f18, t), 1);
+        gfx.fillStyle(lerpColor(dayColor!, 0x0a0f18, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, 0.08);
         gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);
       } else {
-        const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
-        gfx.fillStyle(isTv ? lerpColor(dayColor, tvColor, t * tvFlick) : lerpColor(dayColor, 0xffcc66, t), 1);
+        const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq! + wx)) : 1;
+        gfx.fillStyle(isTv ? lerpColor(dayColor!, tvColor!, t * tvFlick) : lerpColor(dayColor!, 0xffcc66, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, 0.18);
         gfx.fillRect(wx, wy + Math.round(wh / 2), ww, 1);

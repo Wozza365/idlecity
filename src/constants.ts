@@ -121,6 +121,20 @@ export function lerpColor(a: number, b: number, t: number): number {
   return (r << 16) | (g << 8) | bl;
 }
 
+// Shared night-time tint applied to outdoor decor (trees, boats, birds, etc.)
+// as the sun sets — blended in via lerpColor(0xffffff, NIGHT_TINT, nightFactor).
+export const NIGHT_TINT = 0x5a6680;
+
+// Match the verge street trees' "summer" canopy/trunk tints (ClassicTheme
+// palette.verge) for visual consistency — buildings don't carry that palette.
+export const TREE_CANOPY_TINT = 0x4a8c32;
+export const TREE_TRUNK_TINT  = 0x5c3a1e;
+
+/** Darken a colour toward black by `brightness` (0 = black, 1 = original colour). */
+export function dimColor(c: number, brightness: number): number {
+  return lerpColor(0x000000, c, brightness);
+}
+
 /** Component-wise multiply of two colours (each channel /255) — used to
  *  combine a per-instance tint (e.g. a flower's petal colour) with a
  *  global tint (e.g. night darkening) into a single Phaser tint value. */

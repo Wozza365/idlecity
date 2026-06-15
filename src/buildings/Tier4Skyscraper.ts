@@ -1,15 +1,7 @@
 import Phaser from 'phaser';
-import { YARD_H, buildingHeight } from '../constants';
-import { type DoorEntrance } from './types';
+import { YARD_H, buildingHeight, lerpColor } from '../constants';
+import { type DoorEntrance, type WindowRect } from './types';
 import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
-
-function lerpColor(a: number, b: number, t: number): number {
-  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
-  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-  return ((Math.round(ar + (br - ar) * t) << 16) |
-          (Math.round(ag + (bg - ag) * t) << 8)  |
-           Math.round(ab + (bb - ab) * t));
-}
 
 const FLOOR_H    = 12;
 const ANTENNA_H  = 36;
@@ -19,7 +11,7 @@ export class Tier4Skyscraper extends Phaser.GameObjects.Container {
   private windowLights:   Phaser.GameObjects.Light[] = [];
   private windowGlassGfx: Phaser.GameObjects.Graphics | null = null;
   private lampConeGfx:    Phaser.GameObjects.Graphics | null = null;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; accent: boolean }> = [];
+  private windowRects: Array<WindowRect> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene, x: number, plotWidth: number, groundY: number, level: number, palette: BuildingPalette, _params: ThemeParams) {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ROAD_H, VERGE_H, lerpColor, multiplyColor } from '../constants';
+import { ROAD_H, VERGE_H, lerpColor, multiplyColor, NIGHT_TINT } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { VergePalette, ThemeParams } from '../theme/ThemeTypes';
@@ -13,7 +13,6 @@ import { FLOWER_KEYS } from './FlowerAssets';
 import { TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y, CANOPY_SMALL_R } from './TreeAssets';
 
 const CYCLE_H = 14;
-const NIGHT_TINT = 0x5a6680;
 
 type TreeTier = 'small' | 'medium' | 'large';
 

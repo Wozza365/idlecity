@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { lerpColor } from '../constants';
+import { lerpColor, NIGHT_TINT } from '../constants';
 import { type LightSource } from '../lighting/LightingSystem';
 import { type BoatDef, boatOriginY } from './BoatAssets';
 
@@ -17,7 +17,6 @@ const FLAG_PALETTES: ReadonlyArray<[number, number]> = [
   [0xffffff, 0xcccc22],
 ];
 
-const NIGHT_TINT = 0x5a6680;
 const TEX_PAD    = 1;
 
 // Fraction of hull height submerged, ±VARY per boat.

@@ -1,12 +1,10 @@
 import Phaser from 'phaser';
-import { lerpColor } from '../constants';
+import { lerpColor, NIGHT_TINT } from '../constants';
 import {
   BIRD_KEY,
   BIRD_ORIGIN_X, BIRD_ORIGIN_Y,
   BIRD_FRAME_SPREAD, BIRD_FRAME_TUCKED,
 } from './BirdAssets';
-
-const NIGHT_TINT = 0x5a6680;
 
 const MIN_BIRDS   = 5;
 const MAX_BIRDS   = 9;

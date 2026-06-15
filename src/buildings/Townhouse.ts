@@ -1,21 +1,8 @@
 import Phaser from 'phaser';
-import { YARD_H, buildingHeight } from '../constants';
-import { type DoorEntrance } from './types';
+import { YARD_H, buildingHeight, lerpColor } from '../constants';
+import { type DoorEntrance, type WindowRect } from './types';
 import type { BuildingPalette, ThemeParams } from '../theme/ThemeTypes';
-
-function lerpColor(a: number, b: number, t: number): number {
-  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
-  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-  return ((Math.round(ar + (br - ar) * t) << 16) |
-          (Math.round(ag + (bg - ag) * t) << 8)  |
-           Math.round(ab + (bb - ab) * t));
-}
-
-function randTvColor(): number {
-  return ((30 + Math.floor(Math.random() * 40)) << 16) |
-         ((40 + Math.floor(Math.random() * 40)) << 8)  |
-          (110 + Math.floor(Math.random() * 70));
-}
+import { randTvColor } from './buildingHelpers';
 
 const FOUND_H   = 8;
 const PARAPET_H = 10;
@@ -34,7 +21,7 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private flickerFreqs:   number[] = [];
   private lastSleepHour  = -1;
   private pendingSleepAt = Infinity;
-  private windowRects: Array<{ wx: number; wy: number; ww: number; wh: number; dayColor: number; isTv: boolean; flickerFreq: number; tvColor: number; asleep: boolean }> = [];
+  private windowRects: Array<WindowRect> = [];
   private shadowGfx!: Phaser.GameObjects.Graphics;
   private neonSignGfx: Phaser.GameObjects.Graphics | null = null;
   private _neonX = 0;
@@ -517,17 +504,18 @@ export class Townhouse extends Phaser.GameObjects.Container {
   private drawWindowGlass(gfx: Phaser.GameObjects.Graphics, t: number, time = 0): void {
     gfx.clear();
     for (const { wx, wy, ww, wh, dayColor, isTv, flickerFreq, tvColor, asleep } of this.windowRects) {
+      const day = dayColor!;
       if (asleep) {
-        gfx.fillStyle(lerpColor(dayColor, 0x0a0f18, t), 1);
+        gfx.fillStyle(lerpColor(day, 0x0a0f18, t), 1);
         gfx.fillRect(wx, wy, ww, wh);
         gfx.fillStyle(0xffffff, 0.4);
         gfx.fillRect(wx + Math.round(ww / 2) - 1, wy, 2, wh);
         continue;
       }
-      const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq + wx)) : 1;
+      const tvFlick = isTv ? 0.6 + 0.4 * Math.abs(Math.sin(time * flickerFreq! + wx)) : 1;
       const color   = isTv
-        ? lerpColor(dayColor, tvColor, t * tvFlick)
-        : lerpColor(dayColor, 0xffcc66, t);
+        ? lerpColor(day, tvColor!, t * tvFlick)
+        : lerpColor(day, 0xffcc66, t);
       gfx.fillStyle(color, 1);
       gfx.fillRect(wx, wy, ww, wh);
       gfx.fillStyle(0xffffff, 1);
