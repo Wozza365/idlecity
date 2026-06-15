@@ -1,21 +1,12 @@
 import Phaser from 'phaser';
 import { ROAD_H, VERGE_H, WATER_H, NIGHT_TINT, lerpColor, dimColor } from '../constants';
-import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { WaterPalette } from '../theme/ThemeTypes';
 import { type PersonDef, PERSON_DEFS, walkAnimKey } from './PedestrianAssets';
-import {
-  PIER_KEY, PIER_ORIGIN_X, PIER_ORIGIN_Y,
-  CAFE_KEY, CAFE_ORIGIN_X, CAFE_ORIGIN_Y,
-  HUT_KEY, HUT_ORIGIN_X, HUT_ORIGIN_Y,
-  DOCK_PLANK_KEY,
-  DOCK_POST_KEY, DOCK_POST_ORIGIN_X, DOCK_POST_ORIGIN_Y,
-  DOCK_BOLLARD_KEY, DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y,
-  BUOY_RED_KEY, BUOY_ORANGE_KEY, BUOY_ORIGIN_X, BUOY_ORIGIN_Y,
-} from './WaterStructureAssets';
 import { WaterCritterSim, SPLASH_DURATION } from './water/WaterCritterSim';
 import { advanceBeachPersonPosition, advanceBeachPersonPhase } from './water/BeachPeopleSim';
 import { LighthouseFeature, islandClearAt } from './water/LighthouseFeature';
+import { PierAndStructures } from './water/PierAndStructures';
 
 const BEACH_SHORE_H = 48;  // depth of sandy beach area
 const ROCK_SHORE_H  = 22;  // depth of rocky area
@@ -61,7 +52,6 @@ export class WaterArea {
   private waterGfx:        Phaser.GameObjects.Graphics; // 5.5  – gradient water + coast (static)
   private skyReflectGfx:   Phaser.GameObjects.Graphics; // 5.51 – sky horizon colour tint on water top
   private shadowGfx:       Phaser.GameObjects.Graphics; // 5.65 – structure shadows on water (sun-dep)
-  private structGfx:       Phaser.GameObjects.Graphics; // 5.7  – pier, dock, café, hut, lighthouse
   private beachShadowGfx:  Phaser.GameObjects.Graphics; // 5.76 – beach people shadows
   private beachPeopleGfx:  Phaser.GameObjects.Graphics; // 5.78 – moving beach people
   private fxGfx:           Phaser.GameObjects.Graphics; // 5.85 – bonfire, sparkles, buoys (no lighting)
@@ -83,26 +73,13 @@ export class WaterArea {
   private _lighthouseX    = 0;
   private _lighthouseTopY = 0;
   private _lighthouse!: LighthouseFeature;
-  private _pierImg: Phaser.GameObjects.Image | null = null;
-  private _cafeImg: Phaser.GameObjects.Image | null = null;
-  private _hutImg: Phaser.GameObjects.Image | null = null;
-  private _dockSlots: number[] = [];
-  private _dockDeckTile: Phaser.GameObjects.TileSprite | null = null;
-  private _dockPostImgs: Phaser.GameObjects.Image[] = [];
-  private _dockBollardImgs: Phaser.GameObjects.Image[] = [];
-  private _buoyImgs: Phaser.GameObjects.Image[] = [];
+  private _pierAndStructures!: PierAndStructures;
 
   // Beach people
   private _people: BeachPerson[] = [];
 
   // Water critters
   private _critters = new WaterCritterSim();
-
-  // Buoys
-  private _buoys: Array<{ x: number; y: number; color: number; phase: number }> = [];
-
-  // Dock glow lights (positions populated in drawDock, rendered in drawFx)
-  private _dockGlows: Array<{ x: number; y: number; bright?: boolean }> = [];
 
   // Sprites from the High Tides asset pack
   private _foamSprites: Phaser.GameObjects.Sprite[] = [];
@@ -114,44 +91,30 @@ export class WaterArea {
   private _nightFactor     = 0;
   private _lastLightElevation = NaN;
 
-  // Lighting — using SoftSpotLight + bulbs like verge lamps
-  private _dockSpots:  SoftSpotLight[] = [];
-  private _dockBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
-  private _cafeSpot:   SoftSpotLight | null = null;
-  private _cafeBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
-  private _pierSpot:   SoftSpotLight | null = null;
-  private _pierBulb:   Extract<LightSource, { type?: 'point' }> | null = null;
+  // Lighting — bonfire-only here; pier/dock/café/buoy lights live in PierAndStructures
   private _bonFireLights: Array<Extract<LightSource, { type?: 'point' }>> = [];
-  private _buoyBulbs:  Array<Extract<LightSource, { type?: 'point' }>> = [];
-  private _nativeLights: Phaser.GameObjects.Light[] = [];
 
   get extraLights(): LightSource[] {
     const out: LightSource[] = [];
-    for (const s of this._dockSpots) out.push(...s.beams);
-    for (const b of this._dockBulbs) out.push(b);
-    if (this._cafeSpot)   out.push(...this._cafeSpot.beams);
-    if (this._cafeBulb)   out.push(this._cafeBulb);
-    if (this._pierSpot)   out.push(...this._pierSpot.beams);
-    if (this._pierBulb)   out.push(this._pierBulb);
+    out.push(...this._pierAndStructures.extraLights);
     for (const b of this._bonFireLights) out.push(b);
     out.push(...this._lighthouse.extraLights);
-    for (const b of this._buoyBulbs) out.push(b);
     return out;
   }
 
-  getDockSlots(): number[] { return [...this._dockSlots]; }
+  getDockSlots(): number[] { return this._pierAndStructures.getDockSlots(); }
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.waterGfx       = scene.add.graphics().setDepth(5.5).setLighting(true);
     this.skyReflectGfx  = scene.add.graphics().setDepth(5.51);
     this.shadowGfx      = scene.add.graphics().setDepth(5.55);
-    this.structGfx      = scene.add.graphics().setDepth(5.7).setLighting(true);
     this.beachShadowGfx = scene.add.graphics().setDepth(5.62);
     this.beachPeopleGfx = scene.add.graphics().setDepth(5.66).setLighting(true);
     this.fxGfx          = scene.add.graphics().setDepth(5.85);
     this.crittersGfx    = scene.add.graphics().setDepth(5.84).setLighting(true);
     this._lighthouse    = new LighthouseFeature(scene);
+    this._pierAndStructures = new PierAndStructures(scene);
   }
 
   render(level: number, width: number, groundY: number, palette: WaterPalette): void {
@@ -159,7 +122,6 @@ export class WaterArea {
     this._width   = width;
     this._waterY  = groundY + ROAD_H + VERGE_H;
     this._palette = palette;
-    this._dockSlots = [];
 
     // Layout geometry
     this._beachEndX  = Math.floor(width * 0.36);
@@ -173,28 +135,9 @@ export class WaterArea {
     this._lighthouseX    = Math.floor(width * 0.63);
     this._lighthouseTopY = this._waterY + WATER_H * 0.5;
 
-    this.structGfx.clear();
-
     this.drawWaterAndCoast();
 
-    if (level >= 3) this.drawPier(); else this._pierImg?.setVisible(false);
-    if (level >= 4) this.drawBeachCafe(); else this._cafeImg?.setVisible(false);
-    if (level >= 5) this.drawDock();
-    else {
-      this._dockGlows = [];
-      this._dockDeckTile?.setVisible(false);
-      for (const img of this._dockPostImgs) img.destroy();
-      this._dockPostImgs = [];
-      for (const img of this._dockBollardImgs) img.destroy();
-      this._dockBollardImgs = [];
-    }
-    if (level >= 7) { this.drawLifeguardHut(); this.setupBuoys(); }
-    else {
-      this._buoys = [];
-      this._hutImg?.setVisible(false);
-      for (const img of this._buoyImgs) img.destroy();
-      this._buoyImgs = [];
-    }
+    this._pierAndStructures.render(level, this._width, this._waterY, this._pierX, this._cafeX, this._dockX1, this._dockX2);
     this._lighthouse.render(level, this._lighthouseX, this._lighthouseTopY, palette);
     if (level >= 2) { this.initBeachPeople(); this.initFoamSprites(); }
     else { this.destroyFoamSprites(); }
@@ -202,7 +145,7 @@ export class WaterArea {
     this._critters.reset();
     this._critters.initDucks(level, this._transEndX, this._width, this._waterY, ROCK_SHORE_H);
 
-    this.rebuildLights();
+    this.rebuildBonfireLights();
   }
 
   // ── Water gradient + coast ────────────────────────────────────────────────
@@ -302,206 +245,14 @@ export class WaterArea {
 
   }
 
-  // ── Pier (level 3+) ───────────────────────────────────────────────────────
-
-  private drawPier(): void {
-    const { _waterY: wy, _pierX: px } = this;
-
-    if (!this._pierImg) {
-      this._pierImg = this.scene.add.image(px, wy, PIER_KEY)
-        .setOrigin(PIER_ORIGIN_X, PIER_ORIGIN_Y)
-        .setDepth(5.7);
-    } else {
-      this._pierImg.setPosition(px, wy).setVisible(true);
-    }
-  }
-
-  // ── Beach café (level 4+) ─────────────────────────────────────────────────
-
-  private drawBeachCafe(): void {
-    const { _waterY: wy, _cafeX: cx } = this;
-
-    if (!this._cafeImg) {
-      this._cafeImg = this.scene.add.image(cx, wy, CAFE_KEY)
-        .setOrigin(CAFE_ORIGIN_X, CAFE_ORIGIN_Y)
-        .setDepth(5.7);
-    } else {
-      this._cafeImg.setPosition(cx, wy).setVisible(true);
-    }
-  }
-
-  // ── Dock / harbour (level 5+) ─────────────────────────────────────────────
-
-  private drawDock(): void {
-    const gfx = this.structGfx;
-    const { _waterY: wy, _dockX1: dx1, _dockX2: dx2 } = this;
-    const dockW   = dx2 - dx1;
-    const deckEnd = wy + BEACH_SHORE_H;  // wy+48: matches beach height
-
-    // Wood-plank deck, tiled across the dock width
-    if (!this._dockDeckTile) {
-      this._dockDeckTile = this.scene.add.tileSprite(dx1, wy, dockW, BEACH_SHORE_H, DOCK_PLANK_KEY)
-        .setOrigin(0, 0)
-        .setDepth(5.699);
-    } else {
-      this._dockDeckTile.setPosition(dx1, wy).setSize(dockW, BEACH_SHORE_H).setVisible(true);
-    }
-
-    // Posts/pilings — visible wood above the waterline, fading into shadow below
-    for (const img of this._dockPostImgs) img.destroy();
-    this._dockPostImgs = [];
-    const postXs: number[] = [];
-    for (let bx2 = dx1 + 14; bx2 < dx2 - 8; bx2 += 22) postXs.push(bx2);
-    postXs.push(dx2 - 4); // right-edge post
-    for (const px of postXs) {
-      this._dockPostImgs.push(
-        this.scene.add.image(px, deckEnd, DOCK_POST_KEY)
-          .setOrigin(DOCK_POST_ORIGIN_X, DOCK_POST_ORIGIN_Y)
-          .setDepth(5.699),
-      );
-    }
-
-    // Right-edge wall — slightly darker strip to give the dock a natural side face
-    gfx.fillStyle(0x7A5828, 1);
-    gfx.fillRect(dx2 - 4, wy, 4, deckEnd - wy);
-    // Inner shadow line against the right wall
-    gfx.fillStyle(0x000000, 0.15);
-    gfx.fillRect(dx2 - 5, wy, 1, deckEnd - wy);
-
-    // Mooring bollards along top edge
-    for (const img of this._dockBollardImgs) img.destroy();
-    this._dockBollardImgs = [];
-    for (const x of [dx1 + 14, dx1 + Math.floor(dockW / 2), dx2 - 18]) {
-      this._dockBollardImgs.push(
-        this.scene.add.image(x, wy, DOCK_BOLLARD_KEY)
-          .setOrigin(DOCK_BOLLARD_ORIGIN_X, DOCK_BOLLARD_ORIGIN_Y)
-          .setDepth(5.701),
-      );
-    }
-
-    // Front end cap
-    gfx.fillStyle(0x7A5828, 1);
-    gfx.fillRect(dx1, deckEnd - 3, dockW, 4);
-
-    // Glow light positions (rendered in drawFx with nightFactor)
-    this._dockGlows = [];
-    const inset = 21;
-    const pathY = deckEnd - inset; // U-bottom inset matches side inset
-    // Outer edge dots — left wall, right wall, front row
-    for (let gy = wy + 8; gy < deckEnd - 6; gy += 11) {
-      this._dockGlows.push({ x: dx1 + 2, y: gy });
-      this._dockGlows.push({ x: dx2 - 2, y: gy });
-    }
-    for (let gx = dx1 + 2; gx <= dx2 - 2; gx += 11) {
-      this._dockGlows.push({ x: gx, y: deckEnd - 6 });
-    }
-    // U-shaped path inset — left arm, right arm, front bar (slightly brighter)
-    for (let gy = wy + 8; gy <= pathY; gy += 11) {
-      this._dockGlows.push({ x: dx1 + inset, y: gy, bright: true });
-      this._dockGlows.push({ x: dx2 - inset, y: gy, bright: true });
-    }
-    for (let gx = dx1 + inset; gx <= dx2 - inset; gx += 11) {
-      this._dockGlows.push({ x: gx, y: pathY, bright: true });
-    }
-
-    // Dock slots for BoatManager (at the water-level edge of dock)
-    this._dockSlots = [
-      dx1 + Math.floor(dockW * 0.22),
-      dx1 + Math.floor(dockW * 0.52),
-      dx1 + Math.floor(dockW * 0.78),
-    ];
-  }
-
-  // ── Lifeguard hut (level 7+) ──────────────────────────────────────────────
-
-  private drawLifeguardHut(): void {
-    const { _waterY: wy, _beachEndX: bx } = this;
-    const hx = Math.floor(bx * 0.42);
-
-    if (!this._hutImg) {
-      this._hutImg = this.scene.add.image(hx, wy, HUT_KEY)
-        .setOrigin(HUT_ORIGIN_X, HUT_ORIGIN_Y)
-        .setDepth(5.7);
-    } else {
-      this._hutImg.setPosition(hx, wy).setVisible(true);
-    }
-  }
-
-  // ── Buoys ─────────────────────────────────────────────────────────────────
-
-  private setupBuoys(): void {
-    const { _width: w, _waterY: wy } = this;
-    // Two pairs, clear of the dock (36–60%) and the lighthouse island (~59–65%):
-    // one pair bobbing off the beach, one pair out past the lighthouse.
-    this._buoys = [
-      { x: Math.floor(w * 0.18), y: wy + 60, color: 0xFF3333, phase: 0 },
-      { x: Math.floor(w * 0.31), y: wy + 70, color: 0xFF7700, phase: Math.PI * 0.6 },
-      { x: Math.floor(w * 0.71), y: wy + 58, color: 0xFF7700, phase: Math.PI * 1.2 },
-      { x: Math.floor(w * 0.88), y: wy + 74, color: 0xFF3333, phase: Math.PI * 1.8 },
-    ];
-
-    for (const img of this._buoyImgs) img.destroy();
-    this._buoyImgs = this._buoys.map(b =>
-      this.scene.add.image(b.x, b.y, b.color === 0xFF3333 ? BUOY_RED_KEY : BUOY_ORANGE_KEY)
-        .setOrigin(BUOY_ORIGIN_X, BUOY_ORIGIN_Y)
-        .setDepth(5.85),
-    );
-  }
-
   // ── Light sources ─────────────────────────────────────────────────────────
 
-  private rebuildLights(): void {
-    for (const nl of this._nativeLights) this.scene.lights.removeLight(nl);
-    this._nativeLights = [];
-
-    const { _level: lv, _waterY: wy } = this;
-
-    // Dock uses ambient dot glows only (drawn in drawFx) — no directional spots
-    this._dockSpots = [];
-    this._dockBulbs = [];
-
-    // ── Café exterior light — downward spot (level 4+) ──
-    const cafeLampX = this._cafeX + 30;
-    const cafeLampY = wy + 8;
-    if (lv >= 4) {
-      this._cafeSpot = new SoftSpotLight({
-        x: cafeLampX, y: cafeLampY,
-        radius: 55, color: 0xFFDD88, intensity: 0,
-        angle: Math.PI / 2, coneAngle: Math.PI / 2.2,
-        noOcclusion: true,
-      });
-      this._cafeBulb = {
-        x: cafeLampX, y: cafeLampY, radius: 2, color: 0xFFFAE0, intensity: 0, noOcclusion: true,
-      };
-      this._nativeLights.push(this.scene.lights.addLight(cafeLampX, cafeLampY, 60, 0xFFDD88, 0));
-    } else {
-      this._cafeSpot = null;
-      this._cafeBulb = null;
-    }
-
-    // ── Pier end lamp — downward spot (level 6+) ──
-    const pierEndX = this._pierX;
-    const pierEndY = wy + BEACH_SHORE_H + 35;
-    if (lv >= 6) {
-      this._pierSpot = new SoftSpotLight({
-        x: pierEndX, y: pierEndY,
-        radius: 40, color: 0xFFDD88, intensity: 0,
-        angle: Math.PI / 2, coneAngle: Math.PI / 2.5,
-        noOcclusion: true,
-      });
-      this._pierBulb = {
-        x: pierEndX, y: pierEndY, radius: 2, color: 0xFFFAE0, intensity: 0, noOcclusion: true,
-      };
-      this._nativeLights.push(this.scene.lights.addLight(pierEndX, pierEndY, 45, 0xFFDD88, 0));
-    } else {
-      this._pierSpot = null;
-      this._pierBulb = null;
-    }
-
-    // ── Bonfire — four small overlapping point lights at varied positions/colors.
-    // Using multiple smaller lights instead of one big circle produces an organic,
-    // flickering warmth rather than a uniform disc.
-    if (lv >= 9) {
+  // Bonfire — four small overlapping point lights at varied positions/colors.
+  // Using multiple smaller lights instead of one big circle produces an organic,
+  // flickering warmth rather than a uniform disc. Pier/café/dock/buoy lights
+  // live in PierAndStructures (rebuilt by its own render()).
+  private rebuildBonfireLights(): void {
+    if (this._level >= 9) {
       const bx = this._bonfireX, by = this._bonfireY;
       this._bonFireLights = [
         { x: bx,     y: by - 12, radius: 38, color: 0xFF6600, intensity: 0, noOcclusion: true },
@@ -512,11 +263,6 @@ export class WaterArea {
     } else {
       this._bonFireLights = [];
     }
-
-    // ── Buoy lights — small warm points at the lantern, above the float (level 7+) ──
-    this._buoyBulbs = this._buoys.map(b => ({
-      x: b.x, y: b.y - 9, radius: 4, color: b.color, intensity: 0, noOcclusion: true,
-    } as Extract<LightSource, { type?: 'point' }>));
   }
 
   // ── Beach people AI ───────────────────────────────────────────────────────
@@ -838,29 +584,7 @@ export class WaterArea {
     const alpha = Math.min(0.22, elevation * 0.28);
     const leanX = Math.cos(sunAngle) / Math.max(0.15, elevation);
 
-    gfx.fillStyle(0x000000, alpha);
-
-    // Pier shadow
-    if (this._level >= 3) {
-      const px = this._pierX + leanX * 8;
-      gfx.fillEllipse(px, wy + BEACH_SHORE_H + 30, 14 + Math.abs(leanX) * 6, 10);
-    }
-
-    // Dock shadow
-    if (this._level >= 5) {
-      const dockCx  = (this._dockX1 + this._dockX2) / 2;
-      const dockW   = this._dockX2 - this._dockX1;
-      const sx = dockCx + leanX * 10;
-      const sy = wy + 30;
-      gfx.fillEllipse(sx, sy, dockW * 0.7, 14 + Math.abs(leanX) * 4);
-    }
-
-    // Café shadow (on beach/water)
-    if (this._level >= 4) {
-      const cafeCx = this._cafeX + 30;
-      gfx.fillEllipse(cafeCx + leanX * 6, wy + BEACH_SHORE_H - 2, 40, 8);
-    }
-
+    this._pierAndStructures.updateShadows(gfx, leanX, alpha, wy);
     this._lighthouse.drawShadow(gfx, leanX, alpha, elevation);
   }
 
@@ -874,14 +598,7 @@ export class WaterArea {
     this._waveRise    += dt * 7.5; // 7.5 px/s rise speed
     this._bonfireTime += dt * 0.55; // slowed for more organic feel
     this._lighthouse.update(delta, this._nightFactor);
-
-    // Buoy gentle bob
-    for (let i = 0; i < this._buoys.length; i++) {
-      this._buoys[i].phase += dt * 0.8;
-      if (this._buoyBulbs[i]) {
-        this._buoyBulbs[i].y = this._buoys[i].y - 9 + Math.sin(this._buoys[i].phase) * 1.5;
-      }
-    }
+    this._pierAndStructures.update(delta);
 
     // Bonfire light flicker — four lights with independent phases/frequencies
     if (this._nightFactor > 0.05 && this._bonFireLights.length > 0) {
@@ -1113,47 +830,7 @@ export class WaterArea {
       }
     }
 
-    // Buoys — pre-rendered conical channel-marker sprites, dimmed by elevation
-    // so they match day/night lighting.
-    const buoyBrightness = Math.max(0.35, Math.min(1.0, (1 - this._nightFactor * 0.7)));
-    for (let i = 0; i < this._buoys.length; i++) {
-      const b  = this._buoys[i];
-      const bx = b.x;
-      const by = Math.round(b.y + Math.sin(b.phase) * 1.5);
-
-      const img = this._buoyImgs[i];
-      if (img) img.setPosition(bx, by).setTint(dimColor(0xFFFFFF, buoyBrightness));
-
-      // Ripple shadow where the buoy sits in the water
-      gfx.fillStyle(0x0A2A40, 0.30);
-      gfx.fillEllipse(bx, by + 5, 11, 3);
-
-      // Soft circular night glow around the lantern
-      if (this._nightFactor > 0.1) {
-        const nf = this._nightFactor;
-        gfx.fillStyle(b.color, nf * 0.12);
-        gfx.fillCircle(bx, by - 9, 8);
-        gfx.fillStyle(b.color, nf * 0.25);
-        gfx.fillCircle(bx, by - 9, 4);
-        gfx.fillStyle(b.color, Math.min(1, nf * 0.7));
-        gfx.fillCircle(bx, by - 9, 1.5);
-      }
-    }
-
-    // Dock glow lights — night only, invisible during the day
-    const nfGlow = this._nightFactor;
-    if (this._level >= 5 && this._dockGlows.length > 0 && nfGlow > 0.02) {
-      for (const g of this._dockGlows) {
-        const baseA  = g.bright ? nfGlow * 0.75 : nfGlow * 0.60;
-        const radius = g.bright ? 2.0 : 1.5;
-        gfx.fillStyle(0xFFE090, baseA);
-        gfx.fillCircle(g.x, g.y, radius);
-        if (nfGlow > 0.2) {
-          gfx.fillStyle(0xFFCC60, (nfGlow - 0.2) * (g.bright ? 0.45 : 0.30));
-          gfx.fillCircle(g.x, g.y, g.bright ? 4 : 3);
-        }
-      }
-    }
+    this._pierAndStructures.drawFx(gfx, this._nightFactor);
 
     if (this._level >= 9) this.drawBonfire();
   }
@@ -1269,64 +946,31 @@ export class WaterArea {
     this._nightFactor = Math.max(0, Math.min(1, (0.2 - elevation) / 0.3));
     const nf = this._nightFactor;
 
-    // Pier / café / lifeguard hut — manual night tint (these images skip
-    // the Light2D pipeline, same as cyclist/furniture sprites).
+    // Pier / café / lifeguard hut / dock — manual night tint (these images
+    // skip the Light2D pipeline, same as cyclist/furniture sprites).
     const structTint = lerpColor(0xffffff, NIGHT_TINT, nf);
-    this._pierImg?.setTint(structTint);
-    this._cafeImg?.setTint(structTint);
-    this._hutImg?.setTint(structTint);
-    this._dockDeckTile?.setTint(structTint);
-    for (const img of this._dockPostImgs) img.setTint(structTint);
-    for (const img of this._dockBollardImgs) img.setTint(structTint);
-
-    // Dock spots
-    for (const s of this._dockSpots) s.setIntensity(nf * 3.0);
-    for (const b of this._dockBulbs) (b as { intensity: number }).intensity = nf * 220;
-
-    // Café spot
-    if (this._cafeSpot) this._cafeSpot.setIntensity(nf * 2.5);
-    if (this._cafeBulb) (this._cafeBulb as { intensity: number }).intensity = nf * 200;
-
-    // Pier spot
-    if (this._pierSpot) this._pierSpot.setIntensity(nf * 2.2);
-    if (this._pierBulb) (this._pierBulb as { intensity: number }).intensity = nf * 180;
+    this._pierAndStructures.updateLighting(nf, structTint);
+    this._lighthouse.updateLighting(nf, structTint);
 
     // Bonfire (flicker handled in update)
     if (nf < 0.05) {
       for (const b of this._bonFireLights) (b as { intensity: number }).intensity = 0;
     }
-
-    this._lighthouse.updateLighting(nf, structTint);
-
-    // Buoys — tiny glow
-    for (const b of this._buoyBulbs) (b as { intensity: number }).intensity = nf * 50;
-
-    // Native lights
-    for (const nl of this._nativeLights) nl.intensity = nf * 1.2;
   }
 
   // ── Destroy ───────────────────────────────────────────────────────────────
 
   destroy(): void {
-    for (const nl of this._nativeLights) this.scene.lights.removeLight(nl);
-    this._nativeLights = [];
     this.destroyFoamSprites();
     this.destroyBeachPeople();
     this.waterGfx.destroy();
     this.skyReflectGfx.destroy();
     this.shadowGfx.destroy();
-    this.structGfx.destroy();
     this.beachShadowGfx.destroy();
     this.beachPeopleGfx.destroy();
     this.fxGfx.destroy();
     this._lighthouse.destroy();
+    this._pierAndStructures.destroy();
     this.crittersGfx.destroy();
-    this._pierImg?.destroy();
-    this._cafeImg?.destroy();
-    this._hutImg?.destroy();
-    this._dockDeckTile?.destroy();
-    for (const img of this._dockPostImgs) img.destroy();
-    for (const img of this._dockBollardImgs) img.destroy();
-    for (const img of this._buoyImgs) img.destroy();
   }
 }
