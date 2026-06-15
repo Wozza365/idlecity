@@ -51,6 +51,7 @@ import { WeatherAccumulation } from '../objects/WeatherAccumulation';
 import { SeasonSystem } from '../game/SeasonSystem';
 import { Airplane } from '../objects/Airplane';
 import { TierCelebrationFx } from './TierCelebrationFx';
+import { PanelController } from './PanelController';
 import { Balloon } from '../objects/Balloon';
 import { BirdFlock } from '../objects/BirdFlock';
 import { PigeonManager } from '../objects/PigeonManager';
@@ -58,10 +59,6 @@ import { SkyToy } from '../objects/SkyToy';
 import { getTheme } from '../theme/themes';
 import type { ThemeDefinition } from '../theme/ThemeTypes';
 import { LoadingScreen } from '../ui/LoadingScreen';
-
-// ── Bottom-sheet panel tuning ───────────────────────────────────────────────
-const PANEL_SLIDE_MS = 280;
-const PANEL_AUTO_COLLAPSE_MS = 30_000;
 
 interface WindowLightable { updateWindowLights(elevation: number, time?: number, gameHour?: number): void; }
 const isWindowLightable = (o: unknown): o is WindowLightable =>
@@ -98,16 +95,8 @@ export class GameScene extends Phaser.Scene {
   private road!: Road;
   private vergeRiver!: VergeRiver;
 
-  // Panel background — destroyed and recreated on resize
-  private panelBg!: Phaser.GameObjects.Rectangle;
-  // Background for the expandable upgrade panel — slides with its content
-  private expandPanelBg!: Phaser.GameObjects.Rectangle;
-
-  // Expandable bottom-sheet panel state
-  private panelExpanded = false;
-  private panelOffset = UI_HEIGHT;
-  private panelTween: Phaser.Tweens.Tween | null = null;
-  private autoCollapseTimer: Phaser.Time.TimerEvent | null = null;
+  // Expandable bottom-sheet panel
+  private panelController!: PanelController;
 
   private clouds!: Clouds;
   private rain!: Rain;
@@ -225,6 +214,7 @@ export class GameScene extends Phaser.Scene {
     this.skyToy        = new SkyToy(this);
 
     this.panelChrome = new PanelChrome(this);
+    this.panelController = new PanelController(this, (expanded) => this.statsBar.setExpanded(expanded));
 
     // World-layer managers — each owns its own graphics/objects
     this.clouds     = new Clouds(this);
@@ -369,19 +359,6 @@ export class GameScene extends Phaser.Scene {
     this.skyToy?.rebuild(width, this.groundY);
     this.pigeonManager?.rebuild(this.groundY, this.plotWidth);
 
-    this.panelBg?.destroy();
-    this.panelBg = this.add
-      .rectangle(width / 2, (this.collapsedPanelTop + height) / 2, width, height - this.collapsedPanelTop, 0x1e2433)
-      .setDepth(1)
-      .setLighting(false);
-
-    // Background for the expandable panel — overlays the game area when slid up
-    this.expandPanelBg?.destroy();
-    this.expandPanelBg = this.add
-      .rectangle(width / 2, (this.panelTop + this.collapsedPanelTop) / 2, width, this.collapsedPanelTop - this.panelTop, 0x1e2433)
-      .setDepth(9.9)
-      .setLighting(false);
-
     this.road.render(this.state.road.level, width, this.groundY, this.activeTheme.palette.road);
     this.vergeRiver.render(this.state.verge.level, width, this.groundY, this.activeTheme.palette.verge, this.activeTheme.params);
     this.waterArea!.render(this.state.water.level, width, this.groundY, this.activeTheme.palette.water);
@@ -417,8 +394,8 @@ export class GameScene extends Phaser.Scene {
     this.panelChrome.draw(width, this.panelTop, this.collapsedPanelTop, this.colTop, this.sectionW);
 
     this.statsBar?.destroy();
-    this.statsBar = new StatsBar(this, this.collapsedPanelTop, width, () => this.togglePanel());
-    this.statsBar.setExpanded(this.panelExpanded);
+    this.statsBar = new StatsBar(this, this.collapsedPanelTop, width, () => this.panelController.toggle());
+    this.statsBar.setExpanded(this.panelController.expanded);
 
     if (this.townSign) {
       // Reuse the existing instance so an open rename dialog (and its
@@ -492,7 +469,7 @@ export class GameScene extends Phaser.Scene {
       this.menuUI = new MenuUI(this, width, height, () => this.state, (i) => this.onSkinSelect(i));
     }
 
-    this.applyPanelOffset(this.panelOffset);
+    this.panelController.rebuild(width, this.panelTop, this.collapsedPanelTop, this.panelChrome, this.roadUI, this.plotUIs);
 
     this.refreshButtons();
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
@@ -519,71 +496,6 @@ export class GameScene extends Phaser.Scene {
     this.loadingScreen?.resize(width, height);
 
     this.buildLayout();
-  }
-
-  // ── Expandable bottom-sheet panel ───────────────────────────────────────────
-
-  // Shifts the upgrade panel (RoadUI/PlotUI columns + their chrome/background)
-  // down by `offset` px from their fully-expanded position. offset=0 is fully
-  // expanded; offset=UI_HEIGHT pushes the whole panel below the screen, leaving
-  // only the fixed StatsBar visible.
-  private applyPanelOffset(offset: number): void {
-    this.panelChrome.slidingGfx.y = offset;
-    this.expandPanelBg.y = (this.panelTop + this.collapsedPanelTop) / 2 + offset;
-    this.roadUI.container.y = offset;
-    for (const ui of this.plotUIs) ui.container.y = offset;
-  }
-
-  private togglePanel(): void {
-    if (this.panelExpanded) this.collapsePanel();
-    else this.expandPanel();
-  }
-
-  private expandPanel(): void {
-    if (!this.panelExpanded) {
-      this.panelExpanded = true;
-      this.statsBar.setExpanded(true);
-      this.animatePanelTo(0);
-    }
-    this.resetAutoCollapseTimer();
-  }
-
-  private collapsePanel(): void {
-    if (!this.panelExpanded) return;
-    this.panelExpanded = false;
-    this.statsBar.setExpanded(false);
-    this.animatePanelTo(UI_HEIGHT);
-    this.clearAutoCollapseTimer();
-  }
-
-  // Resets the auto-collapse timer when the player interacts with an upgrade
-  // button while the panel is expanded, so it doesn't slide away mid-tap.
-  private touchPanel(): void {
-    if (this.panelExpanded) this.resetAutoCollapseTimer();
-  }
-
-  private animatePanelTo(target: number): void {
-    this.panelTween?.stop();
-    this.panelTween = this.tweens.addCounter({
-      from: this.panelOffset,
-      to: target,
-      duration: PANEL_SLIDE_MS,
-      ease: 'Cubic.Out',
-      onUpdate: () => {
-        this.panelOffset = this.panelTween?.getValue() ?? target;
-        this.applyPanelOffset(this.panelOffset);
-      },
-    });
-  }
-
-  private resetAutoCollapseTimer(): void {
-    this.clearAutoCollapseTimer();
-    this.autoCollapseTimer = this.time.delayedCall(PANEL_AUTO_COLLAPSE_MS, () => this.collapsePanel());
-  }
-
-  private clearAutoCollapseTimer(): void {
-    this.autoCollapseTimer?.remove();
-    this.autoCollapseTimer = null;
   }
 
   // ── UI callbacks ───────────────────────────────────────────────────────────
@@ -615,8 +527,8 @@ export class GameScene extends Phaser.Scene {
       false,
     );
     this.add.existing(this.plotUIs[index].container);
-    this.plotUIs[index].container.y = this.panelOffset;
-    this.touchPanel();
+    this.plotUIs[index].container.y = this.panelController.offset;
+    this.panelController.touch();
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
@@ -661,9 +573,9 @@ export class GameScene extends Phaser.Scene {
         i === nextUnlock,
       );
       this.add.existing(this.plotUIs[i].container);
-      this.plotUIs[i].container.y = this.panelOffset;
+      this.plotUIs[i].container.y = this.panelController.offset;
     }
-    this.touchPanel();
+    this.panelController.touch();
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
@@ -716,8 +628,9 @@ export class GameScene extends Phaser.Scene {
       () => this.onWaterUpgrade(),
     );
     this.add.existing(this.roadUI.container);
-    this.roadUI.container.y = this.panelOffset;
-    this.touchPanel();
+    this.panelController.setRoadUI(this.roadUI);
+    this.roadUI.container.y = this.panelController.offset;
+    this.panelController.touch();
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
@@ -748,8 +661,9 @@ export class GameScene extends Phaser.Scene {
       () => this.onWaterUpgrade(),
     );
     this.add.existing(this.roadUI.container);
-    this.roadUI.container.y = this.panelOffset;
-    this.touchPanel();
+    this.panelController.setRoadUI(this.roadUI);
+    this.roadUI.container.y = this.panelController.offset;
+    this.panelController.touch();
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
@@ -783,8 +697,9 @@ export class GameScene extends Phaser.Scene {
       () => this.onWaterUpgrade(),
     );
     this.add.existing(this.roadUI.container);
-    this.roadUI.container.y = this.panelOffset;
-    this.touchPanel();
+    this.panelController.setRoadUI(this.roadUI);
+    this.roadUI.container.y = this.panelController.offset;
+    this.panelController.touch();
     this.statsBar.update(this.state.gold, this.taxRate, this.state.population);
     this.refreshButtons();
   }
