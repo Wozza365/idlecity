@@ -5,6 +5,8 @@ import { type CarDef } from './CarAssets';
 
 export const CAR_W = 38;
 
+const CAR_DISPLAY_SCALE = 1.5;
+
 // ── Default light parameters ───────────────────────────────────────────────
 const HEAD_SPOT_DEFAULTS  = { radius: 90,  color: 0xfff2cc, intensity: 4.5, coneAngle: Math.PI / 5 };
 const HEAD_POINT_DEFAULTS = { radius: 3,   color: 0xfffae0, intensity: 400 };
@@ -82,9 +84,10 @@ export class Car {
     // Sprites face right by default; flip for leftward traffic
     this.sprite = scene.add.image(x, this.y, def.key)
       .setFlipX(direction === -1)
-      .setDepth(8);
+      .setDepth(8)
+      .setDisplaySize(Math.round(def.w * CAR_DISPLAY_SCALE), Math.round(def.h * CAR_DISPLAY_SCALE));
 
-    const hw = def.w / 2;
+    const hw = def.w * CAR_DISPLAY_SCALE / 2;
     // xOffset convention: positive = inward toward car centre
     // head: inward is against direction of travel → subtract direction * offset
     // tail: inward is toward direction of travel  → add    direction * offset
@@ -122,7 +125,7 @@ export class Car {
 
     this.sprite.setPosition(this.x, this.y);
 
-    const hw    = this.def.w / 2;
+    const hw    = this.def.w * CAR_DISPLAY_SCALE / 2;
     const headX = (this.direction === 1 ? this.x + hw : this.x - hw) - this.direction * this.headXOff;
     const tailX = (this.direction === 1 ? this.x - hw : this.x + hw) + this.direction * this.tailXOff;
 
@@ -152,7 +155,7 @@ export class Car {
   }
 
   getShadowInfo(): { x: number; y: number; w: number; h: number } {
-    return { x: this.x, y: this.y, w: this.def.w, h: this.def.h };
+    return { x: this.x, y: this.y, w: this.def.w * CAR_DISPLAY_SCALE, h: this.def.h * CAR_DISPLAY_SCALE };
   }
 
   setSpeed(speed: number): void {

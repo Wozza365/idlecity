@@ -634,7 +634,7 @@ export class VergeRiver {
       const sprite = this.scene.add.sprite(x, pathMidY, key)
         .setOrigin(0.5, CYCLIST_ORIGIN_Y)
         .setDepth(6.5)
-        .setDisplaySize(Math.round(CYCLIST_FRAME_WIDTH * 1.25), Math.round(CYCLIST_FRAME_HEIGHT * 1.25))
+        .setDisplaySize(Math.round(CYCLIST_FRAME_WIDTH * 1.5), Math.round(CYCLIST_FRAME_HEIGHT * 1.5))
         .setFlipX(dir === -1)
         .setTint(tint);
 
@@ -668,7 +668,7 @@ export class VergeRiver {
       if (c.x < -20)              c.x = this._width + 20;
 
       c.sprite.setPosition(c.x, pathMidY);
-      gfx.fillEllipse(c.x, pathMidY + 5, 18, 4);
+      gfx.fillEllipse(c.x, pathMidY + 5, 21, 5);
     }
   }
 
