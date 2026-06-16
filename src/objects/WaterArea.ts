@@ -22,7 +22,7 @@ const ROCK_SHORE_H  = 22;  // depth of rocky area
 
 // ── Beach people — reuse path-pedestrian character sprites ─────────────────────
 const BEACH_PERSON_WALK_FRAMERATE = 4;
-const BEACH_PERSON_H_MIN = 9;  // px — slightly smaller than path pedestrians (background); varies +0..4 via (i % 5)
+const BEACH_PERSON_H_MIN = 11;  // px — slightly smaller than path pedestrians (background); varies +0..4 via (i % 5)
 const BEACH_PERSON_SHADOW_ALPHA = 0.25;
 const BEACH_PERSON_DEPTH        = 5.665;
 const BEACH_PERSON_SHADOW_DEPTH = 5.663;

@@ -3,7 +3,7 @@ import { ROAD_H, VERGE_H, lerpColor, multiplyColor } from '../constants';
 import { SoftSpotLight } from '../lighting/SoftSpotLight';
 import type { LightSource } from '../lighting/LightingSystem';
 import type { VergePalette, ThemeParams } from '../theme/ThemeTypes';
-import { CYCLIST_KEYS, CYCLIST_ORIGIN_Y, CYCLIST_FRAME_COUNT, cyclistAnimKey } from './CyclistAssets';
+import { CYCLIST_KEYS, CYCLIST_ORIGIN_Y, CYCLIST_FRAME_COUNT, CYCLIST_FRAME_WIDTH, CYCLIST_FRAME_HEIGHT, cyclistAnimKey } from './CyclistAssets';
 import {
   BENCH_ORIGIN_X, BENCH_ORIGIN_Y,
   LAMP_ORIGIN_X, LAMP_ORIGIN_Y,
@@ -549,11 +549,12 @@ export class VergeRiver {
       // Per-tree shape jitter — stable across redraws, varies canopy size,
       // mirroring and a slight tilt/offset so trees aren't all clones.
       const rng     = treeRng(i * 7919 + 1);
-      const scaleJ  = 0.88 + rng() * 0.24;  // ±12%
+      const scaleJ  = 0.75 + rng() * 0.50;  // ±25% overall size
+      const aspectJ = 0.78 + rng() * 0.44;  // 0.78-1.22 width multiplier → squash/stretch
       const flip    = rng() < 0.5;
-      const angle   = (rng() - 0.5) * 14;   // ±7°
-      const offX    = (rng() - 0.5) * 4;    // ±2px
-      const offY    = (rng() - 0.5) * 2;    // ±1px
+      const angle   = (rng() - 0.5) * 32;   // ±16° (was ±7°)
+      const offX    = (rng() - 0.5) * 10;   // ±5px (was ±2px)
+      const offY    = (rng() - 0.5) * 6;    // ±3px (was ±1px)
 
       const trunk = this.scene.add.image(tx, trunkBaseY, trunkKey)
         .setOrigin(TRUNK_ORIGIN_X, TRUNK_ORIGIN_Y)
@@ -563,7 +564,7 @@ export class VergeRiver {
       const cnp = this.scene.add.image(tx + offX, canopyY + offY, canopyKey)
         .setOrigin(0.5, 0.5)
         .setDepth(8.5)
-        .setScale(canopyScale * scaleJ)
+        .setScale(canopyScale * scaleJ * aspectJ, canopyScale * scaleJ)
         .setAngle(angle)
         .setFlipX(flip)
         .setTint(canopyTint);
@@ -633,6 +634,7 @@ export class VergeRiver {
       const sprite = this.scene.add.sprite(x, pathMidY, key)
         .setOrigin(0.5, CYCLIST_ORIGIN_Y)
         .setDepth(6.5)
+        .setDisplaySize(Math.round(CYCLIST_FRAME_WIDTH * 1.25), Math.round(CYCLIST_FRAME_HEIGHT * 1.25))
         .setFlipX(dir === -1)
         .setTint(tint);
 
@@ -666,7 +668,7 @@ export class VergeRiver {
       if (c.x < -20)              c.x = this._width + 20;
 
       c.sprite.setPosition(c.x, pathMidY);
-      gfx.fillEllipse(c.x, pathMidY + 5, 14, 3);
+      gfx.fillEllipse(c.x, pathMidY + 5, 18, 4);
     }
   }
 
