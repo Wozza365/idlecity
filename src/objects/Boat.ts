@@ -19,7 +19,6 @@ const FLAG_PALETTES: ReadonlyArray<[number, number]> = [
 
 const NIGHT_TINT = 0x5a6680;
 const TEX_PAD    = 1;
-const BOAT_SCALE = 1.5;
 
 // Fraction of hull height submerged, ±VARY per boat.
 const SUBMERGE_RATIO      = 0.16;
@@ -111,11 +110,11 @@ export class Boat {
     this.dockDuration = dockDuration;
     this.baseSpeed    = def.speed * (0.975 + Math.random() * 0.05);
     this.bobPhase     = Math.random() * Math.PI * 2;
-    this.hullHalfH    = def.h * BOAT_SCALE / 2;
+    this.hullHalfH    = def.h / 2;
 
     const submergeRatio  = SUBMERGE_RATIO + (Math.random() * 2 - 1) * SUBMERGE_RATIO_VARY;
-    this.waterlineOffset = def.h * BOAT_SCALE * (0.5 - submergeRatio); // bobY + this = waterline world Y
-    this.wlHalfW         = (def.wlW ?? def.w) * BOAT_SCALE / 2;
+    this.waterlineOffset = def.h * (0.5 - submergeRatio); // bobY + this = waterline world Y
+    this.wlHalfW         = (def.wlW ?? def.w) / 2;
 
     const originY      = boatOriginY(def);
     const texH_padded  = def.texH + 2 * TEX_PAD;
@@ -127,11 +126,11 @@ export class Boat {
     const midPx        = waterlinePx + Math.floor(submergeH / 2);
 
     this.shadows = SHADOW_LAYERS.map(l =>
-      scene.add.image(x, y + l.dy * BOAT_SCALE, def.key)
+      scene.add.image(x, y + l.dy, def.key)
         .setOrigin(0.5, originY)
         .setDepth(5.854)
         .setTint(0x000000)
-        .setScale(l.scale * BOAT_SCALE)
+        .setScale(l.scale)
         .setAlpha(l.alpha),
     );
 
@@ -139,7 +138,6 @@ export class Boat {
     this.image = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.855 + (y + this.hullHalfH) * 0.000001)
-      .setScale(BOAT_SCALE)
       .setCrop(0, 0, texW_padded, waterlinePx);
 
     // Submerged hull — two strips for gradient alpha, rendered inside the water body.
@@ -147,7 +145,6 @@ export class Boat {
     this.subTop = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setScale(BOAT_SCALE)
       .setCrop(0, waterlinePx, texW_padded, Math.ceil(submergeH / 2))
       .setTint(WATER_TINT)
       .setAlpha(ALPHA_STRIP_TOP);
@@ -155,7 +152,6 @@ export class Boat {
     this.subBot = scene.add.image(x, y, def.key)
       .setOrigin(0.5, originY)
       .setDepth(5.52)
-      .setScale(BOAT_SCALE)
       .setCrop(0, midPx, texW_padded, texH_padded - midPx)
       .setTint(WATER_TINT)
       .setAlpha(ALPHA_STRIP_BOT);
@@ -176,15 +172,15 @@ export class Boat {
     }
 
     this.portLight = {
-      x, y: y - this.hullHalfH + 2,
+      x, y: y - def.h / 2 + 2,
       radius: 6, color: 0xff2222, intensity: 0, noOcclusion: true,
     };
     this.starboardLight = {
-      x, y: y + this.hullHalfH - 2,
+      x, y: y + def.h / 2 - 2,
       radius: 6, color: 0x22ff55, intensity: 0, noOcclusion: true,
     };
-    this.sternLight = def.w * BOAT_SCALE >= 36 ? {
-      x: x - def.w * BOAT_SCALE / 2, y,
+    this.sternLight = def.w >= 36 ? {
+      x: x - def.w / 2, y,
       radius: 9, color: 0xffffff, intensity: 0, noOcclusion: true,
     } : null;
   }
@@ -227,25 +223,25 @@ export class Boat {
     this.image.setDepth(5.855 + (bobY + this.hullHalfH) * 0.000001);
 
     for (let i = 0; i < this.shadows.length; i++) {
-      this.shadows[i].setPosition(this.x + SHADOW_LAYERS[i].dx, bobY + SHADOW_LAYERS[i].dy * BOAT_SCALE);
+      this.shadows[i].setPosition(this.x + SHADOW_LAYERS[i].dx, bobY + SHADOW_LAYERS[i].dy);
     }
 
     this.drawWaterline(bobY);
     if (this.flagGfx) this.drawFlag(bobY);
 
     this.portLight.x = this.x;
-    this.portLight.y = bobY - this.hullHalfH + 2;
+    this.portLight.y = bobY - this.def.h / 2 + 2;
     this.starboardLight.x = this.x;
-    this.starboardLight.y = bobY + this.hullHalfH - 2;
+    this.starboardLight.y = bobY + this.def.h / 2 - 2;
     if (this.sternLight) {
-      this.sternLight.x = this.x - this.def.w * BOAT_SCALE / 2;
+      this.sternLight.x = this.x - this.def.w / 2;
       this.sternLight.y = bobY;
     }
 
     this.smokeTimer += delta;
     if (this.smokeGfx) this.tickSmoke(bobY);
 
-    return this.x - this.def.w * BOAT_SCALE / 2 > this.sceneWidth + OFFSCREEN_MARGIN;
+    return this.x - this.def.w / 2 > this.sceneWidth + OFFSCREEN_MARGIN;
   }
 
   // Draws a thin wavy stroke at the waterline to suggest foam / surface contact.
@@ -255,7 +251,7 @@ export class Boat {
     const right      = this.x + this.wlHalfW - 2;
     const wlY        = bobY + this.waterlineOffset;
     const t          = this.bobPhase / 1.2;
-    const step       = Math.max(2, Math.ceil(this.def.w * BOAT_SCALE / 30));
+    const step       = Math.max(2, Math.ceil(this.def.w / 30));
 
     gfx.clear();
     gfx.lineStyle(1, 0xb8d8f0, 0.45);
