@@ -12,28 +12,45 @@ type Cloud = {
 
 const PAD = 50;
 
-// Three puff layouts for visual variety — [xOffFrac, yOffFrac, fullWidthFrac, fullHeightFrac]
+// Five distinct puff layouts — [xOffFrac, yOffFrac, fullWidthFrac, fullHeightFrac]
+// Each layout has a different silhouette: classic bell, wispy flat, double-peak,
+// compact round, and asymmetric lean.
 const LAYOUTS: ReadonlyArray<ReadonlyArray<[number, number, number, number]>> = [
+  // Classic 5-puff bell curve
   [
-    [-0.32,  0.05, 0.52, 0.56],
-    [-0.13, -0.09, 0.68, 0.76],
-    [ 0.03, -0.20, 0.80, 0.90],
-    [ 0.20, -0.08, 0.66, 0.74],
-    [ 0.37,  0.07, 0.50, 0.52],
+    [-0.34,  0.05, 0.50, 0.55],
+    [-0.15, -0.09, 0.66, 0.74],
+    [ 0.00, -0.22, 0.82, 0.92],
+    [ 0.17, -0.07, 0.64, 0.72],
+    [ 0.36,  0.07, 0.48, 0.52],
   ],
+  // Wide wispy 3-puff — low profile, stretched horizontally
   [
-    [-0.28,  0.08, 0.48, 0.52],
-    [-0.11, -0.06, 0.64, 0.70],
-    [ 0.05, -0.18, 0.78, 0.86],
-    [ 0.22, -0.05, 0.60, 0.68],
-    [ 0.38,  0.10, 0.46, 0.48],
+    [-0.38,  0.08, 0.52, 0.48],
+    [ 0.00, -0.05, 0.76, 0.62],
+    [ 0.40,  0.10, 0.50, 0.44],
   ],
+  // Double-peak 4-puff — two prominent towers
   [
-    [-0.30,  0.02, 0.50, 0.58],
-    [-0.14, -0.12, 0.70, 0.78],
-    [ 0.01, -0.22, 0.76, 0.88],
-    [ 0.17, -0.10, 0.62, 0.72],
-    [ 0.34,  0.05, 0.48, 0.54],
+    [-0.22, -0.18, 0.62, 0.72],
+    [-0.05,  0.10, 0.48, 0.54],
+    [ 0.13, -0.26, 0.70, 0.82],
+    [ 0.32,  0.06, 0.54, 0.58],
+  ],
+  // Compact round 4-puff — tight cluster, nearly circular silhouette
+  [
+    [-0.16, -0.14, 0.60, 0.70],
+    [ 0.13, -0.20, 0.66, 0.76],
+    [-0.10,  0.12, 0.54, 0.54],
+    [ 0.20,  0.08, 0.58, 0.60],
+  ],
+  // Asymmetric lean — 5-puff with off-centre peak toward the trailing edge
+  [
+    [-0.34,  0.14, 0.44, 0.46],
+    [-0.14,  0.00, 0.60, 0.62],
+    [ 0.04, -0.14, 0.72, 0.78],
+    [ 0.24, -0.22, 0.68, 0.80],
+    [ 0.41,  0.02, 0.50, 0.54],
   ],
 ];
 
@@ -128,7 +145,7 @@ export class Clouds {
         100 + Math.random() * 90,
         46  + Math.random() * 28,
         0.010 + Math.random() * 0.006,
-        i % 3,
+        i % LAYOUTS.length,
       );
     }
     for (let i = 0; i < 4; i++) {
@@ -138,7 +155,7 @@ export class Clouds {
         70  + Math.random() * 60,
         34  + Math.random() * 22,
         0.022 + Math.random() * 0.010,
-        (i + 1) % 3,
+        (i + 2) % LAYOUTS.length,
       );
     }
   }

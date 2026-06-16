@@ -4,8 +4,8 @@ import { type PlotState } from '../game/GameState';
 import { hasDoorEntrances } from '../buildings/types';
 import { type PersonDef, PERSON_DEFS, pickRandomPerson, walkAnimKey } from './PedestrianAssets';
 
-const PED_MIN_H             = 12;
-const PED_MAX_H             = 18;
+const PED_MIN_H             = 15;
+const PED_MAX_H             = 23;
 const PED_MIN_SPEED         = 13;
 const PED_MAX_SPEED         = 37;
 const PED_BASE_SPEED        = (PED_MIN_SPEED + PED_MAX_SPEED) / 2;
@@ -15,7 +15,7 @@ const DOOR_SPAWN_RATE_FRAC  = 0.20;
 const DOOR_SPAWN_POS_JITTER = 3;
 const DESPAWN_ARRIVAL_DIST  = 6;
 const DESPAWN_BASE_PER_SEC  = 0.025;
-const MAX_PEDS              = 60;
+const MAX_PEDS              = 40;
 
 // Depth-sorting: pedestrians lower on the pavement (larger bottomY) draw on top.
 const PED_DEPTH_BASE        = 9.10;
@@ -536,7 +536,7 @@ export class PedestrianManager {
     const totalLevel = plots.reduce((s, p) => s + (p.unlocked ? p.level : 0), 0);
     if (totalLevel === 0) return 8000;
     const factor   = this.dayNightFactor() * (1 - 0.80 * this.weatherIntensity);
-    const baseMs   = Math.max(300, 10000 / totalLevel) / 0.75;
+    const baseMs   = Math.max(300, 10000 / totalLevel) / 0.50;
     const adjusted = baseMs / Math.max(0.02, factor);
     return adjusted * (0.65 + Math.random() * 0.70);
   }
